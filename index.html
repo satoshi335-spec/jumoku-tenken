@@ -242,6 +242,9 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
         <tbody id="sumBody"></tbody>
       </table>
     </div>
+    <div style="text-align:right;margin-top:12px">
+      <button id="delAllBtn" class="miniBtn del">この路線の記録を全削除</button>
+    </div>
   </div>
   <div class="card" id="listCard" style="display:none">
     <div class="rowFlex">
@@ -257,6 +260,9 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     <div class="rowFlex" style="margin-top:10px">
       <button id="prevPage" class="miniBtn">← 前の100件</button>
       <button id="nextPage" class="miniBtn">次の100件 →</button>
+    </div>
+    <div style="text-align:right;margin-top:12px">
+      <button id="delListBtn" class="miniBtn del">取込リストを削除</button>
     </div>
   </div>
 </div>
@@ -481,6 +487,32 @@ function renderListTable(){
 }
 $("prevPage").onclick = ()=>{ listPage--; renderListTable(); };
 $("nextPage").onclick = ()=>{ listPage++; renderListTable(); };
+function confirm2(msg1, msg2){ return confirm(msg1) && confirm(msg2); }
+$("delAllBtn").onclick = ()=>{
+  const k = sumKey(); const [ko, kr] = k.split("|");
+  const rr = sumRecords();
+  if(!rr.length){ toast("この路線の記録はありません"); return; }
+  if(!confirm2(ko + "／" + kr + " の記録 " + rr.length + " 本をすべて削除しますか？",
+    "本当に " + rr.length + " 本すべて削除しますか？\nこの操作は取り消せません。CSV書き出し済みか確認してください")) return;
+  records = records.filter(r => (r.office+"|"+r.route) !== k);
+  store("gj_records", records);
+  if(editingId) endEdit();
+  renderCnt(); renderSummary(); renderProgress();
+  if(getMode() === "list") fillFromList();
+  toast(kr + " の記録 " + rr.length + " 本を削除しました");
+};
+$("delListBtn").onclick = ()=>{
+  const k = sumKey(); const [ko, kr] = k.split("|");
+  const st = imports[k];
+  if(!st || !st.items.length){ toast("取込リストがありません"); return; }
+  if(!confirm2(ko + "／" + kr + " の取込リスト（" + st.items.length + " 件）を削除しますか？\n点検記録は消えません",
+    "本当にリストを削除しますか？\n再度使うにはExcel／CSVの取込が必要です")) return;
+  delete imports[k]; store("gj_imports", imports);
+  listPage = 0;
+  renderSummary(); renderProgress();
+  if(k === routeKey() && getMode() === "list") fillFromList();
+  toast(kr + " の取込リストを削除しました");
+};
 
 $("importBtn").onclick = () => $("importFile").click();
 $("importFile").addEventListener("change", async e=>{
@@ -787,12 +819,13 @@ function renderSummary(){
     eb.onclick = () => startEdit(r.id);
     const db = document.createElement("button"); db.className = "miniBtn del"; db.textContent = "削除"; db.style.marginLeft = "6px";
     db.onclick = ()=>{
-      if(!confirm(r.no + " を削除しますか？")) return;
+      if(!confirm2(r.no + " を削除しますか？", r.no + " の点検記録が完全に消えます。\n本当に削除しますか？（取り消せません）")) return;
       records = records.filter(x => x.id !== r.id);
       store("gj_records", records);
       if(editingId === r.id) endEdit();
-      renderCnt(); renderSummary();
+      renderCnt(); renderSummary(); renderProgress();
       if(getMode() === "list") fillFromList();
+      toast(r.no + " を削除しました");
     };
     td.appendChild(eb); td.appendChild(db);
     tr.appendChild(td);
