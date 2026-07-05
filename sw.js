@@ -1,4 +1,4 @@
-const VERSION = "gj-v2";
+const VERSION = "gj-v4";
 const ASSETS = [
   "./",
   "./index.html",
