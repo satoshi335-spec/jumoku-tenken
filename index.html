@@ -21,13 +21,15 @@ header h1{font-size:17px;margin:0;font-weight:600}
 .tabs{display:flex}
 .tab{flex:1;text-align:center;padding:10px 0;font-size:15px;font-weight:600;color:#fff;opacity:.65;border-bottom:3px solid transparent}
 .tab.on{opacity:1;border-bottom-color:#fff}
-main{max-width:480px;margin:0 auto;padding:12px}
+main{width:100%;margin:0 auto;padding:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
 label.lbl{display:block;font-size:12px;color:var(--tx2);margin:12px 0 5px}
 label.lbl:first-child{margin-top:0}
 input,textarea,select{width:100%;font-size:16px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--tx);font-family:inherit}
 input:focus,textarea:focus{outline:2px solid var(--g);border-color:var(--g)}
 input[readonly]{background:#F1EFE8;color:var(--tx2)}
+#girth.empty{border-color:var(--ng-bd);background:var(--ng-bg)}
+#girthWarn{color:var(--ng-tx);font-weight:600}
 #tno{font-size:24px;font-weight:600;text-align:center;height:54px}
 .note{font-size:12px;color:var(--tx2);margin:5px 0 0}
 .note.manual{color:var(--acc)}
@@ -81,9 +83,10 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 #listPanel.show{display:block}
 #listProg{font-size:13px;color:var(--tx2);margin:8px 0 0}
 #listProg b{color:var(--g)}
-.toast{position:fixed;bottom:16px;left:12px;right:12px;max-width:456px;margin:0 auto;background:var(--g-dark);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
+.toast{position:fixed;bottom:16px;left:12px;right:12px;max-width:640px;margin:0 auto;background:var(--g-dark);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
 .toast.show{opacity:1}
 #view-sum{display:none}
+@media(min-width:700px){ .grid2{grid-template-columns:repeat(3,1fr)} main{padding:16px 24px} }
 </style>
 </head>
 <body>
@@ -136,7 +139,9 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
   </div>
 
   <div class="card">
-    <div class="grid3">
+    <label class="lbl">点検日時（自動・タップで変更可）</label>
+    <input id="dt" type="datetime-local">
+    <div class="grid3" style="margin-top:12px">
       <div>
         <label class="lbl">図面番号</label>
         <input id="zumen" data-key="zumen" placeholder="8">
@@ -158,6 +163,15 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
   <div class="card">
     <div id="editBanner"></div>
     <div id="insertBanner">リスト外の樹木を入力中。保存するとリストに戻ります</div>
+    <div id="progWrap" style="display:none;margin-bottom:12px">
+      <div class="rowFlex" style="margin-bottom:5px">
+        <span style="font-size:13px;font-weight:600">点検進捗</span>
+        <span id="progTxt" style="font-size:13px;color:var(--tx2)"></span>
+      </div>
+      <div style="height:8px;background:#EAE8E0;border-radius:4px;overflow:hidden">
+        <div id="progBar" style="height:100%;width:0%;background:var(--g);border-radius:4px;transition:width .3s"></div>
+      </div>
+    </div>
     <label class="lbl">樹木番号</label>
     <input id="tno" autocomplete="off" placeholder="例）R7-274">
     <p id="tnoNote" class="note">前回保存の続き番号を自動提案。欠番は打ち直せば以降その番号から連番</p>
@@ -165,7 +179,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     <input id="sp" data-key="sp" placeholder="例）イチョウ">
     <div id="sug-sp" class="sug"></div>
 
-    <label class="lbl">幹周り（cm）</label>
+    <label class="lbl">幹周り（cm）<span id="girthWarn"></span></label>
     <input id="girth" type="number" inputmode="decimal" placeholder="例）104">
     <div class="kabuRow">
       <input type="checkbox" id="kabuChk">
@@ -176,9 +190,6 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
       <div class="grid4" id="stems"></div>
       <p id="kabuNote"></p>
     </div>
-
-    <label class="lbl">点検日時（自動・タップで変更可）</label>
-    <input id="dt" type="datetime-local">
 
     <p class="sec">①維持管理上の問題 <small>タップで異常○</small></p>
     <div class="grid2" id="g1"></div>
@@ -220,6 +231,22 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
       </table>
     </div>
   </div>
+  <div class="card" id="listCard" style="display:none">
+    <div class="rowFlex">
+      <span style="font-size:14px;font-weight:600">取込リストの点検状況</span>
+      <span id="pageInfo" class="note" style="margin:0"></span>
+    </div>
+    <div class="tblWrap">
+      <table class="sum" style="min-width:360px">
+        <thead><tr><th>樹木番号</th><th>樹木名</th><th>状態</th><th></th></tr></thead>
+        <tbody id="listBody"></tbody>
+      </table>
+    </div>
+    <div class="rowFlex" style="margin-top:10px">
+      <button id="prevPage" class="miniBtn">← 前の100件</button>
+      <button id="nextPage" class="miniBtn">次の100件 →</button>
+    </div>
+  </div>
 </div>
 </main>
 <div id="toast" class="toast"></div>
@@ -253,6 +280,7 @@ let modes    = load("gj_modes", {});
 let imports  = load("gj_imports", {});
 let editingId = null;
 let insertMode = false;
+let listPage = 0;
 
 ITEMS.forEach((it,i)=>{
   const b = document.createElement("button");
@@ -308,6 +336,7 @@ function getMode(){ return modes[routeKey()] || "manual"; }
 
 function routeChanged(){
   last = {office:$("office").value, route:$("route").value}; store("gj_last", last);
+  listPage = 0;
   updateModeUI();
   if(!editingId && !insertMode){
     if(getMode() === "list"){ fillFromList(); }
@@ -353,7 +382,51 @@ function updateModeUI(){
   $("segManual").classList.toggle("on", m === "manual");
   $("segList").classList.toggle("on", m === "list");
   $("listPanel").classList.toggle("show", m === "list");
+  renderProgress();
 }
+function jumpTo(i){
+  const st = listState(); if(!st) return;
+  modes[routeKey()] = "list"; store("gj_modes", modes);
+  st.idx = i; store("gj_imports", imports);
+  if(editingId) endEdit();
+  insertMode = false; $("insertBanner").style.display = "none";
+  updateModeUI(); fillFromList(); setView("input");
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+function renderListTable(){
+  const st = listState();
+  if(!st || !st.items.length){ $("listCard").style.display = "none"; return; }
+  $("listCard").style.display = "block";
+  const done = savedNos();
+  const total = st.items.length;
+  const pages = Math.ceil(total / 100);
+  if(listPage >= pages) listPage = pages - 1;
+  if(listPage < 0) listPage = 0;
+  const from = listPage * 100, to = Math.min(from + 100, total);
+  $("pageInfo").textContent = (from+1) + "〜" + to + " / " + total + " 件（" + (listPage+1) + "/" + pages + " ページ）";
+  $("prevPage").disabled = listPage === 0;
+  $("nextPage").disabled = listPage >= pages - 1;
+  $("prevPage").style.opacity = listPage === 0 ? .4 : 1;
+  $("nextPage").style.opacity = listPage >= pages - 1 ? .4 : 1;
+  const tb = $("listBody"); tb.innerHTML = "";
+  st.items.slice(from, to).forEach((it, k)=>{
+    const i = from + k;
+    const isDone = done.has(it.no);
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td><b>" + esc(it.no) + "</b></td><td>" + esc(it.sp || "—") + "</td>" +
+      '<td><span class="rjudge" style="' + (isDone ? "background:var(--ok-bg);color:var(--ok-tx)" : "background:#F1EFE8;color:var(--tx2)") + '">' + (isDone ? "点検済" : "未") + "</span></td>";
+    const td = document.createElement("td");
+    if(!isDone){
+      const b = document.createElement("button"); b.className = "miniBtn pri"; b.textContent = "入力へ";
+      b.onclick = () => jumpTo(i);
+      td.appendChild(b);
+    }
+    tr.appendChild(td);
+    tb.appendChild(tr);
+  });
+}
+$("prevPage").onclick = ()=>{ listPage--; renderListTable(); };
+$("nextPage").onclick = ()=>{ listPage++; renderListTable(); };
 
 $("importBtn").onclick = () => $("importFile").click();
 $("importFile").addEventListener("change", async e=>{
@@ -433,7 +506,19 @@ function nextListIndex(from){
   }
   return -1;
 }
+function renderProgress(){
+  const st = listState();
+  const show = getMode() === "list" && st && st.items.length;
+  $("progWrap").style.display = show ? "block" : "none";
+  if(!show) return;
+  const done = savedNos();
+  const doneCount = st.items.filter(it => done.has(it.no)).length;
+  const pct = Math.round(doneCount / st.items.length * 100);
+  $("progTxt").textContent = doneCount + "/" + st.items.length + " 本　点検済み " + pct + "%";
+  $("progBar").style.width = pct + "%";
+}
 function fillFromList(){
+  renderProgress();
   const st = listState();
   if(!st){ $("listProg").innerHTML = "リスト未取込。Excel（樹木番号・樹木名・図面番号・市名・町名の列）または CSV を取り込めます"; return; }
   const done = savedNos();
@@ -487,6 +572,12 @@ function nextNo(no){
   return m[1] + String(parseInt(m[2],10)+1).padStart(m[2].length,"0");
 }
 
+function girthWarnUpd(){
+  const empty = !$("girth").value;
+  $("girth").classList.toggle("empty", empty);
+  $("girthWarn").textContent = empty ? "　⚠ 未入力" : "";
+}
+$("girth").addEventListener("input", girthWarnUpd);
 $("kabuChk").addEventListener("change", ()=>{
   const on = $("kabuChk").checked;
   $("kabuBox").classList.toggle("show", on);
@@ -508,6 +599,7 @@ function kabuCalc(){
   $("girth").value = g;
   $("kabuNote").textContent = kabuText(stems, g);
   $("memoAutoHint").textContent = "　※株立ちの計算式は自動で追記されます";
+  girthWarnUpd();
 }
 
 function calc(){
@@ -568,7 +660,7 @@ $("saveBtn").onclick = ()=>{
   else if(getMode() === "list" && !insertMode){ fillFromList(); }
   else if(insertMode){ insertMode = false; $("insertBanner").style.display = "none"; if(getMode() === "list") fillFromList(); }
   else { $("tno").value = nextNo(no); noteAuto(no); }
-  renderCnt(); renderSummary();
+  renderCnt(); renderSummary(); renderProgress();
   window.scrollTo({top:0, behavior:"smooth"});
 };
 function clearTreeFields(){
@@ -578,7 +670,7 @@ function clearTreeFields(){
   $("kabuNote").textContent = ""; $("memoAutoHint").textContent = "";
   document.querySelectorAll(".stem").forEach(i => i.value = "");
   document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
-  calc();
+  calc(); girthWarnUpd();
 }
 
 function startEdit(id){
@@ -601,7 +693,7 @@ function startEdit(id){
   $("editBanner").style.display = "block"; $("editBanner").textContent = r.no + " を編集中";
   $("saveBtn").textContent = "変更を保存"; $("cancelEdit").style.display = "block";
   $("tnoNote").textContent = "編集中は番号を変更すると上書き保存されます"; $("tnoNote").className = "note manual";
-  calc(); window.scrollTo({top:0, behavior:"smooth"});
+  calc(); girthWarnUpd(); window.scrollTo({top:0, behavior:"smooth"});
 }
 function endEdit(){
   editingId = null;
@@ -623,6 +715,7 @@ function renderSummary(){
   $("sumWarn").textContent = jd.filter(j => j.startsWith("維持")).length;
   $("sumNg").textContent = jd.filter(j => j.startsWith("樹木")).length;
   $("sumTitle").textContent = ($("route").value || "路線未設定") + " の一覧";
+  renderListTable();
   const tb = $("sumBody"); tb.innerHTML = "";
   rr.forEach((r,i)=>{
     const j = jd[i];
@@ -686,7 +779,7 @@ function toast(msg){
 $("inspector").value = settings.inspector || "";
 $("office").value = last.office || ""; $("route").value = last.route || "";
 $("dt").value = nowStr();
-routeChanged(); calc();
+routeChanged(); calc(); girthWarnUpd();
 if(!settings.inspector || !$("office").value || !$("route").value) $("setPanel").open = true;
 
 if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
