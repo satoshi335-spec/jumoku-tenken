@@ -11,27 +11,34 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
 :root{--g:#0F6E56;--g-dark:#085041;--bg:#F4F4F0;--card:#fff;--line:#D8D6CC;--tx:#1c1c1a;--tx2:#6b6a64;
---ok-bg:#EAF3DE;--ok-tx:#3B6D11;--warn-bg:#FAEEDA;--warn-tx:#854F0B;--ng-bg:#FCEBEB;--ng-tx:#A32D2D;--ng-bd:#E24B4A}
+--ok-bg:#EAF3DE;--ok-tx:#3B6D11;--warn-bg:#FAEEDA;--warn-tx:#854F0B;--ng-bg:#FCEBEB;--ng-tx:#A32D2D;--ng-bd:#E24B4A;--acc:#185FA5;--acc-bg:#E6F1FB}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;background:var(--bg);color:var(--tx);padding-bottom:40px}
-header{background:var(--g);color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+header{background:var(--g);color:#fff;padding:calc(env(safe-area-inset-top) + 10px) 16px 0;position:sticky;top:0;z-index:10}
+.hdTop{display:flex;justify-content:space-between;align-items:center;padding-bottom:8px}
 header h1{font-size:17px;margin:0;font-weight:600}
 #hdInfo{font-size:12px;opacity:.9;text-align:right;line-height:1.5}
+.tabs{display:flex}
+.tab{flex:1;text-align:center;padding:10px 0;font-size:15px;font-weight:600;color:#fff;opacity:.65;border-bottom:3px solid transparent}
+.tab.on{opacity:1;border-bottom-color:#fff}
 main{max-width:480px;margin:0 auto;padding:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
 label.lbl{display:block;font-size:12px;color:var(--tx2);margin:12px 0 5px}
 label.lbl:first-child{margin-top:0}
 input,textarea,select{width:100%;font-size:16px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--tx);font-family:inherit}
 input:focus,textarea:focus{outline:2px solid var(--g);border-color:var(--g)}
+input[readonly]{background:#F1EFE8;color:var(--tx2)}
 #tno{font-size:24px;font-weight:600;text-align:center;height:54px}
 .note{font-size:12px;color:var(--tx2);margin:5px 0 0}
-.note.manual{color:#185FA5}
+.note.manual{color:var(--acc)}
 .sug{display:none;gap:6px;flex-wrap:wrap;margin-top:6px}
 .sug.show{display:flex}
 .chip{font-size:14px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--tx);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sec{font-size:14px;font-weight:600;margin:16px 0 8px}
 .sec small{font-weight:400;color:var(--tx2)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .itm{font-size:14px;min-height:52px;padding:8px 6px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--tx);line-height:1.35;font-family:inherit}
 .itm.on{background:var(--ng-bg);color:var(--ng-tx);border-color:var(--ng-bd);font-weight:600}
 .badge{font-size:13px;padding:5px 12px;border-radius:8px;font-weight:600}
@@ -41,65 +48,135 @@ input:focus,textarea:focus{outline:2px solid var(--g);border-color:var(--g)}
 #saveBtn{background:var(--g);color:#fff}
 #saveBtn:active{background:var(--g-dark)}
 #cancelEdit{background:#fff;border:1px solid var(--line);color:var(--tx2);margin-top:8px;display:none;min-height:44px;font-size:15px}
-#editBanner{display:none;background:#E6F1FB;color:#185FA5;font-size:13px;font-weight:600;padding:8px 12px;border-radius:8px;margin-bottom:10px}
-.rowFlex{display:flex;justify-content:space-between;align-items:center}
-#recList{margin:8px 0 0;padding:0;list-style:none}
-#recList li{display:flex;align-items:center;gap:8px;padding:10px 4px;border-top:1px solid var(--line);font-size:14px}
-#recList .rno{font-weight:600;min-width:74px}
-#recList .rsp{color:var(--tx2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#recList .rjudge{font-size:11px;padding:3px 8px;border-radius:6px;white-space:nowrap}
-.miniBtn{font-size:13px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--tx);font-family:inherit}
+#editBanner,#insertBanner{display:none;background:var(--acc-bg);color:var(--acc);font-size:13px;font-weight:600;padding:8px 12px;border-radius:8px;margin-bottom:10px}
+.rowFlex{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.miniBtn{font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--tx);font-family:inherit;white-space:nowrap}
 .miniBtn.del{color:var(--ng-tx)}
-#csvBtn{background:#fff;border:1.5px solid var(--g);color:var(--g)}
+.miniBtn.pri{border-color:var(--g);color:var(--g);font-weight:600}
 details{margin-bottom:12px}
 summary{font-size:14px;font-weight:600;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:14px;list-style:none;cursor:pointer}
 summary::-webkit-details-marker{display:none}
 details[open] summary{border-radius:14px 14px 0 0;border-bottom:none}
 details .card{border-radius:0 0 14px 14px;margin-bottom:0}
-.toast{position:sticky;bottom:12px;left:0;right:0;max-width:480px;margin:0 auto;background:var(--g-dark);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
+.seg{display:flex;border:1px solid var(--g);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.segBtn{flex:1;padding:11px 0;font-size:14px;font-weight:600;background:#fff;color:var(--g);border:none;font-family:inherit}
+.segBtn.on{background:var(--g);color:#fff}
+.kabuRow{display:flex;align-items:center;gap:8px;margin-top:8px}
+.kabuRow label{font-size:14px;font-weight:600}
+.kabuRow input[type=checkbox]{width:22px;height:22px;accent-color:var(--g)}
+#kabuBox{display:none;margin-top:8px;padding:10px;background:#F8F8F4;border:1px solid var(--line);border-radius:10px}
+#kabuBox.show{display:block}
+#kabuBox input{font-size:15px;padding:8px 4px;text-align:center}
+#kabuNote{font-size:12px;color:var(--acc);margin:8px 0 0;font-weight:600;word-break:break-all}
+#sumChips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.sumChip{flex:1;min-width:90px;text-align:center;padding:10px 4px;border-radius:10px;font-size:12px}
+.sumChip b{display:block;font-size:20px}
+.tblWrap{overflow-x:auto;margin-top:4px}
+table.sum{border-collapse:collapse;width:100%;font-size:13px;min-width:520px}
+table.sum th{font-size:11px;color:var(--tx2);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.rjudge{font-size:11px;padding:3px 8px;border-radius:6px;white-space:nowrap;font-weight:600}
+#listPanel{display:none}
+#listPanel.show{display:block}
+#listProg{font-size:13px;color:var(--tx2);margin:8px 0 0}
+#listProg b{color:var(--g)}
+.toast{position:fixed;bottom:16px;left:12px;right:12px;max-width:456px;margin:0 auto;background:var(--g-dark);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
 .toast.show{opacity:1}
+#view-sum{display:none}
 </style>
 </head>
 <body>
 <header>
-  <h1>樹木点検 現場入力</h1>
-  <div id="hdInfo"></div>
+  <div class="hdTop">
+    <h1>樹木点検</h1>
+    <div id="hdInfo"></div>
+  </div>
+  <div class="tabs">
+    <div class="tab on" id="tab-input">入力</div>
+    <div class="tab" id="tab-sum">一覧・集計</div>
+  </div>
 </header>
+
 <main>
+<div id="view-input">
   <details id="setPanel">
-    <summary>基本設定（点検者・路線の共通情報）</summary>
+    <summary>基本設定（点検者・事務所・路線）</summary>
     <div class="card">
-      <label class="lbl">点検者（固定・全路線共通）</label>
+      <label class="lbl">点検者（固定）</label>
       <input id="inspector" placeholder="例）三宅 智（樹木医番号1105）">
-      <label class="lbl">図面番号（この路線の共通値・任意）</label>
-      <input id="zumen" placeholder="例）8">
-      <label class="lbl">市名（この路線の共通値・任意）</label>
-      <input id="city" placeholder="例）吹田市">
-      <label class="lbl">町名（この路線の共通値・任意）</label>
-      <input id="town" placeholder="例）江坂町4">
-      <p class="note">図面番号・市名・町名は事務所＋路線の組ごとに記憶されます</p>
+      <label class="lbl">点検事務所</label>
+      <input id="office" data-key="office" placeholder="例）茨木土木事務所">
+      <div id="sug-office" class="sug"></div>
+      <label class="lbl">路線名</label>
+      <input id="route" data-key="route" placeholder="例）423号">
+      <div id="sug-route" class="sug"></div>
+      <p class="note">一度入力すれば記憶されます。変えるときだけ開いてください</p>
     </div>
   </details>
 
+  <div class="seg">
+    <button type="button" class="segBtn on" id="segManual">手動入力</button>
+    <button type="button" class="segBtn" id="segList">Excelリスト</button>
+  </div>
+
+  <div class="card" id="listPanel">
+    <div class="rowFlex">
+      <span style="font-size:14px;font-weight:600">点検リスト</span>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="miniBtn pri" id="importBtn">リスト取込</button>
+        <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none">
+      </div>
+    </div>
+    <p id="listProg" class="note">リスト未取込。Excel（樹木番号・樹木名・図面番号・市名・町名の列）または CSV を取り込めます</p>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button type="button" class="miniBtn" id="skipBtn">この樹木をスキップ</button>
+      <button type="button" class="miniBtn" id="insertBtn">リスト外の樹木を挿入</button>
+    </div>
+  </div>
+
   <div class="card">
-    <label class="lbl">点検事務所</label>
-    <input id="office" data-key="office" placeholder="例）茨木土木事務所">
-    <div id="sug-office" class="sug"></div>
-    <label class="lbl">路線名</label>
-    <input id="route" data-key="route" placeholder="例）423号">
-    <div id="sug-route" class="sug"></div>
+    <div class="grid3">
+      <div>
+        <label class="lbl">図面番号</label>
+        <input id="zumen" data-key="zumen" placeholder="8">
+      </div>
+      <div>
+        <label class="lbl">市名</label>
+        <input id="city" data-key="city" placeholder="吹田市">
+      </div>
+      <div>
+        <label class="lbl">町名</label>
+        <input id="town" data-key="town" placeholder="江坂町4">
+      </div>
+    </div>
+    <div id="sug-zumen" class="sug"></div>
+    <div id="sug-city" class="sug"></div>
+    <div id="sug-town" class="sug"></div>
   </div>
 
   <div class="card">
     <div id="editBanner"></div>
+    <div id="insertBanner">リスト外の樹木を入力中。保存するとリストに戻ります</div>
     <label class="lbl">樹木番号</label>
     <input id="tno" autocomplete="off" placeholder="例）R7-274">
     <p id="tnoNote" class="note">前回保存の続き番号を自動提案。欠番は打ち直せば以降その番号から連番</p>
     <label class="lbl">樹木名</label>
     <input id="sp" data-key="sp" placeholder="例）イチョウ">
     <div id="sug-sp" class="sug"></div>
-    <label class="lbl">幹周り（cm・任意）</label>
+
+    <label class="lbl">幹周り（cm）</label>
     <input id="girth" type="number" inputmode="decimal" placeholder="例）104">
+    <div class="kabuRow">
+      <input type="checkbox" id="kabuChk">
+      <label for="kabuChk">株立ち（各幹の周長から自動計算）</label>
+    </div>
+    <div id="kabuBox">
+      <p class="note" style="margin:0 0 6px">各幹の周長（cm）を入力（最大8本）。合計×0.7 を幹周りに自動セット</p>
+      <div class="grid4" id="stems"></div>
+      <p id="kabuNote"></p>
+    </div>
+
     <label class="lbl">点検日時（自動・タップで変更可）</label>
     <input id="dt" type="datetime-local">
 
@@ -110,7 +187,7 @@ details .card{border-radius:0 0 14px 14px;margin-bottom:0}
     <p class="sec">③樹木の異常</p>
     <div class="grid2" id="g3"></div>
 
-    <label class="lbl" style="margin-top:16px">その他特記事項</label>
+    <label class="lbl" style="margin-top:16px">その他特記事項<span id="memoAutoHint" style="color:var(--acc)"></span></label>
     <textarea id="memo" data-key="memo" rows="2" placeholder="例）キノコ：根元に子実体2個"></textarea>
     <div id="sug-memo" class="sug"></div>
 
@@ -121,14 +198,29 @@ details .card{border-radius:0 0 14px 14px;margin-bottom:0}
     <button id="saveBtn" class="btn">保存して次の樹木へ</button>
     <button id="cancelEdit" class="btn">編集を取り消す</button>
   </div>
+  <p class="note" style="text-align:center">この路線の保存済み <b id="cnt">0</b> 本（一覧・集計タブで確認）</p>
+</div>
 
+<div id="view-sum">
+  <div id="sumChips">
+    <div class="sumChip" style="background:#fff;border:1px solid var(--line)"><b id="sumAll">0</b>合計</div>
+    <div class="sumChip" style="background:var(--ok-bg);color:var(--ok-tx)"><b id="sumOk">0</b>良好</div>
+    <div class="sumChip" style="background:var(--warn-bg);color:var(--warn-tx)"><b id="sumWarn">0</b>維持管理</div>
+    <div class="sumChip" style="background:var(--ng-bg);color:var(--ng-tx)"><b id="sumNg">0</b>外観診断</div>
+  </div>
   <div class="card">
     <div class="rowFlex">
-      <span style="font-size:14px">この路線の保存済み <b id="cnt">0</b> 本</span>
-      <button id="csvBtn" class="miniBtn" style="border-color:var(--g);color:var(--g);font-weight:600">CSV書き出し</button>
+      <span style="font-size:14px;font-weight:600" id="sumTitle">一覧</span>
+      <button id="csvBtn" class="miniBtn pri">CSV書き出し</button>
     </div>
-    <ul id="recList"></ul>
+    <div class="tblWrap">
+      <table class="sum">
+        <thead><tr><th>樹木番号</th><th>樹木名</th><th>幹周り</th><th>判定</th><th>写真</th><th>特記事項</th><th></th></tr></thead>
+        <tbody id="sumBody"></tbody>
+      </table>
+    </div>
   </div>
+</div>
 </main>
 <div id="toast" class="toast"></div>
 
@@ -152,12 +244,15 @@ const ITEMS = [
   {g:3,label:"不自然な傾斜",csv:"不自然な傾斜"}
 ];
 const load = (k,d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
-const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
-let recents  = load("gj_recents", {office:[],route:[],sp:[],memo:[]});
+const store = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+let recents  = Object.assign({office:[],route:[],sp:[],memo:[],zumen:[],city:[],town:[]}, load("gj_recents", {}));
 let records  = load("gj_records", []);
-let settings = load("gj_settings", {inspector:"", routeCommon:{}});
+let settings = load("gj_settings", {inspector:""});
 let last     = load("gj_last", {office:"",route:""});
+let modes    = load("gj_modes", {});
+let imports  = load("gj_imports", {});
 let editingId = null;
+let insertMode = false;
 
 ITEMS.forEach((it,i)=>{
   const b = document.createElement("button");
@@ -165,13 +260,19 @@ ITEMS.forEach((it,i)=>{
   b.onclick = () => { b.classList.toggle("on"); calc(); };
   $("g"+it.g).appendChild(b);
 });
+for(let i = 0; i < 8; i++){
+  const inp = document.createElement("input");
+  inp.type = "number"; inp.inputMode = "decimal"; inp.className = "stem"; inp.placeholder = (i+1)+"本目";
+  inp.addEventListener("input", kabuCalc);
+  $("stems").appendChild(inp);
+}
 
 function bump(key, v){
   if(!v) return;
   const a = recents[key]; const i = a.indexOf(v);
   if(i > -1) a.splice(i,1);
   a.unshift(v); if(a.length > 10) a.pop();
-  save("gj_recents", recents);
+  store("gj_recents", recents);
 }
 function renderSug(key){
   const box = $("sug-"+key); box.innerHTML = "";
@@ -188,41 +289,225 @@ function renderSug(key){
     box.appendChild(b);
   });
 }
-["office","route","sp","memo"].forEach(key=>{
+["office","route","sp","memo","zumen","city","town"].forEach(key=>{
   const inp = $(key);
   inp.addEventListener("focus", ()=>{ renderSug(key); if(recents[key].length) $("sug-"+key).classList.add("show"); });
   inp.addEventListener("blur", ()=>{ setTimeout(()=>$("sug-"+key).classList.remove("show"), 200); });
 });
 $("office").addEventListener("change", routeChanged);
 $("route").addEventListener("change", routeChanged);
+$("inspector").addEventListener("change", ()=>{
+  settings.inspector = $("inspector").value; store("gj_settings", settings); renderHeader();
+});
 
 const pad = n => String(n).padStart(2,"0");
 function nowStr(){ const d = new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes()); }
 function routeKey(){ return $("office").value.trim()+"|"+$("route").value.trim(); }
 function routeRecords(){ const k = routeKey(); return records.filter(r => (r.office+"|"+r.route) === k); }
+function getMode(){ return modes[routeKey()] || "manual"; }
 
 function routeChanged(){
-  const rc = settings.routeCommon[routeKey()] || {};
-  $("zumen").value = rc.zumen || ""; $("city").value = rc.city || ""; $("town").value = rc.town || "";
-  const rr = routeRecords();
-  if(!editingId){
-    if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
-    else { $("tno").value = ""; $("tnoNote").textContent = "この路線の最初の樹木番号を入力（例：R7-274）。以降は自動で連番"; $("tnoNote").className = "note"; }
+  last = {office:$("office").value, route:$("route").value}; store("gj_last", last);
+  updateModeUI();
+  if(!editingId && !insertMode){
+    if(getMode() === "list"){ fillFromList(); }
+    else {
+      const rr = routeRecords();
+      if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
+      else { $("tno").value = ""; $("tnoNote").textContent = "この路線の最初の樹木番号を入力（例：R7-274）。以降は自動で連番"; $("tnoNote").className = "note"; }
+    }
   }
-  renderList(); renderHeader();
-  last = {office:$("office").value, route:$("route").value}; save("gj_last", last);
+  renderCnt(); renderHeader(); renderSummary();
 }
+function renderHeader(){
+  const parts = [];
+  if($("route").value) parts.push(esc($("office").value)+"　"+esc($("route").value));
+  if(settings.inspector) parts.push(esc(settings.inspector.split("（")[0]));
+  $("hdInfo").innerHTML = parts.join("<br>");
+}
+function renderCnt(){ $("cnt").textContent = routeRecords().length; }
+
+$("tab-input").onclick = () => setView("input");
+$("tab-sum").onclick = () => setView("sum");
+function setView(v){
+  $("view-input").style.display = v === "input" ? "block" : "none";
+  $("view-sum").style.display = v === "sum" ? "block" : "none";
+  $("tab-input").classList.toggle("on", v === "input");
+  $("tab-sum").classList.toggle("on", v === "sum");
+  if(v === "sum") renderSummary();
+}
+
+$("segManual").onclick = () => setMode("manual");
+$("segList").onclick = () => setMode("list");
+function setMode(m){
+  modes[routeKey()] = m; store("gj_modes", modes);
+  updateModeUI();
+  if(m === "list" && !editingId){ fillFromList(); }
+  if(m === "manual" && !editingId && !insertMode){
+    const rr = routeRecords();
+    if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
+  }
+}
+function updateModeUI(){
+  const m = getMode();
+  $("segManual").classList.toggle("on", m === "manual");
+  $("segList").classList.toggle("on", m === "list");
+  $("listPanel").classList.toggle("show", m === "list");
+}
+
+$("importBtn").onclick = () => $("importFile").click();
+$("importFile").addEventListener("change", async e=>{
+  const f = e.target.files[0]; if(!f) return;
+  try {
+    const items = /\.csv$/i.test(f.name) ? parseCsvList(await f.text()) : await parseXlsxList(f);
+    if(!items.length){ toast("リストの行が見つかりませんでした"); return; }
+    applyImport(items);
+    toast(items.length + " 本のリストを取り込みました");
+  } catch(err){ toast("取込に失敗しました：" + err.message); }
+  e.target.value = "";
+});
+function applyImport(items){
+  imports[routeKey()] = {items, idx:0}; store("gj_imports", imports);
+  setMode("list");
+}
+function normHead(s){ return String(s ?? "").replace(/[\s　]/g,""); }
+function mapColumns(head){
+  const find = names => head.findIndex(h => names.some(n => normHead(h).includes(n)));
+  let c = { no: find(["樹木番号","桝番号","管理番号"]), sp: find(["樹木名","樹種"]),
+            zumen: find(["図面"]), city: find(["市名","市町村"]), town: find(["町名","地区"]) };
+  if(c.no < 0){ c = {no:0, sp:1, zumen:2, city:3, town:4}; return {cols:c, skipHeader:false}; }
+  return {cols:c, skipHeader:true};
+}
+function rowsToItems(rows){
+  if(!rows.length) return [];
+  const {cols, skipHeader} = mapColumns(rows[0]);
+  const out = [];
+  rows.slice(skipHeader ? 1 : 0).forEach(r=>{
+    const no = String(r[cols.no] ?? "").trim();
+    if(!no) return;
+    out.push({ no, sp: String(cols.sp > -1 ? r[cols.sp] ?? "" : "").trim(),
+      zumen: String(cols.zumen > -1 ? r[cols.zumen] ?? "" : "").trim(),
+      city: String(cols.city > -1 ? r[cols.city] ?? "" : "").trim(),
+      town: String(cols.town > -1 ? r[cols.town] ?? "" : "").trim() });
+  });
+  return out;
+}
+function parseCsvList(text){
+  const rows = [];
+  text.replace(/^﻿/,"").split(/\r?\n/).forEach(line=>{
+    if(!line.trim()) return;
+    const cells = []; let cur = "", q = false;
+    for(let i = 0; i < line.length; i++){
+      const ch = line[i];
+      if(q){ if(ch === '"'){ if(line[i+1] === '"'){ cur += '"'; i++; } else q = false; } else cur += ch; }
+      else if(ch === '"') q = true;
+      else if(ch === ","){ cells.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    cells.push(cur); rows.push(cells);
+  });
+  return rowsToItems(rows);
+}
+async function parseXlsxList(f){
+  if(!window.XLSX){
+    await new Promise((res, rej)=>{
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+      s.onload = res; s.onerror = () => rej(new Error("Excel読込ライブラリを取得できません（要ネット接続）"));
+      document.head.appendChild(s);
+    });
+  }
+  const wb = XLSX.read(await f.arrayBuffer(), {type:"array"});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:""});
+  return rowsToItems(rows);
+}
+
+function listState(){ return imports[routeKey()] || null; }
+function savedNos(){ return new Set(routeRecords().map(r => r.no)); }
+function nextListIndex(from){
+  const st = listState(); if(!st) return -1;
+  const done = savedNos();
+  for(let i = Math.max(0, from); i < st.items.length; i++){
+    if(!done.has(st.items[i].no)) return i;
+  }
+  return -1;
+}
+function fillFromList(){
+  const st = listState();
+  if(!st){ $("listProg").innerHTML = "リスト未取込。Excel（樹木番号・樹木名・図面番号・市名・町名の列）または CSV を取り込めます"; return; }
+  const done = savedNos();
+  const doneCount = st.items.filter(it => done.has(it.no)).length;
+  let i = nextListIndex(st.idx);
+  if(i < 0) i = nextListIndex(0);
+  if(i < 0){
+    $("listProg").innerHTML = "リスト <b>" + doneCount + "/" + st.items.length + "</b> 本済　— 全て完了しました";
+    return;
+  }
+  st.idx = i; store("gj_imports", imports);
+  const it = st.items[i];
+  $("tno").value = it.no; $("sp").value = it.sp;
+  if(it.zumen) $("zumen").value = it.zumen;
+  if(it.city) $("city").value = it.city;
+  if(it.town) $("town").value = it.town;
+  $("tnoNote").textContent = "リスト " + (i+1) + " 番目の樹木。内容は手で修正できます";
+  $("tnoNote").className = "note";
+  $("listProg").innerHTML = "リスト <b>" + doneCount + "/" + st.items.length + "</b> 本済　｜　現在: " + esc(it.no) + (it.sp ? "（" + esc(it.sp) + "）" : "");
+}
+$("skipBtn").onclick = ()=>{
+  const st = listState(); if(!st){ toast("リストが取り込まれていません"); return; }
+  let i = nextListIndex(st.idx);
+  if(i < 0) i = nextListIndex(0);
+  if(i < 0){ toast("スキップする樹木がありません"); return; }
+  st.idx = i + 1; store("gj_imports", imports);
+  fillFromList();
+};
+$("insertBtn").onclick = ()=>{
+  if(getMode() !== "list"){ toast("Excelリストモードで使うボタンです"); return; }
+  insertMode = true;
+  $("insertBanner").style.display = "block";
+  $("tno").value = ""; $("sp").value = "";
+  $("tnoNote").textContent = "リスト外の樹木番号を入力してください";
+  $("tnoNote").className = "note manual";
+  $("tno").focus();
+};
+
 function noteAuto(prevNo){
-  $("tnoNote").textContent = prevNo+" の次として自動提案。欠番は打ち直せば以降その番号から連番";
+  $("tnoNote").textContent = prevNo + " の次として自動提案。欠番は打ち直せば以降その番号から連番";
   $("tnoNote").className = "note";
 }
 $("tno").addEventListener("input", ()=>{
-  $("tnoNote").textContent = "手動入力中。保存後はこの番号＋1から連番を再開";
-  $("tnoNote").className = "note manual";
+  if(getMode() === "manual" && !editingId){
+    $("tnoNote").textContent = "手動入力中。保存後はこの番号＋1から連番を再開";
+    $("tnoNote").className = "note manual";
+  }
 });
 function nextNo(no){
   const m = String(no).match(/^(.*?)(\d+)\s*$/); if(!m) return "";
   return m[1] + String(parseInt(m[2],10)+1).padStart(m[2].length,"0");
+}
+
+$("kabuChk").addEventListener("change", ()=>{
+  const on = $("kabuChk").checked;
+  $("kabuBox").classList.toggle("show", on);
+  $("girth").readOnly = on;
+  if(!on){ $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; }
+  kabuCalc();
+});
+function stemVals(){
+  return [...document.querySelectorAll(".stem")].map(i => parseFloat(i.value)).filter(v => v > 0);
+}
+function kabuText(stems, g){
+  return "株立ち" + stems.length + "本立ち　幹周り＝(" + stems.join("＋") + ")×0.7＝" + g + "cm";
+}
+function kabuCalc(){
+  if(!$("kabuChk").checked) return;
+  const stems = stemVals();
+  if(!stems.length){ $("girth").value = ""; $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; return; }
+  const g = Math.round(stems.reduce((a,b) => a+b, 0) * 0.7 * 10) / 10;
+  $("girth").value = g;
+  $("kabuNote").textContent = kabuText(stems, g);
+  $("memoAutoHint").textContent = "　※株立ちの計算式は自動で追記されます";
 }
 
 function calc(){
@@ -235,22 +520,6 @@ function calc(){
   else { j.textContent = "概ね良好・異常なし"; j.style.background = "var(--ok-bg)"; j.style.color = "var(--ok-tx)"; }
   $("photoHint").textContent = (on1+on23 > 0) ? "📷 写真2枚（全体＋被害部）" : "📷 写真1枚（全体）";
 }
-
-["inspector","zumen","city","town"].forEach(id=>{
-  $(id).addEventListener("change", ()=>{
-    settings.inspector = $("inspector").value;
-    const k = routeKey();
-    settings.routeCommon[k] = {zumen:$("zumen").value, city:$("city").value, town:$("town").value};
-    save("gj_settings", settings); renderHeader();
-  });
-});
-function renderHeader(){
-  const parts = [];
-  if($("route").value) parts.push($("route").value);
-  if(settings.inspector) parts.push(settings.inspector.split("（")[0]);
-  $("hdInfo").innerHTML = parts.join("<br>");
-}
-
 function judgeOf(items){
   const on1 = items.slice(0,6).filter(v => v === "○").length;
   const on23 = items.slice(6).filter(v => v === "○").length;
@@ -259,45 +528,75 @@ function judgeOf(items){
   return "概ね良好・異常なし";
 }
 function photosOf(items){ return items.includes("○") ? 2 : 1; }
+function fullMemo(r){ return (r.kabuNote ? r.kabuNote + (r.memo ? "。" : "") : "") + (r.memo || ""); }
 
 $("saveBtn").onclick = ()=>{
   const no = $("tno").value.trim();
-  if(!$("office").value.trim() || !$("route").value.trim()){ toast("点検事務所と路線名を入力してください"); return; }
+  if(!$("office").value.trim() || !$("route").value.trim()){
+    $("setPanel").open = true; toast("基本設定の点検事務所と路線名を入力してください"); return;
+  }
   if(!no){ toast("樹木番号を入力してください"); return; }
   const dup = routeRecords().find(r => r.no === no && r.id !== editingId);
-  if(dup){ toast("樹木番号 "+no+" はこの路線で保存済みです"); return; }
+  if(dup){ toast("樹木番号 " + no + " はこの路線で保存済みです"); return; }
   const items = [...document.querySelectorAll(".itm")].map(b => b.classList.contains("on") ? "○" : "");
+  const kabuOn = $("kabuChk").checked;
+  const stems = kabuOn ? stemVals() : [];
   const rec = {
     id: editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,6)),
     office: $("office").value.trim(), route: $("route").value.trim(),
+    zumen: $("zumen").value.trim(), city: $("city").value.trim(), town: $("town").value.trim(),
     no, sp: $("sp").value.trim(), girth: $("girth").value.trim(),
+    kabu: stems, kabuNote: (kabuOn && stems.length) ? kabuText(stems, $("girth").value) : "",
     dt: $("dt").value, items, memo: $("memo").value.trim(),
-    created: editingId ? (records.find(r=>r.id===editingId)||{}).created || Date.now() : Date.now()
+    created: editingId ? (records.find(r => r.id === editingId) || {}).created || Date.now() : Date.now()
   };
-  if(editingId){
+  const wasEdit = !!editingId;
+  if(wasEdit){
     const i = records.findIndex(r => r.id === editingId);
     if(i > -1) records[i] = rec;
     endEdit();
     toast(no + " を更新しました");
   } else {
     records.push(rec);
-    $("tno").value = nextNo(no); noteAuto(no);
     toast(no + " を保存しました（計 " + routeRecords().length + " 本）");
   }
-  save("gj_records", records);
+  store("gj_records", records);
   bump("office", rec.office); bump("route", rec.route); bump("sp", rec.sp); bump("memo", rec.memo);
-  $("sp").value = ""; $("girth").value = ""; $("memo").value = ""; $("dt").value = nowStr();
-  document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
-  calc(); renderList();
+  bump("zumen", rec.zumen); bump("city", rec.city); bump("town", rec.town);
+  clearTreeFields();
+  if(wasEdit){ /* endEdit handled next number */ }
+  else if(getMode() === "list" && !insertMode){ fillFromList(); }
+  else if(insertMode){ insertMode = false; $("insertBanner").style.display = "none"; if(getMode() === "list") fillFromList(); }
+  else { $("tno").value = nextNo(no); noteAuto(no); }
+  renderCnt(); renderSummary();
   window.scrollTo({top:0, behavior:"smooth"});
 };
+function clearTreeFields(){
+  $("sp").value = ""; $("girth").value = ""; $("girth").readOnly = false;
+  $("memo").value = ""; $("dt").value = nowStr();
+  $("kabuChk").checked = false; $("kabuBox").classList.remove("show");
+  $("kabuNote").textContent = ""; $("memoAutoHint").textContent = "";
+  document.querySelectorAll(".stem").forEach(i => i.value = "");
+  document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
+  calc();
+}
 
 function startEdit(id){
   const r = records.find(x => x.id === id); if(!r) return;
-  editingId = id;
+  editingId = id; insertMode = false; $("insertBanner").style.display = "none";
+  setView("input");
   $("office").value = r.office; $("route").value = r.route;
-  $("tno").value = r.no; $("sp").value = r.sp; $("girth").value = r.girth || "";
+  $("zumen").value = r.zumen || ""; $("city").value = r.city || ""; $("town").value = r.town || "";
+  $("tno").value = r.no; $("sp").value = r.sp;
   $("dt").value = r.dt; $("memo").value = r.memo;
+  const stems = r.kabu || [];
+  $("kabuChk").checked = stems.length > 0;
+  $("kabuBox").classList.toggle("show", stems.length > 0);
+  $("girth").readOnly = stems.length > 0;
+  document.querySelectorAll(".stem").forEach((inp,i) => inp.value = stems[i] ?? "");
+  $("girth").value = r.girth || "";
+  if(stems.length){ $("kabuNote").textContent = r.kabuNote; $("memoAutoHint").textContent = "　※株立ちの計算式は自動で追記されます"; }
+  else { $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; }
   document.querySelectorAll(".itm").forEach((b,i) => b.classList.toggle("on", r.items[i] === "○"));
   $("editBanner").style.display = "block"; $("editBanner").textContent = r.no + " を編集中";
   $("saveBtn").textContent = "変更を保存"; $("cancelEdit").style.display = "block";
@@ -308,40 +607,47 @@ function endEdit(){
   editingId = null;
   $("editBanner").style.display = "none";
   $("saveBtn").textContent = "保存して次の樹木へ"; $("cancelEdit").style.display = "none";
-  const rr = routeRecords();
-  if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
+  if(getMode() === "list"){ fillFromList(); }
+  else {
+    const rr = routeRecords();
+    if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
+  }
 }
-$("cancelEdit").onclick = ()=>{
-  endEdit();
-  $("sp").value = ""; $("girth").value = ""; $("memo").value = ""; $("dt").value = nowStr();
-  document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
-  calc();
-};
+$("cancelEdit").onclick = ()=>{ endEdit(); clearTreeFields(); };
 
-function renderList(){
-  const rr = routeRecords().slice().sort((a,b) => b.created - a.created);
-  $("cnt").textContent = rr.length;
-  const ul = $("recList"); ul.innerHTML = "";
-  rr.forEach(r=>{
-    const li = document.createElement("li");
-    const j = judgeOf(r.items);
+function renderSummary(){
+  const rr = routeRecords().slice().sort((a,b) => a.created - b.created);
+  const jd = rr.map(r => judgeOf(r.items));
+  $("sumAll").textContent = rr.length;
+  $("sumOk").textContent = jd.filter(j => j.startsWith("概ね")).length;
+  $("sumWarn").textContent = jd.filter(j => j.startsWith("維持")).length;
+  $("sumNg").textContent = jd.filter(j => j.startsWith("樹木")).length;
+  $("sumTitle").textContent = ($("route").value || "路線未設定") + " の一覧";
+  const tb = $("sumBody"); tb.innerHTML = "";
+  rr.forEach((r,i)=>{
+    const j = jd[i];
     const cls = j.startsWith("概ね") ? "background:var(--ok-bg);color:var(--ok-tx)"
              : j.startsWith("維持") ? "background:var(--warn-bg);color:var(--warn-tx)"
              : "background:var(--ng-bg);color:var(--ng-tx)";
-    li.innerHTML = '<span class="rno">'+esc(r.no)+'</span><span class="rsp">'+esc(r.sp||"—")+'</span>'+
-      '<span class="rjudge" style="'+cls+'">'+(j.startsWith("概ね")?"良好":j.startsWith("維持")?"維持管理":"外観診断")+'</span>';
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td><b>" + esc(r.no) + "</b></td><td>" + esc(r.sp || "—") + "</td><td>" + esc(r.girth || "—") + "</td>" +
+      '<td><span class="rjudge" style="' + cls + '">' + (j.startsWith("概ね") ? "良好" : j.startsWith("維持") ? "維持管理" : "外観診断") + "</span></td>" +
+      "<td>" + photosOf(r.items) + "枚</td><td class=\"memoCell\">" + esc(fullMemo(r)) + "</td>";
+    const td = document.createElement("td");
     const eb = document.createElement("button"); eb.className = "miniBtn"; eb.textContent = "編集";
     eb.onclick = () => startEdit(r.id);
-    const db = document.createElement("button"); db.className = "miniBtn del"; db.textContent = "削除";
+    const db = document.createElement("button"); db.className = "miniBtn del"; db.textContent = "削除"; db.style.marginLeft = "6px";
     db.onclick = ()=>{
       if(!confirm(r.no + " を削除しますか？")) return;
       records = records.filter(x => x.id !== r.id);
-      save("gj_records", records);
+      store("gj_records", records);
       if(editingId === r.id) endEdit();
-      renderList();
+      renderCnt(); renderSummary();
+      if(getMode() === "list") fillFromList();
     };
-    li.appendChild(eb); li.appendChild(db);
-    ul.appendChild(li);
+    td.appendChild(eb); td.appendChild(db);
+    tr.appendChild(td);
+    tb.appendChild(tr);
   });
 }
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -350,11 +656,10 @@ function csvField(v){ v = String(v ?? ""); return /[",\n]/.test(v) ? '"' + v.rep
 $("csvBtn").onclick = ()=>{
   const rr = routeRecords().slice().sort((a,b) => a.created - b.created);
   if(!rr.length){ toast("この路線の保存データがありません"); return; }
-  const rc = settings.routeCommon[routeKey()] || {};
   const head = ["点検事務所","路線名","図面番号","樹木番号","樹木名","幹周り(cm)","市名","町名","点検日時","点検者",
     ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数"];
-  const rows = rr.map(r => [r.office, r.route, rc.zumen||"", r.no, r.sp, r.girth||"", rc.city||"", rc.town||"",
-    (r.dt||"").replace("T"," "), settings.inspector, ...r.items, r.memo, judgeOf(r.items), photosOf(r.items)]
+  const rows = rr.map(r => [r.office, r.route, r.zumen || "", r.no, r.sp, r.girth || "", r.city || "", r.town || "",
+    (r.dt || "").replace("T"," "), settings.inspector, ...r.items, fullMemo(r), judgeOf(r.items), photosOf(r.items)]
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();
@@ -362,7 +667,7 @@ $("csvBtn").onclick = ()=>{
   const blob = new Blob([csv], {type:"text/csv"});
   const file = new File([blob], fname, {type:"text/csv"});
   if(navigator.canShare && navigator.canShare({files:[file]})){
-    navigator.share({files:[file], title:fname}).catch(()=>dl(blob, fname));
+    navigator.share({files:[file], title:fname}).catch(() => dl(blob, fname));
   } else { dl(blob, fname); }
 };
 function dl(blob, fname){
@@ -375,14 +680,14 @@ function dl(blob, fname){
 let toastTimer;
 function toast(msg){
   const t = $("toast"); t.textContent = msg; t.classList.add("show");
-  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove("show"), 2500);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
 }
 
 $("inspector").value = settings.inspector || "";
 $("office").value = last.office || ""; $("route").value = last.route || "";
 $("dt").value = nowStr();
 routeChanged(); calc();
-if(!settings.inspector) $("setPanel").open = true;
+if(!settings.inspector || !$("office").value || !$("route").value) $("setPanel").open = true;
 
 if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
 </script>
