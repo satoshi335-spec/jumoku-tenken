@@ -1,0 +1,16 @@
+{
+  "name": "樹木点検 現場入力",
+  "short_name": "樹木点検",
+  "description": "街路樹診断の現場入力アプリ（大阪府街路樹診断マニュアル準拠）",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F4F0",
+  "theme_color": "#0F6E56",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0F6E56">
+<title>樹木点検 現場入力</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root{--g:#0F6E56;--g-dark:#085041;--bg:#F4F4F0;--card:#fff;--line:#D8D6CC;--tx:#1c1c1a;--tx2:#6b6a64;
+--ok-bg:#EAF3DE;--ok-tx:#3B6D11;--warn-bg:#FAEEDA;--warn-tx:#854F0B;--ng-bg:#FCEBEB;--ng-tx:#A32D2D;--ng-bd:#E24B4A}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;background:var(--bg);color:var(--tx);padding-bottom:40px}
+header{background:var(--g);color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+header h1{font-size:17px;margin:0;font-weight:600}
+#hdInfo{font-size:12px;opacity:.9;text-align:right;line-height:1.5}
+main{max-width:480px;margin:0 auto;padding:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label.lbl{display:block;font-size:12px;color:var(--tx2);margin:12px 0 5px}
+label.lbl:first-child{margin-top:0}
+input,textarea,select{width:100%;font-size:16px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--tx);font-family:inherit}
+input:focus,textarea:focus{outline:2px solid var(--g);border-color:var(--g)}
+#tno{font-size:24px;font-weight:600;text-align:center;height:54px}
+.note{font-size:12px;color:var(--tx2);margin:5px 0 0}
+.note.manual{color:#185FA5}
+.sug{display:none;gap:6px;flex-wrap:wrap;margin-top:6px}
+.sug.show{display:flex}
+.chip{font-size:14px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--tx);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sec{font-size:14px;font-weight:600;margin:16px 0 8px}
+.sec small{font-weight:400;color:var(--tx2)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.itm{font-size:14px;min-height:52px;padding:8px 6px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--tx);line-height:1.35;font-family:inherit}
+.itm.on{background:var(--ng-bg);color:var(--ng-tx);border-color:var(--ng-bd);font-weight:600}
+.badge{font-size:13px;padding:5px 12px;border-radius:8px;font-weight:600}
+#statusRow{display:flex;gap:10px;align-items:center;margin:14px 0;flex-wrap:wrap}
+#photoHint{font-size:13px;color:var(--tx2)}
+.btn{display:block;width:100%;min-height:52px;font-size:17px;font-weight:600;border:none;border-radius:12px;font-family:inherit}
+#saveBtn{background:var(--g);color:#fff}
+#saveBtn:active{background:var(--g-dark)}
+#cancelEdit{background:#fff;border:1px solid var(--line);color:var(--tx2);margin-top:8px;display:none;min-height:44px;font-size:15px}
+#editBanner{display:none;background:#E6F1FB;color:#185FA5;font-size:13px;font-weight:600;padding:8px 12px;border-radius:8px;margin-bottom:10px}
+.rowFlex{display:flex;justify-content:space-between;align-items:center}
+#recList{margin:8px 0 0;padding:0;list-style:none}
+#recList li{display:flex;align-items:center;gap:8px;padding:10px 4px;border-top:1px solid var(--line);font-size:14px}
+#recList .rno{font-weight:600;min-width:74px}
+#recList .rsp{color:var(--tx2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#recList .rjudge{font-size:11px;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.miniBtn{font-size:13px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--tx);font-family:inherit}
+.miniBtn.del{color:var(--ng-tx)}
+#csvBtn{background:#fff;border:1.5px solid var(--g);color:var(--g)}
+details{margin-bottom:12px}
+summary{font-size:14px;font-weight:600;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:14px;list-style:none;cursor:pointer}
+summary::-webkit-details-marker{display:none}
+details[open] summary{border-radius:14px 14px 0 0;border-bottom:none}
+details .card{border-radius:0 0 14px 14px;margin-bottom:0}
+.toast{position:sticky;bottom:12px;left:0;right:0;max-width:480px;margin:0 auto;background:var(--g-dark);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>樹木点検 現場入力</h1>
+  <div id="hdInfo"></div>
+</header>
+<main>
+  <details id="setPanel">
+    <summary>基本設定（点検者・路線の共通情報）</summary>
+    <div class="card">
+      <label class="lbl">点検者（固定・全路線共通）</label>
+      <input id="inspector" placeholder="例）三宅 智（樹木医番号1105）">
+      <label class="lbl">図面番号（この路線の共通値・任意）</label>
+      <input id="zumen" placeholder="例）8">
+      <label class="lbl">市名（この路線の共通値・任意）</label>
+      <input id="city" placeholder="例）吹田市">
+      <label class="lbl">町名（この路線の共通値・任意）</label>
+      <input id="town" placeholder="例）江坂町4">
+      <p class="note">図面番号・市名・町名は事務所＋路線の組ごとに記憶されます</p>
+    </div>
+  </details>
+
+  <div class="card">
+    <label class="lbl">点検事務所</label>
+    <input id="office" data-key="office" placeholder="例）茨木土木事務所">
+    <div id="sug-office" class="sug"></div>
+    <label class="lbl">路線名</label>
+    <input id="route" data-key="route" placeholder="例）423号">
+    <div id="sug-route" class="sug"></div>
+  </div>
+
+  <div class="card">
+    <div id="editBanner"></div>
+    <label class="lbl">樹木番号</label>
+    <input id="tno" autocomplete="off" placeholder="例）R7-274">
+    <p id="tnoNote" class="note">前回保存の続き番号を自動提案。欠番は打ち直せば以降その番号から連番</p>
+    <label class="lbl">樹木名</label>
+    <input id="sp" data-key="sp" placeholder="例）イチョウ">
+    <div id="sug-sp" class="sug"></div>
+    <label class="lbl">幹周り（cm・任意）</label>
+    <input id="girth" type="number" inputmode="decimal" placeholder="例）104">
+    <label class="lbl">点検日時（自動・タップで変更可）</label>
+    <input id="dt" type="datetime-local">
+
+    <p class="sec">①維持管理上の問題 <small>タップで異常○</small></p>
+    <div class="grid2" id="g1"></div>
+    <p class="sec">②活力点検</p>
+    <div class="grid2" id="g2"></div>
+    <p class="sec">③樹木の異常</p>
+    <div class="grid2" id="g3"></div>
+
+    <label class="lbl" style="margin-top:16px">その他特記事項</label>
+    <textarea id="memo" data-key="memo" rows="2" placeholder="例）キノコ：根元に子実体2個"></textarea>
+    <div id="sug-memo" class="sug"></div>
+
+    <div id="statusRow">
+      <span id="judge" class="badge"></span>
+      <span id="photoHint"></span>
+    </div>
+    <button id="saveBtn" class="btn">保存して次の樹木へ</button>
+    <button id="cancelEdit" class="btn">編集を取り消す</button>
+  </div>
+
+  <div class="card">
+    <div class="rowFlex">
+      <span style="font-size:14px">この路線の保存済み <b id="cnt">0</b> 本</span>
+      <button id="csvBtn" class="miniBtn" style="border-color:var(--g);color:var(--g);font-weight:600">CSV書き出し</button>
+    </div>
+    <ul id="recList"></ul>
+  </div>
+</main>
+<div id="toast" class="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const ITEMS = [
+  {g:1,label:"建築限界越え 車道側",csv:"建築限界越え車道側"},
+  {g:1,label:"建築限界越え 歩道側",csv:"建築限界越え歩道側"},
+  {g:1,label:"道路施設との競合",csv:"道路施設との競合"},
+  {g:1,label:"支柱直し・撤去",csv:"支柱直し・撤去"},
+  {g:1,label:"太枝枯れ・折れ",csv:"太枝枯れ・折れ"},
+  {g:1,label:"根上がり・舗装クラック",csv:"根上がり・舗装クラック"},
+  {g:2,label:"葉の状態",csv:"葉の状態"},
+  {g:2,label:"先端枝の枯れ",csv:"先端枝の枯れ"},
+  {g:2,label:"枯死・著しい衰弱",csv:"枯死・著しい衰弱"},
+  {g:3,label:"キノコの有無",csv:"キノコの有無"},
+  {g:3,label:"開口空洞",csv:"開口空洞"},
+  {g:3,label:"樹皮枯死・欠損・腐朽",csv:"樹皮枯死・欠損・腐朽"},
+  {g:3,label:"病虫害（穿孔痕、フラス）",csv:"病虫害（穿孔痕、フラス）"},
+  {g:3,label:"揺れ",csv:"揺れ"},
+  {g:3,label:"不自然な傾斜",csv:"不自然な傾斜"}
+];
+const load = (k,d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
+const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+let recents  = load("gj_recents", {office:[],route:[],sp:[],memo:[]});
+let records  = load("gj_records", []);
+let settings = load("gj_settings", {inspector:"", routeCommon:{}});
+let last     = load("gj_last", {office:"",route:""});
+let editingId = null;
+
+ITEMS.forEach((it,i)=>{
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "itm"; b.dataset.i = i; b.textContent = it.label;
+  b.onclick = () => { b.classList.toggle("on"); calc(); };
+  $("g"+it.g).appendChild(b);
+});
+
+function bump(key, v){
+  if(!v) return;
+  const a = recents[key]; const i = a.indexOf(v);
+  if(i > -1) a.splice(i,1);
+  a.unshift(v); if(a.length > 10) a.pop();
+  save("gj_recents", recents);
+}
+function renderSug(key){
+  const box = $("sug-"+key); box.innerHTML = "";
+  const cur = $(key).value;
+  recents[key].filter(v => v !== cur).slice(0,4).forEach(v=>{
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip";
+    b.textContent = v.length > 20 ? v.slice(0,20)+"…" : v;
+    b.addEventListener("pointerdown", e=>{
+      e.preventDefault();
+      $(key).value = v; bump(key,v); box.classList.remove("show");
+      if(key === "office" || key === "route") routeChanged();
+    });
+    box.appendChild(b);
+  });
+}
+["office","route","sp","memo"].forEach(key=>{
+  const inp = $(key);
+  inp.addEventListener("focus", ()=>{ renderSug(key); if(recents[key].length) $("sug-"+key).classList.add("show"); });
+  inp.addEventListener("blur", ()=>{ setTimeout(()=>$("sug-"+key).classList.remove("show"), 200); });
+});
+$("office").addEventListener("change", routeChanged);
+$("route").addEventListener("change", routeChanged);
+
+const pad = n => String(n).padStart(2,"0");
+function nowStr(){ const d = new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes()); }
+function routeKey(){ return $("office").value.trim()+"|"+$("route").value.trim(); }
+function routeRecords(){ const k = routeKey(); return records.filter(r => (r.office+"|"+r.route) === k); }
+
+function routeChanged(){
+  const rc = settings.routeCommon[routeKey()] || {};
+  $("zumen").value = rc.zumen || ""; $("city").value = rc.city || ""; $("town").value = rc.town || "";
+  const rr = routeRecords();
+  if(!editingId){
+    if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
+    else { $("tno").value = ""; $("tnoNote").textContent = "この路線の最初の樹木番号を入力（例：R7-274）。以降は自動で連番"; $("tnoNote").className = "note"; }
+  }
+  renderList(); renderHeader();
+  last = {office:$("office").value, route:$("route").value}; save("gj_last", last);
+}
+function noteAuto(prevNo){
+  $("tnoNote").textContent = prevNo+" の次として自動提案。欠番は打ち直せば以降その番号から連番";
+  $("tnoNote").className = "note";
+}
+$("tno").addEventListener("input", ()=>{
+  $("tnoNote").textContent = "手動入力中。保存後はこの番号＋1から連番を再開";
+  $("tnoNote").className = "note manual";
+});
+function nextNo(no){
+  const m = String(no).match(/^(.*?)(\d+)\s*$/); if(!m) return "";
+  return m[1] + String(parseInt(m[2],10)+1).padStart(m[2].length,"0");
+}
+
+function calc(){
+  const btns = [...document.querySelectorAll(".itm")];
+  const on1  = btns.filter(b => ITEMS[b.dataset.i].g === 1 && b.classList.contains("on")).length;
+  const on23 = btns.filter(b => ITEMS[b.dataset.i].g !== 1 && b.classList.contains("on")).length;
+  const j = $("judge");
+  if(on23 > 0){ j.textContent = "樹木の外観診断が必要"; j.style.background = "var(--ng-bg)"; j.style.color = "var(--ng-tx)"; }
+  else if(on1 > 0){ j.textContent = "維持管理の処置が必要"; j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
+  else { j.textContent = "概ね良好・異常なし"; j.style.background = "var(--ok-bg)"; j.style.color = "var(--ok-tx)"; }
+  $("photoHint").textContent = (on1+on23 > 0) ? "📷 写真2枚（全体＋被害部）" : "📷 写真1枚（全体）";
+}
+
+["inspector","zumen","city","town"].forEach(id=>{
+  $(id).addEventListener("change", ()=>{
+    settings.inspector = $("inspector").value;
+    const k = routeKey();
+    settings.routeCommon[k] = {zumen:$("zumen").value, city:$("city").value, town:$("town").value};
+    save("gj_settings", settings); renderHeader();
+  });
+});
+function renderHeader(){
+  const parts = [];
+  if($("route").value) parts.push($("route").value);
+  if(settings.inspector) parts.push(settings.inspector.split("（")[0]);
+  $("hdInfo").innerHTML = parts.join("<br>");
+}
+
+function judgeOf(items){
+  const on1 = items.slice(0,6).filter(v => v === "○").length;
+  const on23 = items.slice(6).filter(v => v === "○").length;
+  if(on23 > 0) return "樹木の外観診断が必要";
+  if(on1 > 0) return "維持管理の処置が必要";
+  return "概ね良好・異常なし";
+}
+function photosOf(items){ return items.includes("○") ? 2 : 1; }
+
+$("saveBtn").onclick = ()=>{
+  const no = $("tno").value.trim();
+  if(!$("office").value.trim() || !$("route").value.trim()){ toast("点検事務所と路線名を入力してください"); return; }
+  if(!no){ toast("樹木番号を入力してください"); return; }
+  const dup = routeRecords().find(r => r.no === no && r.id !== editingId);
+  if(dup){ toast("樹木番号 "+no+" はこの路線で保存済みです"); return; }
+  const items = [...document.querySelectorAll(".itm")].map(b => b.classList.contains("on") ? "○" : "");
+  const rec = {
+    id: editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,6)),
+    office: $("office").value.trim(), route: $("route").value.trim(),
+    no, sp: $("sp").value.trim(), girth: $("girth").value.trim(),
+    dt: $("dt").value, items, memo: $("memo").value.trim(),
+    created: editingId ? (records.find(r=>r.id===editingId)||{}).created || Date.now() : Date.now()
+  };
+  if(editingId){
+    const i = records.findIndex(r => r.id === editingId);
+    if(i > -1) records[i] = rec;
+    endEdit();
+    toast(no + " を更新しました");
+  } else {
+    records.push(rec);
+    $("tno").value = nextNo(no); noteAuto(no);
+    toast(no + " を保存しました（計 " + routeRecords().length + " 本）");
+  }
+  save("gj_records", records);
+  bump("office", rec.office); bump("route", rec.route); bump("sp", rec.sp); bump("memo", rec.memo);
+  $("sp").value = ""; $("girth").value = ""; $("memo").value = ""; $("dt").value = nowStr();
+  document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
+  calc(); renderList();
+  window.scrollTo({top:0, behavior:"smooth"});
+};
+
+function startEdit(id){
+  const r = records.find(x => x.id === id); if(!r) return;
+  editingId = id;
+  $("office").value = r.office; $("route").value = r.route;
+  $("tno").value = r.no; $("sp").value = r.sp; $("girth").value = r.girth || "";
+  $("dt").value = r.dt; $("memo").value = r.memo;
+  document.querySelectorAll(".itm").forEach((b,i) => b.classList.toggle("on", r.items[i] === "○"));
+  $("editBanner").style.display = "block"; $("editBanner").textContent = r.no + " を編集中";
+  $("saveBtn").textContent = "変更を保存"; $("cancelEdit").style.display = "block";
+  $("tnoNote").textContent = "編集中は番号を変更すると上書き保存されます"; $("tnoNote").className = "note manual";
+  calc(); window.scrollTo({top:0, behavior:"smooth"});
+}
+function endEdit(){
+  editingId = null;
+  $("editBanner").style.display = "none";
+  $("saveBtn").textContent = "保存して次の樹木へ"; $("cancelEdit").style.display = "none";
+  const rr = routeRecords();
+  if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
+}
+$("cancelEdit").onclick = ()=>{
+  endEdit();
+  $("sp").value = ""; $("girth").value = ""; $("memo").value = ""; $("dt").value = nowStr();
+  document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
+  calc();
+};
+
+function renderList(){
+  const rr = routeRecords().slice().sort((a,b) => b.created - a.created);
+  $("cnt").textContent = rr.length;
+  const ul = $("recList"); ul.innerHTML = "";
+  rr.forEach(r=>{
+    const li = document.createElement("li");
+    const j = judgeOf(r.items);
+    const cls = j.startsWith("概ね") ? "background:var(--ok-bg);color:var(--ok-tx)"
+             : j.startsWith("維持") ? "background:var(--warn-bg);color:var(--warn-tx)"
+             : "background:var(--ng-bg);color:var(--ng-tx)";
+    li.innerHTML = '<span class="rno">'+esc(r.no)+'</span><span class="rsp">'+esc(r.sp||"—")+'</span>'+
+      '<span class="rjudge" style="'+cls+'">'+(j.startsWith("概ね")?"良好":j.startsWith("維持")?"維持管理":"外観診断")+'</span>';
+    const eb = document.createElement("button"); eb.className = "miniBtn"; eb.textContent = "編集";
+    eb.onclick = () => startEdit(r.id);
+    const db = document.createElement("button"); db.className = "miniBtn del"; db.textContent = "削除";
+    db.onclick = ()=>{
+      if(!confirm(r.no + " を削除しますか？")) return;
+      records = records.filter(x => x.id !== r.id);
+      save("gj_records", records);
+      if(editingId === r.id) endEdit();
+      renderList();
+    };
+    li.appendChild(eb); li.appendChild(db);
+    ul.appendChild(li);
+  });
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function csvField(v){ v = String(v ?? ""); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
+$("csvBtn").onclick = ()=>{
+  const rr = routeRecords().slice().sort((a,b) => a.created - b.created);
+  if(!rr.length){ toast("この路線の保存データがありません"); return; }
+  const rc = settings.routeCommon[routeKey()] || {};
+  const head = ["点検事務所","路線名","図面番号","樹木番号","樹木名","幹周り(cm)","市名","町名","点検日時","点検者",
+    ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数"];
+  const rows = rr.map(r => [r.office, r.route, rc.zumen||"", r.no, r.sp, r.girth||"", rc.city||"", rc.town||"",
+    (r.dt||"").replace("T"," "), settings.inspector, ...r.items, r.memo, judgeOf(r.items), photosOf(r.items)]
+    .map(csvField).join(","));
+  const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
+  const d = new Date();
+  const fname = ($("office").value + "_" + $("route").value + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".csv").replace(/[\\/:*?"<>|]/g,"");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const file = new File([blob], fname, {type:"text/csv"});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    navigator.share({files:[file], title:fname}).catch(()=>dl(blob, fname));
+  } else { dl(blob, fname); }
+};
+function dl(blob, fname){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = fname;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+
+let toastTimer;
+function toast(msg){
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove("show"), 2500);
+}
+
+$("inspector").value = settings.inspector || "";
+$("office").value = last.office || ""; $("route").value = last.route || "";
+$("dt").value = nowStr();
+routeChanged(); calc();
+if(!settings.inspector) $("setPanel").open = true;
+
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
+</script>
+</body>
+</html>
