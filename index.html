@@ -213,6 +213,18 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 </div>
 
 <div id="view-sum">
+  <div class="card" style="padding:10px 14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div>
+        <label class="lbl">点検事務所</label>
+        <select id="sumOffice"></select>
+      </div>
+      <div>
+        <label class="lbl">路線名</label>
+        <select id="sumRoute"></select>
+      </div>
+    </div>
+  </div>
   <div id="sumChips">
     <div class="sumChip" style="background:#fff;border:1px solid var(--line)"><b id="sumAll">0</b>合計</div>
     <div class="sumChip" style="background:var(--ok-bg);color:var(--ok-tx)"><b id="sumOk">0</b>良好</div>
@@ -281,6 +293,7 @@ let imports  = load("gj_imports", {});
 let editingId = null;
 let insertMode = false;
 let listPage = 0;
+let sumSel = null;
 
 ITEMS.forEach((it,i)=>{
   const b = document.createElement("button");
@@ -333,6 +346,41 @@ function nowStr(){ const d = new Date(); return d.getFullYear()+"-"+pad(d.getMon
 function routeKey(){ return $("office").value.trim()+"|"+$("route").value.trim(); }
 function routeRecords(){ const k = routeKey(); return records.filter(r => (r.office+"|"+r.route) === k); }
 function getMode(){ return modes[routeKey()] || "manual"; }
+function allKeys(){
+  const s = new Set(records.map(r => r.office+"|"+r.route));
+  Object.keys(imports).forEach(k => { if(imports[k] && imports[k].items.length) s.add(k); });
+  const ck = routeKey();
+  if(ck.split("|")[0] && ck.split("|")[1]) s.add(ck);
+  return [...s].sort();
+}
+function sumKey(){ return (sumSel && allKeys().includes(sumSel)) ? sumSel : routeKey(); }
+function sumRecords(){ const k = sumKey(); return records.filter(r => (r.office+"|"+r.route) === k); }
+function sumListState(){ return imports[sumKey()] || null; }
+function renderSumSel(){
+  const keys = allKeys();
+  const cur = sumKey();
+  const [co, cr] = cur.split("|");
+  const offices = [...new Set(keys.map(k => k.split("|")[0]))];
+  const so = $("sumOffice"); so.innerHTML = "";
+  offices.forEach(o=>{
+    const op = document.createElement("option"); op.value = o; op.textContent = o || "（未設定）"; op.selected = o === co;
+    so.appendChild(op);
+  });
+  const routes = keys.filter(k => k.split("|")[0] === co).map(k => k.split("|")[1]);
+  const sr = $("sumRoute"); sr.innerHTML = "";
+  routes.forEach(r=>{
+    const op = document.createElement("option"); op.value = r; op.textContent = r || "（未設定）"; op.selected = r === cr;
+    sr.appendChild(op);
+  });
+}
+$("sumOffice").addEventListener("change", ()=>{
+  const o = $("sumOffice").value;
+  const first = allKeys().find(k => k.split("|")[0] === o);
+  sumSel = first || null; listPage = 0; renderSummary();
+});
+$("sumRoute").addEventListener("change", ()=>{
+  sumSel = $("sumOffice").value + "|" + $("sumRoute").value; listPage = 0; renderSummary();
+});
 
 function routeChanged(){
   last = {office:$("office").value, route:$("route").value}; store("gj_last", last);
@@ -385,6 +433,12 @@ function updateModeUI(){
   renderProgress();
 }
 function jumpTo(i){
+  const k = sumKey();
+  if(k !== routeKey()){
+    const [o, r] = k.split("|");
+    $("office").value = o; $("route").value = r;
+    routeChanged();
+  }
   const st = listState(); if(!st) return;
   modes[routeKey()] = "list"; store("gj_modes", modes);
   st.idx = i; store("gj_imports", imports);
@@ -394,10 +448,10 @@ function jumpTo(i){
   window.scrollTo({top:0, behavior:"smooth"});
 }
 function renderListTable(){
-  const st = listState();
+  const st = sumListState();
   if(!st || !st.items.length){ $("listCard").style.display = "none"; return; }
   $("listCard").style.display = "block";
-  const done = savedNos();
+  const done = new Set(sumRecords().map(r => r.no));
   const total = st.items.length;
   const pages = Math.ceil(total / 100);
   if(listPage >= pages) listPage = pages - 1;
@@ -678,6 +732,7 @@ function startEdit(id){
   editingId = id; insertMode = false; $("insertBanner").style.display = "none";
   setView("input");
   $("office").value = r.office; $("route").value = r.route;
+  routeChanged();
   $("zumen").value = r.zumen || ""; $("city").value = r.city || ""; $("town").value = r.town || "";
   $("tno").value = r.no; $("sp").value = r.sp;
   $("dt").value = r.dt; $("memo").value = r.memo;
@@ -708,13 +763,14 @@ function endEdit(){
 $("cancelEdit").onclick = ()=>{ endEdit(); clearTreeFields(); };
 
 function renderSummary(){
-  const rr = routeRecords().slice().sort((a,b) => a.created - b.created);
+  renderSumSel();
+  const rr = sumRecords().slice().sort((a,b) => a.created - b.created);
   const jd = rr.map(r => judgeOf(r.items));
   $("sumAll").textContent = rr.length;
   $("sumOk").textContent = jd.filter(j => j.startsWith("概ね")).length;
   $("sumWarn").textContent = jd.filter(j => j.startsWith("維持")).length;
   $("sumNg").textContent = jd.filter(j => j.startsWith("樹木")).length;
-  $("sumTitle").textContent = ($("route").value || "路線未設定") + " の一覧";
+  $("sumTitle").textContent = (sumKey().split("|")[1] || "路線未設定") + " の一覧";
   renderListTable();
   const tb = $("sumBody"); tb.innerHTML = "";
   rr.forEach((r,i)=>{
@@ -747,7 +803,7 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt
 
 function csvField(v){ v = String(v ?? ""); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
 $("csvBtn").onclick = ()=>{
-  const rr = routeRecords().slice().sort((a,b) => a.created - b.created);
+  const rr = sumRecords().slice().sort((a,b) => a.created - b.created);
   if(!rr.length){ toast("この路線の保存データがありません"); return; }
   const head = ["点検事務所","路線名","図面番号","樹木番号","樹木名","幹周り(cm)","市名","町名","点検日時","点検者",
     ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数"];
@@ -756,7 +812,8 @@ $("csvBtn").onclick = ()=>{
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();
-  const fname = ($("office").value + "_" + $("route").value + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".csv").replace(/[\\/:*?"<>|]/g,"");
+  const [ko, kr] = sumKey().split("|");
+  const fname = (ko + "_" + kr + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".csv").replace(/[\\/:*?"<>|]/g,"");
   const blob = new Blob([csv], {type:"text/csv"});
   const file = new File([blob], fname, {type:"text/csv"});
   if(navigator.canShare && navigator.canShare({files:[file]})){
