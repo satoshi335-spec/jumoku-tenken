@@ -174,6 +174,11 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     </div>
     <label class="lbl">樹木番号</label>
     <input id="tno" autocomplete="off" placeholder="例）R7-274">
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+      <button type="button" class="miniBtn" id="edaBtn">＋枝番(-1)</button>
+      <button type="button" class="miniBtn" id="edaKanaBtn">＋枝番(-イ)</button>
+      <button type="button" class="miniBtn" id="parentBtn">次の本番号へ</button>
+    </div>
     <p id="tnoNote" class="note">前回保存の続き番号を自動提案。欠番は打ち直せば以降その番号から連番</p>
     <label class="lbl">樹木名</label>
     <input id="sp" data-key="sp" placeholder="例）イチョウ">
@@ -457,7 +462,7 @@ function renderListTable(){
   const st = sumListState();
   if(!st || !st.items.length){ $("listCard").style.display = "none"; return; }
   $("listCard").style.display = "block";
-  const done = new Set(sumRecords().map(r => r.no));
+  const doneSet = new Set(sumRecords().map(r => r.no));
   const total = st.items.length;
   const pages = Math.ceil(total / 100);
   if(listPage >= pages) listPage = pages - 1;
@@ -471,7 +476,7 @@ function renderListTable(){
   const tb = $("listBody"); tb.innerHTML = "";
   st.items.slice(from, to).forEach((it, k)=>{
     const i = from + k;
-    const isDone = done.has(it.no);
+    const isDone = listItemDone(it.no, doneSet);
     const tr = document.createElement("tr");
     tr.innerHTML = "<td><b>" + esc(it.no) + "</b></td><td>" + esc(it.sp || "—") + "</td>" +
       '<td><span class="rjudge" style="' + (isDone ? "background:var(--ok-bg);color:var(--ok-tx)" : "background:#F1EFE8;color:var(--tx2)") + '">' + (isDone ? "点検済" : "未") + "</span></td>";
@@ -532,9 +537,10 @@ function applyImport(items){
 function normHead(s){ return String(s ?? "").replace(/[\s　]/g,""); }
 function mapColumns(head){
   const find = names => head.findIndex(h => names.some(n => normHead(h).includes(n)));
-  let c = { no: find(["樹木番号","桝番号","管理番号"]), sp: find(["樹木名","樹種"]),
+  let c = { no: find(["樹木番号","桝番号","管理番号"]), hojo: find(["補助番号","補助","枝番"]),
+            sp: find(["樹木名","樹種"]),
             zumen: find(["図面"]), city: find(["市名","市町村"]), town: find(["町名","地区"]) };
-  if(c.no < 0){ c = {no:0, sp:1, zumen:2, city:3, town:4}; return {cols:c, skipHeader:false}; }
+  if(c.no < 0){ c = {no:0, hojo:-1, sp:1, zumen:2, city:3, town:4}; return {cols:c, skipHeader:false}; }
   return {cols:c, skipHeader:true};
 }
 function rowsToItems(rows){
@@ -542,14 +548,27 @@ function rowsToItems(rows){
   const {cols, skipHeader} = mapColumns(rows[0]);
   const out = [];
   rows.slice(skipHeader ? 1 : 0).forEach(r=>{
-    const no = String(r[cols.no] ?? "").trim();
+    let no = String(r[cols.no] ?? "").trim();
     if(!no) return;
+    // 補助番号列があれば「左18」+「1」→「左18-1」に結合（写真・シート名と一致させる）
+    const hojo = String(cols.hojo > -1 ? r[cols.hojo] ?? "" : "").trim();
+    if(hojo && !no.endsWith("-" + hojo)) no = no + "-" + hojo;
     out.push({ no, sp: String(cols.sp > -1 ? r[cols.sp] ?? "" : "").trim(),
       zumen: String(cols.zumen > -1 ? r[cols.zumen] ?? "" : "").trim(),
       city: String(cols.city > -1 ? r[cols.city] ?? "" : "").trim(),
       town: String(cols.town > -1 ? r[cols.town] ?? "" : "").trim() });
   });
   return out;
+}
+function splitHojo(no){
+  const m = String(no).match(/^(.*\d.*)-(\d{1,2}|[ア-ヴ])$/);
+  return m ? {base:m[1], hojo:m[2]} : {base:no, hojo:""};
+}
+// リスト項目が点検済みか: 番号そのもの、または枝番付き（左18→左18-1など）で保存されていれば済
+function listItemDone(no, doneSet){
+  if(doneSet.has(no)) return true;
+  for(const d of doneSet){ if(d.startsWith(no + "-")) return true; }
+  return false;
 }
 function parseCsvList(text){
   const rows = [];
@@ -588,7 +607,7 @@ function nextListIndex(from){
   const st = listState(); if(!st) return -1;
   const done = savedNos();
   for(let i = Math.max(0, from); i < st.items.length; i++){
-    if(!done.has(st.items[i].no)) return i;
+    if(!listItemDone(st.items[i].no, done)) return i;
   }
   return -1;
 }
@@ -598,7 +617,7 @@ function renderProgress(){
   $("progWrap").style.display = show ? "block" : "none";
   if(!show) return;
   const done = savedNos();
-  const doneCount = st.items.filter(it => done.has(it.no)).length;
+  const doneCount = st.items.filter(it => listItemDone(it.no, done)).length;
   const pct = Math.round(doneCount / st.items.length * 100);
   $("progTxt").textContent = doneCount + "/" + st.items.length + " 本　点検済み " + pct + "%";
   $("progBar").style.width = pct + "%";
@@ -608,7 +627,7 @@ function fillFromList(){
   const st = listState();
   if(!st){ $("listProg").innerHTML = "リスト未取込。Excel（樹木番号・樹木名・図面番号・市名・町名の列）または CSV を取り込めます"; return; }
   const done = savedNos();
-  const doneCount = st.items.filter(it => done.has(it.no)).length;
+  const doneCount = st.items.filter(it => listItemDone(it.no, done)).length;
   let i = nextListIndex(st.idx);
   if(i < 0) i = nextListIndex(0);
   if(i < 0){
@@ -629,7 +648,7 @@ $("skipBtn").onclick = ()=>{
   const st = listState(); if(!st){ toast("リストが取り込まれていません"); return; }
   let i = nextListIndex(st.idx);
   if(i < 0) i = nextListIndex(0);
-  if(i < 0){ toast("スキップする樹木がありません"); return; }
+  if(i < 0){ fillFromList(); toast("未点検の樹木はありません"); return; }
   st.idx = i + 1; store("gj_imports", imports);
   fillFromList();
 };
@@ -653,10 +672,37 @@ $("tno").addEventListener("input", ()=>{
     $("tnoNote").className = "note manual";
   }
 });
+const IROHA = "イロハニホヘトチリヌルヲワカヨタレソツネナラム";
 function nextNo(no){
-  const m = String(no).match(/^(.*?)(\d+)\s*$/); if(!m) return "";
-  return m[1] + String(parseInt(m[2],10)+1).padStart(m[2].length,"0");
+  no = String(no).trim();
+  const m = no.match(/^(.*?)(\d+)\s*$/);
+  if(m) return m[1] + String(parseInt(m[2],10)+1).padStart(m[2].length,"0");
+  // 末尾がイロハ形式の枝番なら次の文字へ（左18-イ→左18-ロ）
+  const last = no.slice(-1);
+  const i = IROHA.indexOf(last);
+  if(i > -1 && i < IROHA.length - 1) return no.slice(0, -1) + IROHA[i + 1];
+  return "";
 }
+$("edaBtn").onclick = ()=>{
+  const v = $("tno").value.trim(); if(!v) return;
+  $("tno").value = v + "-1";
+  $("tno").dispatchEvent(new Event("input"));
+};
+$("edaKanaBtn").onclick = ()=>{
+  const v = $("tno").value.trim(); if(!v) return;
+  $("tno").value = v + "-イ";
+  $("tno").dispatchEvent(new Event("input"));
+};
+$("parentBtn").onclick = ()=>{
+  let v = $("tno").value.trim(); if(!v) return;
+  // 末尾の枝番（-1〜-99 または -イ〜）を外す。ただし外した残りにも数字がある場合のみ
+  const m = v.match(/^(.*\d.*)-(\d{1,2}|[ア-ヴ])$/);
+  if(m) v = m[1];
+  const n = v.match(/^(.*?)(\d+)$/);
+  if(n) v = n[1] + String(parseInt(n[2],10)+1).padStart(n[2].length,"0");
+  $("tno").value = v;
+  $("tno").dispatchEvent(new Event("input"));
+};
 
 function girthWarnUpd(){
   const empty = !$("girth").value;
@@ -743,7 +789,21 @@ $("saveBtn").onclick = ()=>{
   bump("zumen", rec.zumen); bump("city", rec.city); bump("town", rec.town);
   clearTreeFields();
   if(wasEdit){ /* endEdit handled next number */ }
-  else if(getMode() === "list" && !insertMode){ fillFromList(); }
+  else if(getMode() === "list" && !insertMode){
+    if(splitHojo(rec.no).hojo){
+      // 枝番付きで保存＝同じ樹木の続き。次の枝番を提案し、リストは進めない
+      $("tno").value = nextNo(rec.no);
+      $("tnoNote").textContent = rec.no + " の次の枝番を提案中。この樹木が終わったら「この樹木をスキップ」で次の樹木へ";
+      $("tnoNote").className = "note manual";
+      renderProgress();
+      const st = listState();
+      if(st){
+        const done = savedNos();
+        const dc = st.items.filter(it => listItemDone(it.no, done)).length;
+        $("listProg").innerHTML = "リスト <b>" + dc + "/" + st.items.length + "</b> 本済　｜　枝番入力中: " + esc(splitHojo(rec.no).base);
+      }
+    } else { fillFromList(); }
+  }
   else if(insertMode){ insertMode = false; $("insertBanner").style.display = "none"; if(getMode() === "list") fillFromList(); }
   else { $("tno").value = nextNo(no); noteAuto(no); }
   renderCnt(); renderSummary(); renderProgress();
@@ -838,9 +898,9 @@ function csvField(v){ v = String(v ?? ""); return /[",\n]/.test(v) ? '"' + v.rep
 $("csvBtn").onclick = ()=>{
   const rr = sumRecords().slice().sort((a,b) => a.created - b.created);
   if(!rr.length){ toast("この路線の保存データがありません"); return; }
-  const head = ["点検事務所","路線名","図面番号","樹木番号","樹木名","幹周り(cm)","市名","町名","点検日時","点検者",
+  const head = ["点検事務所","路線名","図面番号","樹木番号","補助番号","樹木名","幹周り(cm)","市名","町名","点検日時","点検者",
     ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数"];
-  const rows = rr.map(r => [r.office, r.route, r.zumen || "", r.no, r.sp, r.girth || "", r.city || "", r.town || "",
+  const rows = rr.map(r => [r.office, r.route, r.zumen || "", r.no, splitHojo(r.no).hojo, r.sp, r.girth || "", r.city || "", r.town || "",
     (r.dt || "").replace("T"," "), settings.inspector, ...r.items, fullMemo(r), judgeOf(r.items), photosOf(r.items)]
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
