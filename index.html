@@ -105,6 +105,26 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 #camBoard .klab{padding:3px 4px;border-right:2px solid #fff;white-space:nowrap}
 #camBoard .kval{padding:3px 4px;flex:1}
 #camBoard .knum{text-align:center;font-size:30px;font-weight:600;padding:12px 4px}
+#camBoard .kcmts{text-align:center;font-weight:600;font-size:14px;line-height:1.35;padding:0 2px 8px}
+#camDraw{position:absolute;inset:0;touch-action:none}
+#camMarkBox{position:absolute;border:3px dashed #ff2a2a;border-radius:50%;display:none;pointer-events:none}
+#camCmtBar{display:none;gap:6px;align-items:center;padding:8px 10px;background:#111;overflow-x:auto;-webkit-overflow-scrolling:touch}
+#camCmtBar.show{display:flex}
+#cmtEditBtn,#markClearBtn{flex-shrink:0;background:#333;color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;white-space:nowrap}
+#markClearBtn{background:#5c2020}
+.cmtSel{flex-shrink:0;background:#1b6b5f;color:#fff;border:1px solid #2e9c8a;border-radius:999px;padding:8px 12px;font-size:13px;font-family:inherit;white-space:nowrap}
+#cmtHint{color:#888;font-size:12px;white-space:nowrap}
+#cmtPicker{display:none;position:fixed;left:0;right:0;bottom:0;background:#1b1b1b;color:#fff;z-index:60;border-radius:16px 16px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom) + 14px);max-height:70%;overflow-y:auto}
+#cmtPicker.show{display:block}
+#cmtPicker .cpHead{font-size:14px;font-weight:600;margin-bottom:10px}
+#cmtList{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.cmtItem{display:flex;align-items:center;gap:6px;background:#2a2a2a;border:1px solid #444;border-radius:999px;padding:8px 8px 8px 14px;font-size:14px}
+.cmtItem.on{background:#1b6b5f;border-color:#2e9c8a}
+.cmtItem .cx{background:#444;color:#ccc;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;line-height:1;font-family:inherit}
+.cpAdd{display:flex;gap:8px;margin-bottom:12px}
+.cpAdd input{flex:1;padding:10px;border-radius:8px;border:1px solid #555;background:#222;color:#fff;font-size:16px;font-family:inherit}
+.cpAdd button,#cmtCloseBtn{background:#1b6b5f;color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:14px;font-family:inherit;min-height:42px}
+#cmtCloseBtn{display:block;width:100%;background:#333}
 #camBottom{display:flex;align-items:center;justify-content:center;padding:14px 0 calc(env(safe-area-inset-bottom) + 14px);background:#000}
 #camShutter{width:74px;height:74px;border-radius:50%;background:#fff;border:5px solid #999}
 #camShutter:disabled{opacity:.4}
@@ -114,7 +134,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v11</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v12</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -323,13 +343,32 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     <div id="camFrame">
       <video id="camVideo" autoplay playsinline muted></video>
       <div id="camNoCam">カメラを利用できません<br>（テストモード：グレー画像で撮影されます）</div>
+      <div id="camMarkBox"></div>
       <div id="camBoard">
         <div class="krow"><span class="klab">業務名</span><span class="kval" id="camKoji"></span></div>
         <div class="knum" id="camBNum">-</div>
+        <div class="kcmts" id="camCmts" style="display:none"></div>
       </div>
+      <div id="camDraw"></div>
     </div>
   </div>
+  <div id="camCmtBar">
+    <button type="button" id="cmtEditBtn">💬 状況コメント</button>
+    <div id="cmtSelChips" style="display:flex;gap:6px"></div>
+    <span id="cmtHint">指でなぞると赤点線で囲めます（任意）</span>
+    <button type="button" id="markClearBtn">囲み消去</button>
+  </div>
   <div id="camBottom"><button type="button" id="camShutter"></button></div>
+</div>
+<!-- 状況コメント選択パネル -->
+<div id="cmtPicker">
+  <div class="cpHead">被害状況コメント（タップで黒板に記載 ⇔ 解除、✕で削除）</div>
+  <div id="cmtList"></div>
+  <div class="cpAdd">
+    <input id="cmtNew" placeholder="新しいコメント（例: 子実体発生）">
+    <button type="button" id="cmtAddBtn">追加</button>
+  </div>
+  <button type="button" id="cmtCloseBtn">閉じる</button>
 </div>
 <div id="camFlash"></div>
 <div id="toast" class="toast"></div>
@@ -1088,6 +1127,9 @@ async function openCam(branch){
   $("camKind").textContent = branch === 1 ? "全体" : "被害部";
   $("camKoji").textContent = kojiText();
   $("camBNum").textContent = no;
+  selCmts = []; camMark = null;
+  $("camCmtBar").classList.toggle("show", branch === 2);
+  renderCamCmts(); updateMarkUI();
   $("camModal").style.display = "flex";
   fitCamFrame();
   try {
@@ -1099,6 +1141,7 @@ async function openCam(branch){
 }
 function closeCam(){
   $("camModal").style.display = "none";
+  $("cmtPicker").classList.remove("show");
   if(camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; }
   $("camVideo").srcObject = null;
   $("camNoCam").style.display = "none";
@@ -1106,6 +1149,95 @@ function closeCam(){
 $("camClose").onclick = closeCam;
 $("shot1").onclick = ()=>openCam(1);
 $("shot2").onclick = ()=>openCam(2);
+
+/* ---- 被害状況コメント（保存・再利用・削除可） ---- */
+let dmgComments = load("gj_cmts", []);
+let selCmts = [], camMark = null, drawStart = null;
+function renderCamCmts(){
+  $("camCmts").style.display = selCmts.length ? "block" : "none";
+  $("camCmts").innerHTML = selCmts.map(esc).join("<br>");
+  $("camBNum").style.fontSize = selCmts.length ? "20px" : "30px";
+  $("camBNum").style.padding = selCmts.length ? "8px 4px 2px" : "12px 4px";
+  const chips = $("cmtSelChips"); chips.innerHTML = "";
+  selCmts.forEach(t=>{
+    const b = document.createElement("button"); b.type = "button"; b.className = "cmtSel"; b.textContent = t + " ✕";
+    b.onclick = ()=>{ selCmts = selCmts.filter(x => x !== t); renderCamCmts(); renderCmtList(); };
+    chips.appendChild(b);
+  });
+  $("cmtHint").style.display = (camMark || selCmts.length) ? "none" : "inline";
+}
+function renderCmtList(){
+  const box = $("cmtList"); box.innerHTML = "";
+  if(!dmgComments.length){
+    box.innerHTML = '<span style="color:#888;font-size:13px">まだコメントがありません。下の欄から追加してください</span>';
+    return;
+  }
+  dmgComments.forEach(t=>{
+    const d = document.createElement("div"); d.className = "cmtItem" + (selCmts.includes(t) ? " on" : "");
+    const s = document.createElement("span"); s.textContent = t;
+    s.onclick = ()=>{
+      if(selCmts.includes(t)) selCmts = selCmts.filter(x => x !== t);
+      else selCmts.push(t);
+      renderCamCmts(); renderCmtList();
+    };
+    const x = document.createElement("button"); x.type = "button"; x.className = "cx"; x.textContent = "✕";
+    x.onclick = ()=>{
+      if(!confirm("コメント「" + t + "」を一覧から削除しますか？")) return;
+      dmgComments = dmgComments.filter(v => v !== t); store("gj_cmts", dmgComments);
+      selCmts = selCmts.filter(v => v !== t);
+      renderCamCmts(); renderCmtList();
+    };
+    d.appendChild(s); d.appendChild(x); box.appendChild(d);
+  });
+}
+$("cmtEditBtn").onclick = ()=>{ renderCmtList(); $("cmtPicker").classList.add("show"); };
+$("cmtCloseBtn").onclick = ()=>$("cmtPicker").classList.remove("show");
+$("cmtAddBtn").onclick = ()=>{
+  const t = $("cmtNew").value.trim(); if(!t) return;
+  if(!dmgComments.includes(t)){ dmgComments.unshift(t); store("gj_cmts", dmgComments); }
+  if(!selCmts.includes(t)) selCmts.push(t);
+  $("cmtNew").value = "";
+  renderCamCmts(); renderCmtList();
+};
+
+/* ---- 赤点線の囲み（なぞって指定・任意） ---- */
+function updateMarkUI(){
+  const box = $("camMarkBox"), f = $("camFrame");
+  if(camMark){
+    box.style.display = "block";
+    box.style.left = camMark.x * f.clientWidth + "px";
+    box.style.top = camMark.y * f.clientHeight + "px";
+    box.style.width = camMark.w * f.clientWidth + "px";
+    box.style.height = camMark.h * f.clientHeight + "px";
+  } else box.style.display = "none";
+  $("markClearBtn").style.display = camMark ? "block" : "none";
+  $("cmtHint").style.display = (camMark || selCmts.length) ? "none" : "inline";
+}
+$("markClearBtn").onclick = ()=>{ camMark = null; updateMarkUI(); };
+$("camDraw").addEventListener("pointerdown", e=>{
+  if(camBranch !== 2) return;
+  const r = $("camDraw").getBoundingClientRect();
+  drawStart = {x: e.clientX - r.left, y: e.clientY - r.top};
+  $("camDraw").setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+$("camDraw").addEventListener("pointermove", e=>{
+  if(!drawStart) return;
+  const r = $("camDraw").getBoundingClientRect();
+  const x2 = Math.max(0, Math.min(e.clientX - r.left, r.width));
+  const y2 = Math.max(0, Math.min(e.clientY - r.top, r.height));
+  camMark = {
+    x: Math.min(drawStart.x, x2) / r.width, y: Math.min(drawStart.y, y2) / r.height,
+    w: Math.abs(x2 - drawStart.x) / r.width, h: Math.abs(y2 - drawStart.y) / r.height
+  };
+  updateMarkUI();
+});
+$("camDraw").addEventListener("pointerup", ()=>{
+  if(!drawStart) return;
+  drawStart = null;
+  if(camMark && (camMark.w < 0.04 || camMark.h < 0.04)) camMark = null; // 誤タップは無視
+  updateMarkUI();
+});
 
 function drawCamBoard(ctx, W, H, num){
   const bw = W * 0.46, bh = H * 0.20, bx = W * 0.03, by = H - bh - H * 0.03;
@@ -1137,8 +1269,28 @@ function drawCamBoard(ctx, W, H, num){
   while(kf > 8 && (lines.length > 2 || lines.length * kf * 1.25 > rowH)){ kf -= 1; lines = wrapText(koji, kf); }
   const lh = kf * 1.25, y0 = by + rowH / 2 - (lines.length - 1) * lh / 2;
   lines.forEach((ln, i)=>ctx.fillText(ln, kx, y0 + i * lh));
-  ctx.font = "600 " + (bh * 0.34) + "px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(num, bx + bw / 2, by + rowH + (bh - rowH) / 2);
+  // 下段: 番号（＋状況コメント）
+  const lowH = bh - rowH, cx0 = bx + bw / 2;
+  ctx.textAlign = "center";
+  if(selCmts.length){
+    let cf = lowH * 0.92 / ((1.5 + selCmts.length) * 1.3);
+    const fits = f => {
+      ctx.font = "600 " + f + "px sans-serif";
+      if(!selCmts.every(t => ctx.measureText(t).width <= bw * 0.92)) return false;
+      ctx.font = "600 " + (f * 1.5) + "px sans-serif";
+      return ctx.measureText(num).width <= bw * 0.92;
+    };
+    while(cf > 7 && !fits(cf)) cf -= 1;
+    const nf = cf * 1.5;
+    let y = by + rowH + (lowH - (nf * 1.3 + selCmts.length * cf * 1.3)) / 2;
+    ctx.font = "600 " + nf + "px sans-serif";
+    y += nf * 1.3 / 2; ctx.fillText(num, cx0, y); y += nf * 1.3 / 2;
+    ctx.font = "600 " + cf + "px sans-serif";
+    for(const t of selCmts){ y += cf * 1.3 / 2; ctx.fillText(t, cx0, y); y += cf * 1.3 / 2; }
+  } else {
+    ctx.font = "600 " + (bh * 0.34) + "px sans-serif";
+    ctx.fillText(num, cx0, by + rowH + lowH / 2);
+  }
   ctx.textAlign = "left";
 }
 let camShooting = false;
@@ -1161,6 +1313,19 @@ $("camShutter").onclick = async ()=>{
       const g = ctx.createLinearGradient(0, 0, 960, 1280);
       g.addColorStop(0, "#666"); g.addColorStop(1, "#333");
       ctx.fillStyle = g; ctx.fillRect(0, 0, 960, 1280);
+    }
+    // 赤点線の囲み（被害部・指定時のみ）
+    if(camMark && camBranch === 2){
+      const ctx = c.getContext("2d");
+      ctx.save();
+      ctx.setLineDash([c.width * 0.025, c.width * 0.015]);
+      ctx.strokeStyle = "#ff2a2a";
+      ctx.lineWidth = Math.max(3, c.width * 0.008);
+      ctx.beginPath();
+      ctx.ellipse((camMark.x + camMark.w / 2) * c.width, (camMark.y + camMark.h / 2) * c.height,
+                  camMark.w / 2 * c.width, camMark.h / 2 * c.height, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
     drawCamBoard(c.getContext("2d"), c.width, c.height, camNo);
     const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
