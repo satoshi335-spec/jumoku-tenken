@@ -1,4 +1,4 @@
-const VERSION = "gj-v10";
+const VERSION = "gj-v11";
 const ASSETS = [
   "./",
   "./index.html",
@@ -23,6 +23,17 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
+  if (e.request.mode === "navigate") {
+    // アプリ本体は「ネット優先」: オンラインなら常に最新版、圏外ならキャッシュ
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(VERSION).then(c => { c.put("./index.html", clone.clone()); c.put("./", clone); });
+        return res;
+      }).catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(cached => {
       const fetched = fetch(e.request)
