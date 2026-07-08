@@ -87,12 +87,34 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 .toast.show{opacity:1}
 #view-sum{display:none}
 @media(min-width:700px){ .grid2{grid-template-columns:repeat(3,1fr)} main{padding:16px 24px} }
+/* ===== 小黒板カメラ ===== */
+#photoRow{display:flex;gap:8px;margin-top:10px}
+.pbtn{flex:1;min-height:52px;font-size:15px;font-weight:600;border-radius:12px;border:1px solid var(--g);background:#fff;color:var(--g);font-family:inherit}
+.pbtn.done{background:var(--ok-bg);color:var(--ok-tx);border-color:var(--ok-tx)}
+#camModal{display:none;position:fixed;inset:0;background:#000;z-index:40;flex-direction:column}
+#camTop{display:flex;gap:8px;align-items:center;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;color:#fff}
+#camNo{background:#1b6b5f;border:2px solid #fff;border-radius:8px;padding:6px 12px;font-size:20px;font-weight:700}
+#camKind{background:#c62828;border-radius:12px;padding:4px 10px;font-size:13px;font-weight:600}
+#camClose{margin-left:auto;background:#333;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:14px;font-family:inherit}
+#camWrap{position:relative;flex:1;overflow:hidden;background:#000}
+#camFrame{position:absolute;overflow:hidden;background:#111}
+#camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#camNoCam{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#888;font-size:13px;text-align:center}
+#camBoard{position:absolute;left:3%;bottom:3%;width:46%;background:#1b6b5f;border:3px solid #fff;color:#fff}
+#camBoard .krow{display:flex;border-bottom:2px solid #fff;font-size:10px}
+#camBoard .klab{padding:3px 4px;border-right:2px solid #fff;white-space:nowrap}
+#camBoard .kval{padding:3px 4px;flex:1}
+#camBoard .knum{text-align:center;font-size:30px;font-weight:600;padding:12px 4px}
+#camBottom{display:flex;align-items:center;justify-content:center;padding:14px 0 calc(env(safe-area-inset-bottom) + 14px);background:#000}
+#camShutter{width:74px;height:74px;border-radius:50%;background:#fff;border:5px solid #999}
+#camShutter:disabled{opacity:.4}
+#camFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
 </style>
 </head>
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検</h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v11</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -114,6 +136,8 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
       <label class="lbl">路線名</label>
       <input id="route" data-key="route" placeholder="例）423号">
       <div id="sug-route" class="sug"></div>
+      <label class="lbl">黒板の業務名（写真の小黒板に表示）</label>
+      <input id="koji" placeholder="例）令和8年度 街路樹診断業務（未入力なら事務所+路線名）">
       <p class="note">一度入力すれば記憶されます。変えるときだけ開いてください</p>
     </div>
   </details>
@@ -219,7 +243,11 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
       <span id="judge" class="badge"></span>
       <span id="photoHint"></span>
     </div>
-    <button id="saveBtn" class="btn">保存して次の樹木へ</button>
+    <div id="photoRow">
+      <button type="button" class="pbtn" id="shot1">📷 全体</button>
+      <button type="button" class="pbtn" id="shot2" style="display:none">📷 被害部</button>
+    </div>
+    <button id="saveBtn" class="btn" style="margin-top:10px">保存して次の樹木へ</button>
     <button id="cancelEdit" class="btn">編集を取り消す</button>
   </div>
   <p class="note" style="text-align:center">この路線の保存済み <b id="cnt">0</b> 本（一覧・集計タブで確認）</p>
@@ -247,7 +275,10 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
   <div class="card">
     <div class="rowFlex">
       <span style="font-size:14px;font-weight:600" id="sumTitle">一覧</span>
-      <button id="csvBtn" class="miniBtn pri">CSV書き出し</button>
+      <div style="display:flex;gap:6px">
+        <button id="zipBtn" class="miniBtn pri">写真ZIP</button>
+        <button id="csvBtn" class="miniBtn pri">CSV書き出し</button>
+      </div>
     </div>
     <div class="tblWrap">
       <table class="sum">
@@ -280,6 +311,27 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
   </div>
 </div>
 </main>
+
+<!-- 小黒板カメラ -->
+<div id="camModal">
+  <div id="camTop">
+    <span id="camNo">-</span>
+    <span id="camKind">全体</span>
+    <button type="button" id="camClose">閉じる</button>
+  </div>
+  <div id="camWrap">
+    <div id="camFrame">
+      <video id="camVideo" autoplay playsinline muted></video>
+      <div id="camNoCam">カメラを利用できません<br>（テストモード：グレー画像で撮影されます）</div>
+      <div id="camBoard">
+        <div class="krow"><span class="klab">業務名</span><span class="kval" id="camKoji"></span></div>
+        <div class="knum" id="camBNum">-</div>
+      </div>
+    </div>
+  </div>
+  <div id="camBottom"><button type="button" id="camShutter"></button></div>
+</div>
+<div id="camFlash"></div>
 <div id="toast" class="toast"></div>
 
 <script>
@@ -413,7 +465,7 @@ function routeChanged(){
       else { $("tno").value = ""; $("hojo").value = ""; $("tnoNote").textContent = "この路線の最初の樹木番号を入力（例：R7-274）。以降は自動で連番"; $("tnoNote").className = "note"; }
     }
   }
-  renderCnt(); renderHeader(); renderSummary();
+  renderCnt(); renderHeader(); renderSummary(); updatePhotoButtons();
 }
 function renderHeader(){
   const parts = [];
@@ -505,10 +557,11 @@ $("delAllBtn").onclick = ()=>{
   const k = sumKey(); const [ko, kr] = k.split("|");
   const rr = sumRecords();
   if(!rr.length){ toast("この路線の記録はありません"); return; }
-  if(!confirm2(ko + "／" + kr + " の記録 " + rr.length + " 本をすべて削除しますか？",
-    "本当に " + rr.length + " 本すべて削除しますか？\nこの操作は取り消せません。CSV書き出し済みか確認してください")) return;
+  if(!confirm2(ko + "／" + kr + " の記録 " + rr.length + " 本と撮影写真をすべて削除しますか？",
+    "本当に " + rr.length + " 本すべて削除しますか？\nこの操作は取り消せません。CSV・写真ZIPの書き出し済みか確認してください")) return;
   records = records.filter(r => (r.office+"|"+r.route) !== k);
   store("gj_records", records);
+  if(pdb) deletePhotosOfKey(k);
   if(editingId) endEdit();
   renderCnt(); renderSummary(); renderProgress();
   if(getMode() === "list") fillFromList();
@@ -653,6 +706,7 @@ function fillFromList(){
   $("tnoNote").textContent = "リスト " + (i+1) + " 番目の樹木。内容は手で修正できます";
   $("tnoNote").className = "note";
   $("listProg").innerHTML = "リスト <b>" + doneCount + "/" + st.items.length + "</b> 本済　｜　現在: " + esc(it.no) + (it.sp ? "（" + esc(it.sp) + "）" : "");
+  updatePhotoButtons();
 }
 $("skipBtn").onclick = ()=>{
   const st = listState(); if(!st){ toast("リストが取り込まれていません"); return; }
@@ -761,7 +815,7 @@ function calc(){
   if(on23 > 0){ j.textContent = "樹木の外観診断が必要"; j.style.background = "var(--ng-bg)"; j.style.color = "var(--ng-tx)"; }
   else if(on1 > 0){ j.textContent = "維持管理の処置が必要"; j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
   else { j.textContent = "概ね良好・異常なし"; j.style.background = "var(--ok-bg)"; j.style.color = "var(--ok-tx)"; }
-  $("photoHint").textContent = (on1+on23 > 0) ? "📷 写真2枚（全体＋被害部）" : "📷 写真1枚（全体）";
+  updatePhotoButtons();
 }
 function judgeOf(items){
   const on1 = items.slice(0,6).filter(v => v === "○").length;
@@ -782,6 +836,9 @@ $("saveBtn").onclick = ()=>{
   const dup = routeRecords().find(r => r.no === no && r.id !== editingId);
   if(dup){ toast("樹木番号 " + no + " はこの路線で保存済みです"); return; }
   const items = [...document.querySelectorAll(".itm")].map(b => b.classList.contains("on") ? "○" : "");
+  // 撮り忘れチェック: 必要枚数（異常あり2枚/なし1枚）に足りなければ警告
+  const needP = photosOf(items), haveP = pdb ? photosFor(routeKey(), no).length : 0;
+  if(pdb && haveP < needP && !confirm("⚠ 写真が " + haveP + "/" + needP + " 枚です。\n撮影せずに保存しますか？\n（キャンセル→📷ボタンで撮影できます）")) return;
   const kabuOn = $("kabuChk").checked;
   const stems = kabuOn ? stemVals() : [];
   const rec = {
@@ -833,7 +890,7 @@ $("saveBtn").onclick = ()=>{
     $("tnoNote").className = "note manual";
   }
   else { $("hojo").value = ""; $("tno").value = nextNo(no); noteAuto(no); }
-  renderCnt(); renderSummary(); renderProgress();
+  renderCnt(); renderSummary(); renderProgress(); updatePhotoButtons();
   window.scrollTo({top:0, behavior:"smooth"});
 };
 function clearTreeFields(){
@@ -879,6 +936,7 @@ function endEdit(){
     const rr = routeRecords();
     if(rr.length){ $("hojo").value = ""; $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
   }
+  updatePhotoButtons();
 }
 $("cancelEdit").onclick = ()=>{ endEdit(); clearTreeFields(); };
 
@@ -899,9 +957,12 @@ function renderSummary(){
              : j.startsWith("維持") ? "background:var(--warn-bg);color:var(--warn-tx)"
              : "background:var(--ng-bg);color:var(--ng-tx)";
     const tr = document.createElement("tr");
+    const needP = photosOf(r.items);
+    const haveP = pdb ? photosFor(r.office + "|" + r.route, r.no).length : 0;
+    const pCls = haveP >= needP ? "color:var(--ok-tx);font-weight:600" : "color:var(--ng-tx);font-weight:600";
     tr.innerHTML = "<td><b>" + esc(r.no) + "</b></td><td>" + esc(r.sp || "—") + "</td><td>" + esc(r.girth || "—") + "</td>" +
       '<td><span class="rjudge" style="' + cls + '">' + (j.startsWith("概ね") ? "良好" : j.startsWith("維持") ? "維持管理" : "外観診断") + "</span></td>" +
-      "<td>" + photosOf(r.items) + "枚</td><td class=\"memoCell\">" + esc(fullMemo(r)) + "</td>";
+      '<td style="' + pCls + '">' + (haveP >= needP ? "" : "⚠") + haveP + "/" + needP + "枚</td><td class=\"memoCell\">" + esc(fullMemo(r)) + "</td>";
     const td = document.createElement("td");
     const eb = document.createElement("button"); eb.className = "miniBtn"; eb.textContent = "編集";
     eb.onclick = () => startEdit(r.id);
@@ -948,6 +1009,229 @@ function dl(blob, fname){
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
 
+/* ================= 小黒板カメラ・写真管理 ================= */
+let pdb, photoMetas = [];
+function openPdb(){
+  return new Promise((res, rej)=>{
+    const r = indexedDB.open("gj_photos", 1);
+    r.onupgradeneeded = ()=>{
+      r.result.createObjectStore("blobs", {keyPath:"id", autoIncrement:true});
+      r.result.createObjectStore("meta", {keyPath:"id"});
+    };
+    r.onsuccess = ()=>res(r.result); r.onerror = ()=>rej(r.error);
+  });
+}
+const ptx = (s,m) => pdb.transaction(s,m).objectStore(s);
+const preq = q => new Promise((res, rej)=>{ q.onsuccess = ()=>res(q.result); q.onerror = ()=>rej(q.error); });
+function photosFor(key, no){ return photoMetas.filter(m => m.key === key && m.no === no); }
+async function addPhotoBlob(key, no, branch, blob){
+  // 同じ枠（全体/被害部）は撮り直しで置き換え
+  for(const o of photoMetas.filter(m => m.key === key && m.no === no && m.branch === branch)){
+    await preq(ptx("blobs","readwrite").delete(o.id));
+    await preq(ptx("meta","readwrite").delete(o.id));
+  }
+  photoMetas = photoMetas.filter(m => !(m.key === key && m.no === no && m.branch === branch));
+  const id = await preq(ptx("blobs","readwrite").add({blob}));
+  const meta = {id, key, no, branch, filename: no + "_" + branch + ".jpeg", ts: Date.now(), size: blob.size};
+  await preq(ptx("meta","readwrite").put(meta));
+  photoMetas.push(meta);
+  return meta;
+}
+async function deletePhotosOf(key, no){
+  for(const m of photosFor(key, no)){
+    await preq(ptx("blobs","readwrite").delete(m.id));
+    await preq(ptx("meta","readwrite").delete(m.id));
+  }
+  photoMetas = photoMetas.filter(m => !(m.key === key && m.no === no));
+}
+async function deletePhotosOfKey(key){
+  for(const m of photoMetas.filter(m => m.key === key)){
+    await preq(ptx("blobs","readwrite").delete(m.id));
+    await preq(ptx("meta","readwrite").delete(m.id));
+  }
+  photoMetas = photoMetas.filter(m => m.key !== key);
+}
+async function getPhotoBlob(id){ return (await preq(ptx("blobs","readonly").get(id))).blob; }
+
+function kojiText(){ return (settings.koji || "").trim() || ($("office").value + " " + $("route").value + " 樹木点検").trim(); }
+function requiredPhotos(){ return document.querySelectorAll(".itm.on").length > 0 ? 2 : 1; }
+function updatePhotoButtons(){
+  if(!pdb) return;
+  const no = fullNo(), key = routeKey(), req = requiredPhotos();
+  const ps = no ? photosFor(key, no) : [];
+  const has1 = ps.some(m => m.branch === 1), has2 = ps.some(m => m.branch === 2);
+  $("shot1").classList.toggle("done", has1);
+  $("shot1").textContent = (has1 ? "✔ 全体（撮り直し）" : "📷 全体を撮影");
+  $("shot2").style.display = (req === 2 || has2) ? "block" : "none";
+  $("shot2").classList.toggle("done", has2);
+  $("shot2").textContent = (has2 ? "✔ 被害部（撮り直し）" : "📷 被害部を撮影");
+  $("photoHint").textContent = "📷 必要" + req + "枚・撮影済" + ps.length + "枚";
+  $("photoHint").style.color = ps.length >= req ? "var(--ok-tx)" : "var(--ng-tx)";
+  $("photoHint").style.fontWeight = "600";
+}
+
+const CAM_AR = 3/4, CAM_MAXH = 1280;
+let camStream = null, camBranch = 1, camNo = "";
+function fitCamFrame(){
+  const wrap = $("camWrap"), f = $("camFrame");
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  const fh = Math.min(h, w / CAM_AR), fw = fh * CAM_AR;
+  f.style.width = fw + "px"; f.style.height = fh + "px";
+  f.style.left = (w - fw) / 2 + "px"; f.style.top = (h - fh) / 2 + "px";
+}
+window.addEventListener("resize", ()=>{ if($("camModal").style.display === "flex") fitCamFrame(); });
+async function openCam(branch){
+  const no = fullNo();
+  if(!no){ toast("樹木番号を入力してください"); return; }
+  camBranch = branch; camNo = no;
+  $("camNo").textContent = no;
+  $("camKind").textContent = branch === 1 ? "全体" : "被害部";
+  $("camKoji").textContent = kojiText();
+  $("camBNum").textContent = no;
+  $("camModal").style.display = "flex";
+  fitCamFrame();
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: {facingMode:"environment", width:{ideal:1440}, height:{ideal:1920}}, audio: false
+    });
+    $("camVideo").srcObject = camStream;
+  } catch(e){ $("camNoCam").style.display = "flex"; }
+}
+function closeCam(){
+  $("camModal").style.display = "none";
+  if(camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  $("camVideo").srcObject = null;
+  $("camNoCam").style.display = "none";
+}
+$("camClose").onclick = closeCam;
+$("shot1").onclick = ()=>openCam(1);
+$("shot2").onclick = ()=>openCam(2);
+
+function drawCamBoard(ctx, W, H, num){
+  const bw = W * 0.46, bh = H * 0.20, bx = W * 0.03, by = H - bh - H * 0.03;
+  const bd = Math.max(2, W * 0.004);
+  ctx.fillStyle = "#1b6b5f"; ctx.fillRect(bx, by, bw, bh);
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = bd * 2; ctx.strokeRect(bx, by, bw, bh);
+  const rowH = bh * 0.32;
+  ctx.lineWidth = bd;
+  ctx.beginPath(); ctx.moveTo(bx, by + rowH); ctx.lineTo(bx + bw, by + rowH); ctx.stroke();
+  ctx.fillStyle = "#fff";
+  const f1 = rowH * 0.40;
+  ctx.font = f1 + "px sans-serif"; ctx.textBaseline = "middle";
+  const lab = "業務名";
+  const labW = ctx.measureText(lab).width + f1 * 0.8;
+  ctx.fillText(lab, bx + f1 * 0.4, by + rowH / 2);
+  ctx.beginPath(); ctx.moveTo(bx + labW, by); ctx.lineTo(bx + labW, by + rowH); ctx.stroke();
+  const kx = bx + labW + f1 * 0.3, kw = bw - labW - f1 * 0.6, koji = kojiText();
+  const wrapText = (text, font)=>{
+    ctx.font = font + "px sans-serif";
+    const lines = []; let line = "";
+    for(const ch of text){
+      if(ctx.measureText(line + ch).width > kw && line){ lines.push(line); line = ch; }
+      else line += ch;
+    }
+    if(line) lines.push(line);
+    return lines;
+  };
+  let kf = f1, lines = wrapText(koji, kf);
+  while(kf > 8 && (lines.length > 2 || lines.length * kf * 1.25 > rowH)){ kf -= 1; lines = wrapText(koji, kf); }
+  const lh = kf * 1.25, y0 = by + rowH / 2 - (lines.length - 1) * lh / 2;
+  lines.forEach((ln, i)=>ctx.fillText(ln, kx, y0 + i * lh));
+  ctx.font = "600 " + (bh * 0.34) + "px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(num, bx + bw / 2, by + rowH + (bh - rowH) / 2);
+  ctx.textAlign = "left";
+}
+let camShooting = false;
+$("camShutter").onclick = async ()=>{
+  if(camShooting) return;
+  camShooting = true; $("camShutter").disabled = true;
+  try {
+    const v = $("camVideo");
+    const c = document.createElement("canvas");
+    if(camStream && v.videoWidth){
+      const vw = v.videoWidth, vh = v.videoHeight;
+      let cw, ch;
+      if(vw / vh > CAM_AR){ ch = vh; cw = vh * CAM_AR; } else { cw = vw; ch = vw / CAM_AR; }
+      const H = Math.min(CAM_MAXH, Math.round(ch)), W = Math.round(H * CAM_AR);
+      c.width = W; c.height = H;
+      c.getContext("2d").drawImage(v, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, W, H);
+    } else { // テストモード
+      c.width = 960; c.height = 1280;
+      const ctx = c.getContext("2d");
+      const g = ctx.createLinearGradient(0, 0, 960, 1280);
+      g.addColorStop(0, "#666"); g.addColorStop(1, "#333");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 960, 1280);
+    }
+    drawCamBoard(c.getContext("2d"), c.width, c.height, camNo);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+    const meta = await addPhotoBlob(routeKey(), camNo, camBranch, blob);
+    $("camFlash").style.opacity = "0.9";
+    setTimeout(()=>$("camFlash").style.opacity = "0", 120);
+    toast(meta.filename + " を保存しました");
+    closeCam();
+    updatePhotoButtons();
+    renderSummary();
+  } finally { camShooting = false; $("camShutter").disabled = false; }
+};
+
+/* 写真ZIP書き出し（無圧縮ZIP自前実装） */
+const CRC_T = (()=>{ const t = new Uint32Array(256);
+  for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c; }
+  return t; })();
+const crc32 = d => { let c = 0xFFFFFFFF; for(let i = 0; i < d.length; i++) c = CRC_T[(c ^ d[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+async function makeZip(files){
+  const enc = new TextEncoder(); const parts = [], central = []; let offset = 0, count = 0;
+  for(const f of files){
+    const data = new Uint8Array(await f.blob.arrayBuffer());
+    const nb = enc.encode(f.name), crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+    lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true);
+    lh.setUint16(26, nb.length, true);
+    parts.push(lh.buffer, nb, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+    ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true);
+    ch.setUint16(28, nb.length, true); ch.setUint32(42, offset, true);
+    central.push(ch.buffer, nb);
+    offset += 30 + nb.length + data.length; count++;
+  }
+  const cSize = central.reduce((s, b)=>s + b.byteLength, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, count, true); end.setUint16(10, count, true);
+  end.setUint32(12, cSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end.buffer], {type:"application/zip"});
+}
+$("zipBtn").onclick = async ()=>{
+  const key = sumKey();
+  const ps = photoMetas.filter(m => m.key === key).sort((a,b)=>a.filename < b.filename ? -1 : 1);
+  if(!ps.length){ toast("この路線の写真がありません"); return; }
+  const CHUNK = 50;
+  const chunks = [];
+  for(let i = 0; i < ps.length; i += CHUNK) chunks.push(ps.slice(i, i + CHUNK));
+  const d = new Date();
+  const [ko, kr] = key.split("|");
+  toast("ZIP作成中…（" + ps.length + "枚）");
+  for(let ci = 0; ci < chunks.length; ci++){
+    const files = [];
+    for(const m of chunks[ci]) files.push({name: m.filename, blob: await getPhotoBlob(m.id)});
+    const zip = await makeZip(files);
+    const base = ("写真_" + ko + "_" + kr + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate())).replace(/[\\/:*?"<>|]/g,"");
+    const name = chunks.length > 1 ? base + "_" + (ci+1) + ".zip" : base + ".zip";
+    const file = new File([zip], name, {type:"application/zip"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try { await navigator.share({files:[file], title:name}); } catch(e){}
+    } else {
+      dl(zip, name);
+      await new Promise(r => setTimeout(r, 800));
+    }
+  }
+  toast(ps.length + "枚を" + chunks.length + "個のZIPに書き出しました");
+};
+$("koji").addEventListener("change", ()=>{ settings.koji = $("koji").value.trim(); store("gj_settings", settings); });
+$("tno").addEventListener("input", updatePhotoButtons);
+$("hojo").addEventListener("input", updatePhotoButtons);
+
 let toastTimer;
 function toast(msg){
   const t = $("toast"); t.textContent = msg; t.classList.add("show");
@@ -955,10 +1239,17 @@ function toast(msg){
 }
 
 $("inspector").value = settings.inspector || "";
+$("koji").value = settings.koji || "";
 $("office").value = last.office || ""; $("route").value = last.route || "";
 $("dt").value = nowStr();
 routeChanged(); calc(); girthWarnUpd();
 if(!settings.inspector || !$("office").value || !$("route").value) $("setPanel").open = true;
+openPdb().then(async db=>{
+  pdb = db;
+  photoMetas = await preq(ptx("meta","readonly").getAll()) || [];
+  updatePhotoButtons(); renderSummary();
+});
+if(navigator.storage && navigator.storage.persist) navigator.storage.persist();
 
 if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
 </script>
