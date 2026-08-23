@@ -1,13 +1,12 @@
-/* ランチャー用 Service Worker（サブアプリは各ディレクトリの sw.js が担当） */
-const VERSION = "sys-v1";
+const VERSION = "gj-v13";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
-  "./common/project.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./icons/apple-touch-icon.png"
+  "./icons/apple-touch-icon.png",
+  "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
 ];
 
 self.addEventListener("install", e => {
@@ -24,6 +23,17 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
+  if (e.request.mode === "navigate") {
+    // アプリ本体は「ネット優先」: オンラインなら常に最新版、圏外ならキャッシュ
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(VERSION).then(c => { c.put("./index.html", clone.clone()); c.put("./", clone); });
+        return res;
+      }).catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(cached => {
       const fetched = fetch(e.request)
