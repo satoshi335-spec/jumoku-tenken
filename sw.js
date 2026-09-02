@@ -1,5 +1,9 @@
-/* ランチャー用 Service Worker（サブアプリは各ディレクトリの sw.js が担当） */
-const VERSION = "sys-v2";
+/* ランチャー用 Service Worker（サブアプリは各ディレクトリの sw.js が担当）
+
+   HTML・JS は「まず通信、だめならキャッシュ」。
+   古いキャッシュのまま新しい画面と食い違うのを防ぐため、コードは常に最新を取りに行く。
+   アイコンなどは「まずキャッシュ」で速さを優先する。 */
+const VERSION = "sys-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -11,7 +15,11 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(VERSION)
+      .then(c => Promise.all(ASSETS.map(u => c.add(u).catch(() => null))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", e => {
@@ -22,20 +30,41 @@ self.addEventListener("activate", e => {
   );
 });
 
+function isCode(url) {
+  return /\.(?:html|js|webmanifest)$/.test(url.pathname) || url.pathname.endsWith("/");
+}
+
 self.addEventListener("fetch", e => {
-  if (e.request.method !== "GET") return;
-  e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(cached => {
-      const fetched = fetch(e.request)
+  const req = e.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== location.origin) return;
+
+  if (req.mode === "navigate" || isCode(url)) {
+    // コードは最新を優先（オフラインならキャッシュ）
+    e.respondWith(
+      fetch(req)
         .then(res => {
-          if (res.ok && new URL(e.request.url).origin === location.origin) {
+          if (res && res.ok) {
             const clone = res.clone();
-            caches.open(VERSION).then(c => c.put(e.request, clone));
+            caches.open(VERSION).then(c => c.put(req, clone));
           }
           return res;
         })
-        .catch(() => cached);
-      return cached || fetched;
-    })
+        .catch(() => caches.match(req, { ignoreSearch: true })
+          .then(c => c || caches.match("./index.html")))
+    );
+    return;
+  }
+
+  // 画像などはキャッシュ優先
+  e.respondWith(
+    caches.match(req, { ignoreSearch: true }).then(cached => cached || fetch(req).then(res => {
+      if (res && res.ok) {
+        const clone = res.clone();
+        caches.open(VERSION).then(c => c.put(req, clone));
+      }
+      return res;
+    }))
   );
 });
