@@ -134,10 +134,15 @@ function render(){
     const card = document.createElement("div");
     card.className = "card" + (isCur ? " cur" : "");
     const meta = [p.office, p.year, p.kind].filter(Boolean).join("　");
+    const rs = SysProject.routeNames(p);
+    const rtxt = rs.length
+      ? '<br>路線：' + SysProject.esc(rs.slice(0, 3).join("、")) + (rs.length > 3 ? "　ほか" + (rs.length - 3) + "路線" : "")
+      : "";
     card.innerHTML =
       '<div class="rowFlex"><p class="pname">' + SysProject.esc(p.name) + '</p>' +
       (isCur ? '<span class="badge">選択中</span>' : '') + '</div>' +
-      '<p class="pmeta">' + SysProject.esc(meta) + (p.inspector ? '<br>点検者：' + SysProject.esc(p.inspector) : '') + '</p>';
+      '<p class="pmeta">' + SysProject.esc(meta) +
+      (p.inspector ? '<br>点検者：' + SysProject.esc(p.inspector) : '') + rtxt + '</p>';
 
     const stages = document.createElement("div");
     stages.className = "stages";
