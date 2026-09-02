@@ -289,7 +289,7 @@ function toast(msg){
   clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove("show"), 2600);
 }
 
-const APP_VER = 5;   // index.html を直したら1つ増やす
+const APP_VER = 6;   // index.html を直したら1つ増やす
 $("verInfo").textContent =
   "画面 v" + APP_VER + "　／　共通部品 v" + (SysProject.VERSION || "1（古い版）") +
   (SysProject.VERSION === APP_VER ? "" : "　※食い違っています。下のボタンで更新してください");

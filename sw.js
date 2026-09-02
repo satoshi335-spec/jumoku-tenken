@@ -3,7 +3,7 @@
    HTML・JS は「まず通信、だめならキャッシュ」。
    古いキャッシュのまま新しい画面と食い違うのを防ぐため、コードは常に最新を取りに行く。
    アイコンなどは「まずキャッシュ」で速さを優先する。 */
-const VERSION = "sys-v5";
+const VERSION = "sys-v6";
 const ASSETS = [
   "./",
   "./index.html",
