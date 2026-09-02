@@ -1,5 +1,5 @@
 /* ランチャー用 Service Worker（サブアプリは各ディレクトリの sw.js が担当） */
-const VERSION = "sys-v1";
+const VERSION = "sys-v2";
 const ASSETS = [
   "./",
   "./index.html",
