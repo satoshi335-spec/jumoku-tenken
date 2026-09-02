@@ -235,12 +235,12 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
         <input id="zumen" data-key="zumen" placeholder="8" style="font-size:18px;height:54px;text-align:center">
       </div>
       <div>
-        <label class="lbl">樹木番号（桝番号）</label>
-        <input id="tno" autocomplete="off" placeholder="例）左18">
+        <label class="lbl">桝No.</label>
+        <input id="tno" autocomplete="off" placeholder="例）L1">
       </div>
       <div>
-        <label class="lbl">補助番号</label>
-        <input id="hojo" autocomplete="off" placeholder="1／イ" style="font-size:22px;font-weight:600;text-align:center;height:54px">
+        <label class="lbl">樹木No.（補助番号）</label>
+        <input id="hojo" autocomplete="off" placeholder="L38／1" style="font-size:20px;font-weight:600;text-align:center;height:54px">
       </div>
     </div>
     <div id="sug-zumen" class="sug"></div>
@@ -659,8 +659,20 @@ $("importFile").addEventListener("change", async e=>{
   } catch(err){ toast("取込に失敗しました：" + err.message); }
   e.target.value = "";
 });
+/* 桝No＋樹木No だけでは重なる（図面の区間ごとに番号がふり直されている）かを調べる */
+function detectZumenKey(items){
+  const seen = new Set();
+  for(const it of items){
+    const k = (it.base || "") + "|" + (it.hojo || "");
+    if(seen.has(k)) return true;
+    seen.add(k);
+  }
+  return false;
+}
 function applyImport(items){
-  imports[routeKey()] = {items, idx:0}; store("gj_imports", imports);
+  const zk = detectZumenKey(items);
+  items.forEach(it => { it.no = composeNo(it.zumen, it.base, it.hojo, zk); });
+  imports[routeKey()] = {items, idx:0, zumenKey:zk}; store("gj_imports", imports);
   setMode("list");
 }
 function normHead(s){ return String(s ?? "").replace(/[\s　]/g,""); }
@@ -681,7 +693,7 @@ function rowsToItems(rows){
   rows.slice(skipHeader ? 1 : 0).forEach(r=>{
     let no = String(r[cols.no] ?? "").trim();
     if(!no) return;
-    // 補助番号列があれば「左18」+「1」→「左18-1」に結合（写真・シート名と一致させる）
+    // 桝Noと樹木Noは別々に持ち、照合用の番号は applyImport で組み立てる
     const hojo = String(cols.hojo > -1 ? r[cols.hojo] ?? "" : "").trim();
     const base = no;
     if(hojo && !no.endsWith("-" + hojo)) no = no + "-" + hojo;
@@ -691,8 +703,9 @@ function rowsToItems(rows){
   });
   return out;
 }
+/* 「左18-1」「左18-イ」「049-L1-L38」の末尾を樹木No（補助番号）として切り出す */
 function splitHojo(no){
-  const m = String(no).match(/^(.*\d.*)-(\d{1,2}|[ア-ヴ])$/);
+  const m = String(no).match(/^(.*\d.*)-([A-Za-z]{0,2}\d{1,3}|[ア-ヴ])$/);
   return m ? {base:m[1], hojo:m[2]} : {base:no, hojo:""};
 }
 // リスト項目が点検済みか: 番号そのもの、または枝番付き（左18→左18-1など）で保存されていれば済
@@ -792,10 +805,10 @@ function renderListInfo(it, saved){
   const box = $("listInfo");
   if(!it){ box.classList.remove("show"); box.innerHTML = ""; return; }
   const parts = [];
-  if(it.zumen) parts.push("図面 <b>" + esc(it.zumen) + "</b>");
+  if(it.zumen) parts.push("図面番号 <b>" + esc(it.zumen) + "</b>");
   const sh = it.base != null ? {base: it.base, hojo: it.hojo || ""} : splitHojo(it.no);
-  if(sh.base) parts.push("桝 <b>" + esc(sh.base) + "</b>");
-  if(sh.hojo) parts.push("樹木 <b>" + esc(sh.hojo) + "</b>");
+  if(sh.base) parts.push("桝No. <b>" + esc(sh.base) + "</b>");
+  if(sh.hojo) parts.push("樹木No. <b>" + esc(sh.hojo) + "</b>");
   if(it.sp) parts.push("<b>" + esc(it.sp) + "</b>");
   if(it.girth) parts.push("幹周 " + esc(it.girth) + "cm");
   let html = parts.join("　｜　");
@@ -937,9 +950,28 @@ function prevHojo(h){
   if(i > 0) return IROHA[i - 1];
   return "";
 }
+/* 図面番号「130-41-049」→「049」。区間ごとに桝Noがふり直される台帳で番号を区別するのに使う */
+function zumenTag(z){
+  const parts = String(z || "").trim().split(/[-‐－_\s]+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : "";
+}
+/* 図面番号・桝No・樹木No から、路線の中で重ならない1つの番号を組み立てる。
+   画面には桝No「L1」だけを出し、写真名や照合にはこの番号を使う。 */
+function composeNo(zumen, masu, eda, useZumen){
+  masu = String(masu || "").trim();
+  eda = String(eda || "").trim();
+  if(!masu) return "";
+  let n = masu;
+  const tag = useZumen ? zumenTag(zumen) : "";
+  if(tag && !n.startsWith(tag + "-")) n = tag + "-" + n;
+  return eda ? n + "-" + eda : n;
+}
+function useZumenKey(){
+  const st = listState();
+  return !!(st && st.zumenKey);
+}
 function fullNo(){
-  const b = $("tno").value.trim(), h = $("hojo").value.trim();
-  return h ? b + "-" + h : b;
+  return composeNo($("zumen").value, $("tno").value, $("hojo").value, useZumenKey());
 }
 $("edaBtn").onclick = ()=>{
   const h = $("hojo").value.trim();
@@ -1035,7 +1067,8 @@ function saveAndMove(move){
     id: editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,6)),
     office: $("office").value.trim(), route: $("route").value.trim(),
     zumen: $("zumen").value.trim(), city: $("city").value.trim(), town: $("town").value.trim(),
-    no, hojo: $("hojo").value.trim(), sp: $("sp").value.trim(), girth: $("girth").value.trim(),
+    no, masu: $("tno").value.trim(), hojo: $("hojo").value.trim(),
+    sp: $("sp").value.trim(), girth: $("girth").value.trim(),
     kabu: stems, kabuNote: (kabuOn && stems.length) ? kabuText(stems, $("girth").value) : "",
     dt: $("dt").value, items, memo: $("memo").value.trim(),
     created: editingId ? (records.find(r => r.id === editingId) || {}).created || Date.now() : Date.now()
@@ -1120,7 +1153,11 @@ function startEdit(id, quiet){
     routeChanged();
   }
   $("zumen").value = r.zumen || ""; $("city").value = r.city || ""; $("town").value = r.town || "";
-  const esh = splitHojo(r.no);
+  // 保存時の桝No・樹木Noをそのまま戻す（番号から切り出そうとすると「L38」のような
+  // 英字付きの樹木Noを拾えず、桝Noに番号全体が入ってしまう）
+  const esh = (r.masu != null && r.masu !== "")
+    ? {base: r.masu, hojo: r.hojo || ""}
+    : splitHojo(r.no);
   $("tno").value = esh.base; $("hojo").value = esh.hojo; $("sp").value = r.sp;
   $("dt").value = r.dt; $("memo").value = r.memo;
   const stems = r.kabu || [];
