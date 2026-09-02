@@ -7,7 +7,7 @@
 (function (global) {
   "use strict";
 
-  var VERSION = 6;   // project.js を直したら1つ増やす（画面下に表示される）
+  var VERSION = 7;   // project.js を直したら1つ増やす（画面下に表示される）
   var KEY_P = "sys_projects", KEY_C = "sys_current";
 
   var TERM_PRESETS = {

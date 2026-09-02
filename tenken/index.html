@@ -49,6 +49,11 @@ input[readonly]{background:#F1EFE8;color:var(--tx2)}
 #listInfo.show{display:block}
 #listInfo b{font-weight:600}
 #listInfo .bikou{color:var(--ng-tx);font-weight:600}
+.emptyBtn{border-color:var(--tx2);color:var(--tx2)}
+.emptyBtn.on{background:var(--tx2);color:#fff;border-color:var(--tx2);font-weight:600}
+body.noTree .itm,body.noTree #girth,body.noTree .kabuRow,body.noTree #kabuBox{opacity:.35;pointer-events:none}
+#listBody tr.picked{background:var(--acc-bg)}
+#listBody td.chk{text-align:center;font-size:17px;cursor:pointer;user-select:none;width:34px}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .itm{font-size:14px;min-height:52px;padding:8px 6px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--tx);line-height:1.35;font-family:inherit}
 .itm.on{background:var(--ng-bg);color:var(--ng-tx);border-color:var(--ng-bd);font-weight:600}
@@ -253,6 +258,11 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     <p id="tnoNote" class="note">前回保存の続き番号を自動提案。欠番は打ち直せば以降その番号から連番</p>
     <label class="lbl">樹木名</label>
     <input id="sp" data-key="sp" placeholder="例）イチョウ">
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+      <button type="button" class="miniBtn emptyBtn" id="karaBtn">空桝</button>
+      <button type="button" class="miniBtn emptyBtn" id="nashiBtn">桝無し</button>
+      <button type="button" class="miniBtn" id="treeBtn" style="display:none">樹木ありに戻す</button>
+    </div>
     <div id="sug-sp" class="sug"></div>
 
     <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:8px;margin-top:12px">
@@ -323,6 +333,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     <div class="sumChip" style="background:var(--ok-bg);color:var(--ok-tx)"><b id="sumOk">0</b>良好</div>
     <div class="sumChip" style="background:var(--warn-bg);color:var(--warn-tx)"><b id="sumWarn">0</b>維持管理</div>
     <div class="sumChip" style="background:var(--ng-bg);color:var(--ng-tx)"><b id="sumNg">0</b>外観診断</div>
+    <div class="sumChip" style="background:#EAE8E0;color:var(--tx2)"><b id="sumKara">0</b>空桝・桝無し</div>
   </div>
   <div class="card">
     <div class="rowFlex">
@@ -349,7 +360,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     </div>
     <div class="tblWrap">
       <table class="sum" style="min-width:360px">
-        <thead><tr><th>樹木番号</th><th>樹木名</th><th>状態</th><th>樹木備考</th><th></th></tr></thead>
+        <thead><tr><th></th><th>樹木番号</th><th>樹木名</th><th>状態</th><th>樹木備考</th><th></th></tr></thead>
         <tbody id="listBody"></tbody>
       </table>
     </div>
@@ -357,6 +368,25 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
       <button id="prevPage" class="miniBtn">← 前の100件</button>
       <button id="nextPage" class="miniBtn">次の100件 →</button>
     </div>
+
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+      <div class="rowFlex" style="flex-wrap:wrap;gap:6px">
+        <span style="font-size:13px;font-weight:600">まとめて記録</span>
+        <span id="pickCount" class="note" style="margin:0"></span>
+      </div>
+      <p class="note">左の□をタップして選びます。連続する空桝は［範囲で選ぶ］を押してから
+        最初と最後をタップすると、間がまとめて選べます。</p>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <button id="rangeBtn" class="miniBtn">範囲で選ぶ</button>
+        <button id="pickPageBtn" class="miniBtn">このページを全選択</button>
+        <button id="pickClearBtn" class="miniBtn">選択を解除</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <button id="bulkKaraBtn" class="miniBtn pri">選んだ樹木を「空桝」で記録</button>
+        <button id="bulkNashiBtn" class="miniBtn pri">「桝無し」で記録</button>
+      </div>
+    </div>
+
     <div style="text-align:right;margin-top:12px">
       <button id="delListBtn" class="miniBtn del">取込リストを削除</button>
     </div>
@@ -611,30 +641,109 @@ function renderListTable(){
   $("prevPage").style.opacity = listPage === 0 ? .4 : 1;
   $("nextPage").style.opacity = listPage >= pages - 1 ? .4 : 1;
   const tb = $("listBody"); tb.innerHTML = "";
+  const savedByNo = {};
+  sumRecords().forEach(r => { savedByNo[r.no] = r; });
   st.items.slice(from, to).forEach((it, k)=>{
     const i = from + k;
     const isDone = listItemDone(it, doneSet);
     const gone = goneReason(it);
-    // 状態…点検済／台帳で伐採などになっているものはその内容／未
+    const rec = savedByNo[it.no];
+    // 状態…点検済（空桝ならその内容）／台帳で伐採などになっていればその内容／未
     let label, style;
-    if(isDone){ label = "点検済"; style = "background:var(--ok-bg);color:var(--ok-tx)"; }
+    if(isDone){
+      label = (rec && isNoTree(rec.sp)) ? rec.sp : "点検済";
+      style = (rec && isNoTree(rec.sp)) ? "background:#EAE8E0;color:var(--tx2)"
+                                        : "background:var(--ok-bg);color:var(--ok-tx)";
+    }
     else if(gone){ label = gone; style = "background:var(--ng-bg);color:var(--ng-tx)"; }
     else { label = "未"; style = "background:#F1EFE8;color:var(--tx2)"; }
     const tr = document.createElement("tr");
-    tr.innerHTML = "<td><b>" + esc(it.no) + "</b></td><td>" + esc(it.sp || "—") + "</td>" +
+    if(picked.has(i)) tr.className = "picked";
+    tr.innerHTML = '<td class="chk">' + (picked.has(i) ? "☑" : "☐") + "</td>" +
+      "<td><b>" + esc(it.no) + "</b></td><td>" + esc((rec && rec.sp) || it.sp || "—") + "</td>" +
       '<td><span class="rjudge" style="' + style + '">' + esc(label) + "</span></td>" +
       '<td class="memoCell">' + esc(it.bikou || "") + "</td>";
+    tr.querySelector(".chk").onclick = () => togglePick(i);
     const td = document.createElement("td");
-    if(!isDone){
-      const b = document.createElement("button");
-      b.className = gone ? "miniBtn" : "miniBtn pri";
-      b.textContent = "入力へ";
-      b.onclick = () => jumpTo(i);
-      td.appendChild(b);
-    }
+    const b = document.createElement("button");
+    b.className = (isDone || gone) ? "miniBtn" : "miniBtn pri";
+    b.textContent = isDone ? "見直す" : "入力へ";
+    b.onclick = () => jumpTo(i);
+    td.appendChild(b);
     tr.appendChild(td);
     tb.appendChild(tr);
   });
+  $("pickCount").textContent = picked.size ? picked.size + "本を選択中" : "";
+}
+
+/* ===== まとめて「空桝」「桝無し」で記録する（連続する空桝の入力を省く） ===== */
+let picked = new Set();
+let rangeMode = false, rangeFirst = null;
+
+function togglePick(i){
+  if(rangeMode){
+    if(rangeFirst === null){
+      rangeFirst = i;
+      toast("ここから。もう1つの端をタップしてください");
+      renderListTable();
+      return;
+    }
+    const a = Math.min(rangeFirst, i), b = Math.max(rangeFirst, i);
+    for(let k = a; k <= b; k++) picked.add(k);
+    rangeFirst = null; rangeMode = false;
+    $("rangeBtn").classList.remove("pri");
+    renderListTable();
+    toast((b - a + 1) + "本を選びました");
+    return;
+  }
+  if(picked.has(i)) picked.delete(i); else picked.add(i);
+  renderListTable();
+}
+$("rangeBtn").onclick = ()=>{
+  rangeMode = !rangeMode; rangeFirst = null;
+  $("rangeBtn").classList.toggle("pri", rangeMode);
+  toast(rangeMode ? "最初と最後の樹木をタップしてください" : "範囲選択をやめました");
+};
+$("pickPageBtn").onclick = ()=>{
+  const st = sumListState(); if(!st) return;
+  const from = listPage * 100, to = Math.min(from + 100, st.items.length);
+  for(let i = from; i < to; i++) picked.add(i);
+  renderListTable();
+};
+$("pickClearBtn").onclick = ()=>{ picked.clear(); rangeFirst = null; renderListTable(); };
+$("bulkKaraBtn").onclick = ()=> bulkNoTree("空桝");
+$("bulkNashiBtn").onclick = ()=> bulkNoTree("桝無し");
+
+function bulkNoTree(label){
+  const st = sumListState();
+  if(!st){ toast("取込リストがありません"); return; }
+  if(!picked.size){ toast("記録する樹木を選んでください"); return; }
+  const key = sumKey(), parts = key.split("|");
+  const office = parts[0], route = parts[1];
+  const idx = [...picked].sort((a,b)=>a-b);
+  const targets = idx.map(i => st.items[i]).filter(Boolean);
+  if(!confirm(targets.length + "本を「" + label + "」として記録します。よろしいですか？\n\n"
+              + targets.slice(0,8).map(t=>t.no).join("、") + (targets.length>8 ? " ほか" : ""))) return;
+  const now = nowStr();
+  let added = 0, updated = 0;
+  targets.forEach(it=>{
+    const exist = records.find(r => r.office === office && r.route === route && r.no === it.no);
+    const base = {
+      office, route, zumen: it.zumen || "", city: it.city || "", town: it.town || "",
+      no: it.no, masu: it.base || it.no, hojo: it.hojo || "",
+      sp: label, girth: "", girthPrev: it.girth || "",
+      kabu: [], kabuNote: "", dt: now, items: new Array(ITEMS.length).fill(""),
+      memo: it.bikou ? "台帳備考：" + it.bikou : ""
+    };
+    if(exist){ Object.assign(exist, base); updated++; }
+    else { records.push(Object.assign({id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+                                       created: Date.now()}, base)); added++; }
+  });
+  store("gj_records", records);
+  picked.clear(); rangeFirst = null; rangeMode = false;
+  $("rangeBtn").classList.remove("pri");
+  renderCnt(); renderSummary(); renderProgress();
+  toast(label + " として " + (added + updated) + "本を記録しました");
 }
 $("prevPage").onclick = ()=>{ listPage--; renderListTable(); };
 $("nextPage").onclick = ()=>{ listPage++; renderListTable(); };
@@ -1074,24 +1183,65 @@ function kabuCalc(){
   girthWarnUpd();
 }
 
+/* 樹木名が「空桝」「桝無し」＝そこに点検する樹木が無い状態 */
+const NO_TREE = ["空桝", "桝無し"];
+function isNoTree(sp){ return NO_TREE.indexOf(String(sp || "").trim()) > -1; }
+
 function calc(){
+  const noTree = isNoTree($("sp").value);
+  document.body.classList.toggle("noTree", noTree);
+  $("karaBtn").classList.toggle("on", $("sp").value.trim() === "空桝");
+  $("nashiBtn").classList.toggle("on", $("sp").value.trim() === "桝無し");
+  $("treeBtn").style.display = noTree ? "" : "none";
+  const j = $("judge");
+  if(noTree){
+    j.textContent = $("sp").value.trim();
+    j.style.background = "#EAE8E0"; j.style.color = "var(--tx2)";
+    updatePhotoButtons();
+    return;
+  }
   const btns = [...document.querySelectorAll(".itm")];
   const on1  = btns.filter(b => ITEMS[b.dataset.i].g === 1 && b.classList.contains("on")).length;
   const on23 = btns.filter(b => ITEMS[b.dataset.i].g !== 1 && b.classList.contains("on")).length;
-  const j = $("judge");
   if(on23 > 0){ j.textContent = "樹木の外観診断が必要"; j.style.background = "var(--ng-bg)"; j.style.color = "var(--ng-tx)"; }
   else if(on1 > 0){ j.textContent = "維持管理の処置が必要"; j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
   else { j.textContent = "概ね良好・異常なし"; j.style.background = "var(--ok-bg)"; j.style.color = "var(--ok-tx)"; }
   updatePhotoButtons();
 }
-function judgeOf(items){
+
+/* 空桝・桝無しを設定する。樹木の情報は使わないので消してしまう */
+function setNoTree(label){
+  const cur = $("sp").value.trim();
+  if(cur === label){ clearNoTree(); return; }
+  $("sp").value = label;
+  $("girth").value = ""; $("girth").readOnly = false;
+  $("kabuChk").checked = false; $("kabuBox").classList.remove("show");
+  $("kabuNote").textContent = ""; $("memoAutoHint").textContent = "";
+  document.querySelectorAll(".stem").forEach(i => i.value = "");
+  document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
+  calc(); girthWarnUpd();
+}
+function clearNoTree(){
+  if(isNoTree($("sp").value)) $("sp").value = "";
+  calc(); girthWarnUpd();
+}
+$("karaBtn").onclick = ()=> setNoTree("空桝");
+$("nashiBtn").onclick = ()=> setNoTree("桝無し");
+$("treeBtn").onclick = ()=> clearNoTree();
+$("sp").addEventListener("input", ()=>{ calc(); girthWarnUpd(); });
+
+function judgeOf(items, sp){
+  if(isNoTree(sp)) return String(sp).trim();
   const on1 = items.slice(0,6).filter(v => v === "○").length;
   const on23 = items.slice(6).filter(v => v === "○").length;
   if(on23 > 0) return "樹木の外観診断が必要";
   if(on1 > 0) return "維持管理の処置が必要";
   return "概ね良好・異常なし";
 }
-function photosOf(items){ return items.includes("○") ? 2 : 1; }
+function photosOf(items, sp){
+  if(isNoTree(sp)) return 0;      // 樹木が無いので撮影は任意
+  return items.includes("○") ? 2 : 1;
+}
 function fullMemo(r){ return (r.kabuNote ? r.kabuNote + (r.memo ? "。" : "") : "") + (r.memo || ""); }
 
 /* 保存して move の向きへ動く（-1=前の樹木 / 0=この樹木 / +1=次の樹木）*/
@@ -1111,7 +1261,7 @@ function saveAndMove(move){
   if(dup){ toast("樹木番号 " + no + " はこの路線で保存済みです"); return; }
   const items = [...document.querySelectorAll(".itm")].map(b => b.classList.contains("on") ? "○" : "");
   // 撮り忘れチェック: 必要枚数（異常あり2枚/なし1枚）に足りなければ警告
-  const needP = photosOf(items), haveP = pdb ? photosFor(routeKey(), no).length : 0;
+  const needP = photosOf(items, $("sp").value), haveP = pdb ? photosFor(routeKey(), no).length : 0;
   if(pdb && haveP < needP && !confirm("⚠ 写真が " + haveP + "/" + needP + " 枚です。\n撮影せずに保存しますか？\n（キャンセル→📷ボタンで撮影できます）")) return;
   const kabuOn = $("kabuChk").checked;
   const stems = kabuOn ? stemVals() : [];
@@ -1250,21 +1400,23 @@ $("cancelEdit").onclick = ()=>{ endEdit(); clearTreeFields(); };
 function renderSummary(){
   renderSumSel();
   const rr = sumRecords().slice().sort((a,b) => a.created - b.created);
-  const jd = rr.map(r => judgeOf(r.items));
+  const jd = rr.map(r => judgeOf(r.items, r.sp));
   $("sumAll").textContent = rr.length;
   $("sumOk").textContent = jd.filter(j => j.startsWith("概ね")).length;
   $("sumWarn").textContent = jd.filter(j => j.startsWith("維持")).length;
-  $("sumNg").textContent = jd.filter(j => j.startsWith("樹木")).length;
+  $("sumNg").textContent = jd.filter(j => j === "樹木の外観診断が必要").length;
+  $("sumKara").textContent = rr.filter(r => isNoTree(r.sp)).length;
   $("sumTitle").textContent = (sumKey().split("|")[1] || "路線未設定") + " の一覧";
   renderListTable();
   const tb = $("sumBody"); tb.innerHTML = "";
   rr.forEach((r,i)=>{
     const j = jd[i];
-    const cls = j.startsWith("概ね") ? "background:var(--ok-bg);color:var(--ok-tx)"
+    const cls = isNoTree(r.sp) ? "background:#EAE8E0;color:var(--tx2)"
+             : j.startsWith("概ね") ? "background:var(--ok-bg);color:var(--ok-tx)"
              : j.startsWith("維持") ? "background:var(--warn-bg);color:var(--warn-tx)"
              : "background:var(--ng-bg);color:var(--ng-tx)";
     const tr = document.createElement("tr");
-    const needP = photosOf(r.items);
+    const needP = photosOf(r.items, r.sp);
     const haveP = pdb ? photosFor(r.office + "|" + r.route, r.no).length : 0;
     const pCls = haveP >= needP ? "color:var(--ok-tx);font-weight:600" : "color:var(--ng-tx);font-weight:600";
     // 今回と前回の幹周を並べ、3割以上ちがうときは赤くする
@@ -1273,8 +1425,11 @@ function renderSummary(){
     tr.innerHTML = "<td><b>" + esc(r.no) + "</b></td><td>" + esc(r.sp || "—") + "</td>" +
       '<td style="' + (bigDiff ? "color:var(--ng-tx);font-weight:600" : "") + '">' + esc(r.girth || "—") + "</td>" +
       '<td style="color:var(--tx2)">' + esc(r.girthPrev || "—") + "</td>" +
-      '<td><span class="rjudge" style="' + cls + '">' + (j.startsWith("概ね") ? "良好" : j.startsWith("維持") ? "維持管理" : "外観診断") + "</span></td>" +
-      '<td style="' + pCls + '">' + (haveP >= needP ? "" : "⚠") + haveP + "/" + needP + "枚</td><td class=\"memoCell\">" + esc(fullMemo(r)) + "</td>";
+      '<td><span class="rjudge" style="' + cls + '">' +
+        (isNoTree(r.sp) ? esc(r.sp) : j.startsWith("概ね") ? "良好" : j.startsWith("維持") ? "維持管理" : "外観診断") + "</span></td>" +
+      '<td style="' + pCls + '">' + (needP === 0 ? (haveP ? haveP + "枚" : "—")
+        : (haveP >= needP ? "" : "⚠") + haveP + "/" + needP + "枚") + "</td>" +
+      '<td class="memoCell">' + esc(fullMemo(r)) + "</td>";
     const td = document.createElement("td");
     const eb = document.createElement("button"); eb.className = "miniBtn"; eb.textContent = "編集";
     eb.onclick = () => startEdit(r.id);
@@ -1305,7 +1460,7 @@ $("csvBtn").onclick = ()=>{
     (r.masu != null && r.masu !== "") ? r.masu : splitHojo(r.no).base,
     (r.hojo != null && r.hojo !== "") ? r.hojo : splitHojo(r.no).hojo,
     r.sp, r.girth || "", r.girthPrev || "", r.city || "", r.town || "",
-    (r.dt || "").replace("T"," "), settings.inspector, ...r.items, fullMemo(r), judgeOf(r.items), photosOf(r.items)]
+    (r.dt || "").replace("T"," "), settings.inspector, ...r.items, fullMemo(r), judgeOf(r.items, r.sp), photosOf(r.items, r.sp)]
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();
@@ -1369,7 +1524,10 @@ async function deletePhotosOfKey(key){
 async function getPhotoBlob(id){ return (await preq(ptx("blobs","readonly").get(id))).blob; }
 
 function kojiText(){ return (settings.koji || "").trim() || ($("office").value + " " + $("route").value + " 樹木点検").trim(); }
-function requiredPhotos(){ return document.querySelectorAll(".itm.on").length > 0 ? 2 : 1; }
+function requiredPhotos(){
+  if(isNoTree($("sp").value)) return 0;   // 空桝・桝無しは撮影任意
+  return document.querySelectorAll(".itm.on").length > 0 ? 2 : 1;
+}
 function updatePhotoButtons(){
   if(!pdb) return;
   const no = fullNo(), key = routeKey(), req = requiredPhotos();
@@ -1380,7 +1538,9 @@ function updatePhotoButtons(){
   $("shot2").style.display = (req === 2 || has2) ? "block" : "none";
   $("shot2").classList.toggle("done", has2);
   $("shot2").textContent = (has2 ? "✔ 被害部（撮り直し）" : "📷 被害部を撮影");
-  $("photoHint").textContent = "📷 必要" + req + "枚・撮影済" + ps.length + "枚";
+  $("photoHint").textContent = req === 0
+    ? "📷 撮影は任意（撮影済" + ps.length + "枚）"
+    : "📷 必要" + req + "枚・撮影済" + ps.length + "枚";
   $("photoHint").style.color = ps.length >= req ? "var(--ok-tx)" : "var(--ng-tx)";
   $("photoHint").style.fontWeight = "600";
 }
