@@ -7,6 +7,7 @@
 (function (global) {
   "use strict";
 
+  var VERSION = 3;   // project.js を直したら1つ増やす（画面下に表示される）
   var KEY_P = "sys_projects", KEY_C = "sys_current";
 
   var TERM_PRESETS = {
@@ -48,6 +49,13 @@
     if (!p) return TERM_PRESETS.A;
     if (p.terms && p.terms.s1) return p.terms;
     return TERM_PRESETS[p.termPreset || "A"] || TERM_PRESETS.A;
+  }
+
+  /* 案件が持つ路線名の一覧（事務所PCで街路樹台帳を取り込むと入る） */
+  function routeNames(p) {
+    var rs = (p && p.routes) || [];
+    return rs.map(function (r) { return typeof r === "string" ? r : (r && r.name) || ""; })
+             .filter(function (n) { return !!n; });
   }
 
   /* 案件をエクスポート（PCハブへの受け渡し用） */
@@ -122,9 +130,10 @@
   }
 
   global.SysProject = {
+    VERSION: VERSION,
     TERM_PRESETS: TERM_PRESETS,
     all: all, current: current, setCurrent: setCurrent, upsert: upsert, remove: remove,
     terms: terms, exportJson: exportJson, importJson: importJson,
-    attachBar: attachBar, setField: setField, esc: esc
+    routeNames: routeNames, attachBar: attachBar, setField: setField, esc: esc
   };
 })(window);

@@ -1535,6 +1535,19 @@ SysProject.attachBar("tenken", {
     SysProject.setField("inspector", p.inspector, "change");
     SysProject.setField("office", p.office, "change");
     SysProject.setField("koji", p.koji, "change");
+    // 案件の路線を路線名の候補に加える（事務所PCで台帳を取り込むと入ってくる）
+    try{
+      var rs = (typeof SysProject.routeNames === "function")
+        ? SysProject.routeNames(p)
+        : ((p.routes || []).map(function(r){ return typeof r === "string" ? r : (r && r.name) || ""; })
+                           .filter(Boolean));
+      if(rs.length && typeof recents !== "undefined" && recents.route){
+        rs.forEach(function(n){
+          if(recents.route.indexOf(n) < 0) recents.route.push(n);
+        });
+        store("gj_recents", recents);
+      }
+    }catch(e){ console.warn("路線候補の反映に失敗:", e); }
   }
 });
 </script>
