@@ -102,6 +102,16 @@ details .card{border-radius:0 0 14px 14px;margin-bottom:0;border-top:none}
       <p class="note">事務所PCの統合ハブで作った案件ファイル（案件.json）を取り込めます。書き出したファイルはハブ側で読み込めます。</p>
     </div>
   </details>
+
+  <details>
+    <summary>アプリの更新・不具合のとき</summary>
+    <div class="card">
+      <p id="verInfo" class="note" style="margin-top:0"></p>
+      <button id="updBtn" class="miniBtn pri" style="width:100%;min-height:44px;margin-top:8px">最新版に更新する</button>
+      <p class="note">画面がおかしいときや「〜is not a function」のようなエラーが出るときに押してください。
+        保存済みの案件・点検データは消えません。</p>
+    </div>
+  </details>
 </main>
 <div id="toast" class="toast"></div>
 
@@ -109,6 +119,16 @@ details .card{border-radius:0 0 14px 14px;margin-bottom:0;border-top:none}
 <script>
 const $ = id => document.getElementById(id);
 let editingId = null;
+
+/* 古い common/project.js がキャッシュに残っていても画面が止まらないようにする */
+function routeNamesOf(p){
+  try{
+    if(typeof SysProject.routeNames === "function") return SysProject.routeNames(p);
+  }catch(e){}
+  return ((p && p.routes) || [])
+    .map(r => typeof r === "string" ? r : (r && r.name) || "")
+    .filter(Boolean);
+}
 
 (function initTerms(){
   const sel = $("f_terms");
@@ -134,7 +154,7 @@ function render(){
     const card = document.createElement("div");
     card.className = "card" + (isCur ? " cur" : "");
     const meta = [p.office, p.year, p.kind].filter(Boolean).join("　");
-    const rs = SysProject.routeNames(p);
+    const rs = routeNamesOf(p);
     const rtxt = rs.length
       ? '<br>路線：' + SysProject.esc(rs.slice(0, 3).join("、")) + (rs.length > 3 ? "　ほか" + (rs.length - 3) + "路線" : "")
       : "";
@@ -268,6 +288,25 @@ function toast(msg){
   const t = $("toast"); t.textContent = msg; t.classList.add("show");
   clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove("show"), 2600);
 }
+
+const APP_VER = 3;   // index.html を直したら1つ増やす
+$("verInfo").textContent =
+  "画面 v" + APP_VER + "　／　共通部品 v" + (SysProject.VERSION || "1（古い版）") +
+  (SysProject.VERSION === APP_VER ? "" : "　※食い違っています。下のボタンで更新してください");
+
+$("updBtn").onclick = async ()=>{
+  $("updBtn").disabled = true;
+  toast("更新しています…");
+  try{
+    if("caches" in window){
+      for(const k of await caches.keys()) await caches.delete(k);
+    }
+    if("serviceWorker" in navigator){
+      for(const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    }
+  }catch(e){ console.warn(e); }
+  location.reload(true);
+};
 
 render();
 if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
