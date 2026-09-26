@@ -53,6 +53,17 @@ header select{font-size:15px;padding:7px 6px;border-radius:8px;border:none;backg
 #tools{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}
 .tb{min-width:44px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.95);font-size:13px;color:var(--tx);padding:4px 8px}
 .tb.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.tb.add{background:var(--g);color:#fff;border-color:var(--g);font-weight:600}
+.tb.add.on{background:var(--acc);border-color:var(--acc)}
+/* 台帳に無い樹木を追加する画面 */
+.dlg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:30;display:none;align-items:center;justify-content:center;padding:16px}
+.dlg.show{display:flex}
+.dlgBox{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:440px;max-height:90dvh;overflow:auto}
+.dlgBox h3{margin:0 0 4px;font-size:17px}
+.kinds{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.kinds button{min-height:48px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:16px;font-weight:600;color:var(--tx)}
+.kinds button.on{background:var(--g);border-color:var(--g);color:#fff}
+.tlist button.addNd{border-style:dashed;border-color:var(--g);color:var(--g);font-weight:600;text-align:center}
 #legend{position:absolute;left:8px;top:8px;background:rgba(255,255,255,.93);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font-size:12px;line-height:1.7}
 #legend i{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid;margin:0 3px -1px 6px}
 #legend i:first-child{margin-left:0}
@@ -175,6 +186,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
     <div id="marks"></div>
     <div id="legend"></div>
     <div id="tools">
+      <button class="tb add" id="addBtn">＋追加</button>
       <button class="tb" id="fitBtn">全体</button>
       <button class="tb" id="rotBtn">回転</button>
       <button class="tb" id="zinBtn">＋</button>
@@ -213,7 +225,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
     </div>
     <p class="note" style="margin-top:4px">株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7で自動計算）</p>
 
-    <label class="lbl">現地の樹種（台帳と違うときだけ）</label>
+    <label class="lbl" id="sp2Lbl">現地の樹種（台帳と違うときだけ）</label>
     <input class="inp" id="sp2" list="spList" placeholder="例）新植でサクラになっている">
     <datalist id="spList"></datalist>
     <label class="lbl">メモ</label>
@@ -228,6 +240,21 @@ td.chg{background:#FFF3A0!important;font-weight:600}
       <a href="#" id="undoLink">未調査に戻す</a>
       <a href="#" id="delAdd" class="del" style="display:none">この追加樹木を削除</a>
     </div>
+  </div>
+</div>
+
+<!-- 台帳に無い樹木（新植・実生など）の追加 -->
+<div class="dlg" id="addDlg">
+  <div class="dlgBox">
+    <h3 id="addTitle">台帳に無い樹木を追加</h3>
+    <p class="note" id="addWhere" style="margin:0 0 4px"></p>
+    <label class="lbl">種別</label>
+    <div class="kinds" id="addKinds"><button data-k="新植">新植</button><button data-k="実生">実生</button><button data-k="その他">その他</button></div>
+    <label class="lbl">樹種</label>
+    <input class="inp" id="addSp" list="spList" placeholder="例）クスノキ（分からなければ空欄）">
+    <label class="lbl">樹木番号（そのままで構いません）</label>
+    <input class="inp" id="addNo">
+    <div class="nav"><button id="addCancel">やめる</button><button class="pri" id="addOk">追加する</button></div>
   </div>
 </div>
 
@@ -286,7 +313,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 3;   // このファイルを直したら1つ増やす
+const APP_VER = 4;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -490,11 +517,12 @@ function renderNoDraw(key){
     '<div class="tlist">' + ts.map(t => {
       const r0 = recOf(t.id);
       const g = girthOf(r0.g);
-      return '<button data-id="' + esc(t.id) + '" class="' + r0.st + '"><b>' + esc(t.no) + '</b>　' + esc(t.sp) +
+      return '<button data-id="' + esc(t.id) + '" class="' + r0.st + '"><b>' + esc(t.no) + '</b>　' + esc(t.added ? (t.kind || "追加") + " " + (r0.sp2 || "") : t.sp) +
              '<br><small>桝 ' + esc(t.masu) + '　台帳C ' + esc(t.c || "—") + (g.c != null ? '　実測 ' + g.c : '') +
              '　' + ST_LABEL[r0.st] + '</small></button>';
-    }).join("") + "</div>";
+    }).join("") + '<button class="addNd">＋ 台帳に無い樹木を追加<br><small>新植・実生など</small></button></div>';
   box.querySelectorAll("button[data-id]").forEach(b => b.onclick = ()=> select(b.dataset.id, false));
+  box.querySelector(".addNd").onclick = ()=> openAddDlg({route: r, zumen: z, drawing: null, x: null, y: null});
 }
 
 /* ================= 図面の拡大・移動 ================= */
@@ -684,6 +712,7 @@ function nearestTree(sx, sy, lim){
 }
 function tapAt(sx, sy){
   if(pinFor){ placePin(sx, sy); return; }
+  if(addMode){ setAddMode(false); openAddAt(sx, sy); return; }
   const t = nearestTree(sx, sy, Math.max(30, markSize() * 0.9));
   if(t) select(t.id, false);
 }
@@ -691,20 +720,84 @@ function longPress(sx, sy){
   if(pinFor) return;
   const near = nearestTree(sx, sy, 20);
   if(near){ select(near.id, false); return; }
-  if(!confirm("ここに台帳に無い樹木を追加しますか？\n（新植などで台帳に載っていない樹木）")) return;
-  const d = pkg.drawings.find(x => x.id === dwKey);
-  const n = (res.added || []).filter(a => a.drawing === dwKey).length + 1;
-  const no = prompt("樹木番号（分からなければそのままで）", "追加" + n);
-  if(no === null) return;
-  const p = toImage(sx, sy);
-  const a = {id: "add-" + Date.now().toString(36), route, zumen: d.zumen, drawing: dwKey,
-             no: no.trim() || ("追加" + n), x: Math.round(p.x), y: Math.round(p.y), order: 1e9 + Date.now() % 1e6};
-  res.added.push(a);
-  rec(a.id).st = "ok"; rec(a.id).t = Date.now();
-  saveRes();
-  fillDwSel(); select(a.id, false);
-  toast("追加しました。幹周と樹種を入力してください");
+  openAddAt(sx, sy);          // 長押しでも追加できる（［＋追加］ボタンと同じ）
 }
+
+/* ---- 台帳に無い樹木（新植・実生など）の追加 ---- */
+const ADD_KINDS = ["新植", "実生", "その他"];
+let addMode = false, addCtx = null;
+function setAddMode(on){
+  addMode = on;
+  $("addBtn").classList.toggle("on", on);
+  $("addBtn").textContent = on ? "やめる" : "＋追加";
+  if(on){
+    endPin();
+    $("pinMsg").textContent = "追加する樹木の位置を図面上でタップしてください";
+    $("pinBar").style.display = "flex";
+  } else if(!pinFor) $("pinBar").style.display = "none";
+}
+function openAddAt(sx, sy){
+  const d = pkg.drawings.find(x => x.id === dwKey);
+  if(!d) return;
+  const p = toImage(sx, sy);
+  openAddDlg({route, zumen: d.zumen, drawing: dwKey, x: Math.round(p.x), y: Math.round(p.y)});
+}
+function autoNo(kind, r){ return kind + ((res.added || []).filter(a => a.route === r).length + 1); }
+function openAddDlg(ctx, editId){
+  addCtx = Object.assign({editId: editId || null}, ctx);
+  const a = editId ? res.added.find(x => x.id === editId) : null;
+  const kind = a ? (a.kind || "その他") : lsGet("jizen_addkind", "新植");
+  addCtx.kind = kind;
+  addCtx.auto = a ? null : autoNo(kind, ctx.route);
+  $("addTitle").textContent = a ? "追加した樹木の変更" : "台帳に無い樹木を追加";
+  $("addOk").textContent = a ? "変更する" : "追加する";
+  $("addWhere").textContent = ctx.route + "　図面 " + zShort(ctx.zumen) + (ctx.drawing ? "" : "（図面なし）");
+  $("addNo").value = a ? a.no : addCtx.auto;
+  $("addSp").value = a ? (recOf(a.id).sp2 || "") : "";
+  renderKinds();
+  $("addDlg").classList.add("show");
+}
+function renderKinds(){
+  $("addKinds").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.k === addCtx.kind));
+}
+$("addKinds").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+  addCtx.kind = b.dataset.k;
+  // 番号を自動のまま使っているときは、種別に合わせて付け直す（新植3 → 実生3）
+  const m = $("addNo").value.match(/^(新植|実生|その他)(\d+)$/);
+  if(m) $("addNo").value = addCtx.kind + m[2];
+  if(addCtx.auto) addCtx.auto = addCtx.kind + (m ? m[2] : "");
+  renderKinds();
+});
+$("addCancel").onclick = ()=> $("addDlg").classList.remove("show");
+$("addOk").onclick = ()=>{
+  const c = addCtx, sp = $("addSp").value.trim();
+  const no = $("addNo").value.trim() || c.auto || autoNo(c.kind, c.route);
+  lsSet("jizen_addkind", c.kind);
+  if(c.editId){
+    const a = res.added.find(x => x.id === c.editId);
+    a.no = no; a.kind = c.kind;
+    const r = rec(a.id); r.sp2 = sp; r.t = Date.now();
+    saveRes();
+    $("addDlg").classList.remove("show");
+    renderSheet(); scheduleMarks(); if(dwKey.startsWith("nodraw|")) renderNoDraw(dwKey);
+    return;
+  }
+  const a = {id: "add-" + Date.now().toString(36), route: c.route, zumen: c.zumen, drawing: c.drawing,
+             no, kind: c.kind, x: c.x, y: c.y, order: 1e9 + Date.now() % 1e6};
+  res.added.push(a);
+  const r = rec(a.id); r.st = "ok"; r.sp2 = sp; r.t = Date.now();
+  saveRes();
+  $("addDlg").classList.remove("show");
+  fillDwSel(); updProgress();
+  if(dwKey.startsWith("nodraw|")) renderNoDraw(dwKey);
+  select(a.id, false);
+  toast(c.kind + "の樹木を追加しました。幹周を入力してください");
+};
+$("addBtn").onclick = ()=>{
+  if(!pkg || !dwKey) return;
+  if(dwKey.startsWith("nodraw|")){ const [, r0, z] = dwKey.split("|"); openAddDlg({route: r0, zumen: z, drawing: null, x: null, y: null}); return; }
+  setAddMode(!addMode);
+};
 
 /* ---- 位置の指定 ---- */
 function startPin(id){
@@ -726,7 +819,7 @@ function placePin(sx, sy){
   select(id, false);
   toast(t.no + " の位置を記録しました");
 }
-$("pinCancel").onclick = endPin;
+$("pinCancel").onclick = ()=>{ endPin(); setAddMode(false); };
 
 /* ================= 入力パネル ================= */
 function select(id, center){
@@ -750,9 +843,12 @@ function renderSheet(){
   const r = recOf(t.id);
   $("sNo").textContent = t.no;
   $("sSub").innerHTML = esc(t.route) + "　図面 " + esc(zShort(t.zumen)) + (t.masu ? "　桝 " + esc(t.masu) : "") +
-                        (t.added ? '　<b style="color:var(--acc)">台帳外（追加）</b>' : "");
+                        (t.added ? '　<b style="color:var(--acc)">台帳外（' + esc(t.kind || "追加") + '）</b>' : "");
+  $("sp2Lbl").textContent = t.added ? "樹種" : "現地の樹種（台帳と違うときだけ）";
   if(t.added){
-    $("sInfo").innerHTML = "現地で追加した樹木です。樹種と幹周を入力してください。";
+    $("sInfo").innerHTML = "台帳に無い樹木（" + esc(t.kind || "追加") + "）です。幹周を入力してください。　" +
+      '<a href="#" id="editAdd" style="color:var(--acc)">種別・番号・樹種を変える</a>';
+    $("editAdd").onclick = e => { e.preventDefault(); openAddDlg({route: t.route, zumen: t.zumen, drawing: t.drawing}, t.id); };
   } else {
     const lc = ledgerCls(t);
     $("sInfo").innerHTML = "<b>" + esc(t.sp || "（樹種なし）") + "</b>　台帳 H " + esc(t.h || "—") + "m　C " + esc(t.c || "—") + "cm" +
@@ -916,7 +1012,7 @@ function renderList(){
   ts.forEach(t => {
     const r = recOf(t.id), g = girthOf(r.g), chg = clsChanged(t, r), ac = afterCls(t, r);
     h += '<tr data-id="' + esc(t.id) + '" class="' + (r.st || "none") + '"><td>' + esc(zShort(t.zumen)) + "</td><td>" + esc(t.masu) +
-         "</td><td><b>" + esc(t.no) + "</b>" + (t.added ? "（追加）" : "") + (t.flag ? ' <span style="color:var(--ng)">図面で撤去</span>' : "") + "</td><td>" + esc(r.sp2 ? r.sp2 + "（台帳 " + (t.sp || "—") + "）" : t.sp) +
+         "</td><td><b>" + esc(t.no) + "</b>" + (t.added ? "（" + esc(t.kind || "追加") + "）" : "") + (t.flag ? ' <span style="color:var(--ng)">図面で撤去</span>' : "") + "</td><td>" + esc(t.added ? (r.sp2 || "") : r.sp2 ? r.sp2 + "（台帳 " + (t.sp || "—") + "）" : t.sp) +
          '</td><td class="n">' + esc(t.c) + "</td><td>" + ST_LABEL[r.st] + '</td><td class="n">' + (g.c != null ? g.c : "") +
          '</td><td class="' + (chg ? "chg" : "") + '">' + (ac ? CLS_TXT[ac] : (ac === null ? "—" : "")) + "</td><td>" + esc(r.memo) + "</td></tr>";
   });
@@ -932,10 +1028,13 @@ $("listBtn").onclick = ()=>{ if(pkg) openList(); };
 /* ================= 集計 ================= */
 function tally(r0){
   const ts = routeTrees(r0);
-  const o = {n: 0, before: {lt: 0, ge: 0, x: 0}, after: {lt: 0, ge: 0, x: 0}, none: 0, ok: 0, gone: 0, nomasu: 0, add: 0, chg: 0, nog: 0, flag: 0, flagOpen: 0};
+  const o = {n: 0, before: {lt: 0, ge: 0, x: 0}, after: {lt: 0, ge: 0, x: 0}, none: 0, ok: 0, gone: 0, nomasu: 0, add: 0, addKind: {}, chg: 0, nog: 0, flag: 0, flagOpen: 0};
   ts.forEach(t => {
     const r = recOf(t.id);
-    if(t.added){ if(r.st === "ok"){ o.add++; const a = afterCls(t, r); o.after[a || "x"]++; } return; }
+    if(t.added){
+      if(r.st === "ok"){ o.add++; const k = t.kind || "その他"; o.addKind[k] = (o.addKind[k] || 0) + 1; const a = afterCls(t, r); o.after[a || "x"]++; }
+      return;
+    }
     o.n++;
     o.before[ledgerCls(t) || "x"]++;
     if(t.flag){ o.flag++; if(!r.st) o.flagOpen++; }
@@ -946,6 +1045,11 @@ function tally(r0){
     if(a !== null) o.after[a || "x"]++;
   });
   return o;
+}
+/* 「台帳外の追加 3本（新植 2・実生 1）」 */
+function addTxt(o){
+  const ks = ADD_KINDS.filter(k => o.addKind[k]).map(k => k + " " + o.addKind[k]);
+  return "台帳外の追加 " + o.add + "本" + (ks.length ? "（" + ks.join("・") + "）" : "");
 }
 function openSum(){
   let h = "";
@@ -959,7 +1063,7 @@ function openSum(){
       '<div class="big">' + done + ' / ' + o.n + ' 本 調査済み（' + (o.n ? Math.floor(done * 100 / o.n) : 0) + '%）</div>' +
       '<div class="bar"><i style="width:' + (o.n ? done * 100 / o.n : 0) + '%"></i></div>' +
       '<p class="note">現存 ' + o.ok + '本（うち幹周未測定 ' + o.nog + '本）　伐採済・空桝 ' + o.gone + '本　桝無し ' + o.nomasu +
-      '本　台帳外の追加 ' + o.add + '本　区分が変わる樹木 ' + o.chg + '本' +
+      '本　' + addTxt(o) + '　区分が変わる樹木 ' + o.chg + '本' +
       (o.flag ? '<br>最新の台帳図面で撤去になっている樹木 ' + o.flag + '本（うち未調査 ' + o.flagOpen + '本）' : '') + '</p></div>';
     const d = k => { const v = o.after[k] - o.before[k]; return (v > 0 ? "+" : "") + v; };
     rows += '<tr><td rowspan="3"><b>' + esc(rt.name) + '</b></td><td>台帳（集計表）</td><td class="n">' + o.before.lt + '</td><td class="n">' + o.before.ge +
@@ -1213,7 +1317,7 @@ function buildWorkbook(){
     tot.bl += o.before.lt; tot.bg += o.before.ge; tot.al += o.after.lt; tot.ag += o.after.ge;
     S.rows.push([{v: rt.name, s: 8}, B("台帳（集計表）"), N(o.before.lt), N(o.before.ge), N(o.before.lt + o.before.ge), B("対象 " + o.n + "本")]);
     S.rows.push([{v: "", s: 8}, B("事前調査後"), N(o.after.lt), N(o.after.ge), N(o.after.lt + o.after.ge),
-      B("伐採済・空桝 " + o.gone + "本、桝無し " + o.nomasu + "本、台帳外の追加 " + o.add + "本、区分変更 " + o.chg + "本、未調査 " + o.none + "本")]);
+      B("伐採済・空桝 " + o.gone + "本、桝無し " + o.nomasu + "本、" + addTxt(o) + "、区分変更 " + o.chg + "本、未調査 " + o.none + "本")]);
     S.rows.push([{v: "", s: 8}, {v: "増減", s: 5}, {v: o.after.lt - o.before.lt, s: 5}, {v: o.after.ge - o.before.ge, s: 5},
       {v: (o.after.lt + o.after.ge) - (o.before.lt + o.before.ge), s: 5}, B("")]);
     S.merges.push("A" + r0 + ":A" + (r0 + 2));
@@ -1246,7 +1350,7 @@ function buildWorkbook(){
       const s = t.added ? 9 : r.st === "gone" ? 3 : r.st === "nomasu" ? 4 : !r.st ? 7 : 2;
       const c = v => ({v, s}), cn = v => ({v: (v === "" || v == null || isNaN(+v)) ? (v == null ? "" : v) : +v, s});
       R.rows.push([cn(i + 1), c(t.zumen), c(t.masu), c(t.no), c(t.sp), cn(t.h), cn(t.c), c(lc ? CLS_TXT[lc] : ""),
-        c(t.added ? "追加（台帳外）" : ST_LABEL[r.st]), cn(g.c != null ? g.c : ""), c(g.note),
+        c(t.added ? "追加（" + (t.kind || "台帳外") + "）" : ST_LABEL[r.st]), cn(g.c != null ? g.c : ""), c(g.note),
         chg ? {v: ac ? CLS_TXT[ac] : "", s: 5} : c(ac ? CLS_TXT[ac] : (ac === null ? "—" : "")),
         chg ? {v: "変更", s: 5} : c(""), c(r.sp2), c(r.memo), c(t.bikou),
         c(t.flag === "red" ? "赤い○（撤去）" : t.flag === "nolabel" ? "記号・番号なし" : ""), c(fmtT(r.t)), cn(t.row)]);
