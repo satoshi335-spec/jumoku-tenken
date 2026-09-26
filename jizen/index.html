@@ -313,7 +313,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 4;   // このファイルを直したら1つ増やす
+const APP_VER = 5;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -745,6 +745,7 @@ function openAddAt(sx, sy){
 function autoNo(kind, r){ return kind + ((res.added || []).filter(a => a.route === r).length + 1); }
 function openAddDlg(ctx, editId){
   addCtx = Object.assign({editId: editId || null}, ctx);
+  addCtx.prevId = selId;          // 追加する直前に開いていた樹木（「次の樹木」の並びをここにつなぐ）
   const a = editId ? res.added.find(x => x.id === editId) : null;
   const kind = a ? (a.kind || "その他") : lsGet("jizen_addkind", "新植");
   addCtx.kind = kind;
@@ -783,7 +784,8 @@ $("addOk").onclick = ()=>{
     return;
   }
   const a = {id: "add-" + Date.now().toString(36), route: c.route, zumen: c.zumen, drawing: c.drawing,
-             no, kind: c.kind, x: c.x, y: c.y, order: 1e9 + Date.now() % 1e6};
+             no, kind: c.kind, x: c.x, y: c.y, order: 0};
+  a.order = insertOrder(a, c.prevId);
   res.added.push(a);
   const r = rec(a.id); r.st = "ok"; r.sp2 = sp; r.t = Date.now();
   saveRes();
@@ -936,7 +938,7 @@ $("memo").addEventListener("input", ()=>{ const r = rec(selId); r.memo = $("memo
 /* 前後の樹木（路線の並び順。図面が変われば図面も切り替える） */
 function goNext(dir){
   const t0 = treeById(selId); if(!t0) return;
-  const ts = routeTrees(t0.route).sort((a, b) => (a.zumen < b.zumen ? -1 : a.zumen > b.zumen ? 1 : 0) || (a.order - b.order));
+  const ts = routeTrees(t0.route).sort(byRouteOrder);
   const i = ts.findIndex(t => t.id === selId);
   const n = ts[i + dir];
   if(!n){ toast(dir > 0 ? "この路線の最後の樹木です" : "この路線の最初の樹木です"); return; }
@@ -995,7 +997,7 @@ function renderList(){
   $("lFilters").innerHTML = FILTERS.map(([k, v]) => '<button data-f="' + k + '" class="' + (k === lFilter ? "on" : "") + '">' + v + '</button>').join(" ");
   $("lFilters").querySelectorAll("button").forEach(b => b.onclick = ()=>{ lFilter = b.dataset.f; renderList(); });
   const r0 = $("lRoute").value;
-  const ts = routeTrees(r0).sort((a, b) => (a.zumen < b.zumen ? -1 : a.zumen > b.zumen ? 1 : 0) || (a.order - b.order)).filter(t => {
+  const ts = routeTrees(r0).sort(byRouteOrder).filter(t => {
     const r = recOf(t.id);
     switch(lFilter){
       case "none": return !r.st;
@@ -1046,6 +1048,35 @@ function tally(r0){
   });
   return o;
 }
+/* 追加した樹木の並び順：直前に入力していた樹木の後ろ。無ければ図面上で一番近い台帳の樹木の後ろ */
+function nearestLedger(a){
+  if(a.x == null) return null;
+  let best = null, bd = Infinity;
+  pkg.trees.forEach(t => {
+    if(t.drawing !== a.drawing) return;
+    const p = posOf(t); if(!p) return;
+    const d = Math.hypot(p.x - a.x, p.y - a.y);
+    if(d < bd){ bd = d; best = t; }
+  });
+  return best;
+}
+function insertOrder(a, prevId){
+  const prev = prevId && treeById(prevId);
+  let base = (prev && prev.id !== a.id && prev.route === a.route && prev.zumen === a.zumen) ? prev : nearestLedger(a);
+  if(!base) return 1e9 + Date.now() % 1e6;           // 図面も位置も無いときは図面の最後
+  let o = (base.order >= 1e9 ? effOrder(base) : base.order) + 0.001;
+  // 同じ所に続けて追加したときは、その後ろへ順に並べる
+  while((res.added || []).some(x => x.id !== a.id && x.zumen === a.zumen && Math.abs(x.order - o) < 1e-9)) o += 0.001;
+  return o;
+}
+/* 以前の版で追加した樹木（並びが図面の最後）も、一番近い樹木の後ろとして扱う */
+function effOrder(t){
+  if(!t.added || t.order < 1e9) return t.order;
+  const n = nearestLedger(t);
+  return n ? n.order + 0.0005 : t.order;
+}
+const byRouteOrder = (a, b) => (a.zumen < b.zumen ? -1 : a.zumen > b.zumen ? 1 : 0) || (effOrder(a) - effOrder(b));
+
 /* 「台帳外の追加 3本（新植 2・実生 1）」 */
 function addTxt(o){
   const ks = ADD_KINDS.filter(k => o.addKind[k]).map(k => k + " " + o.addKind[k]);
