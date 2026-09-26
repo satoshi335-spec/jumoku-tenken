@@ -458,7 +458,10 @@ const ITEMS = [
   {g:3,label:"樹皮枯死・欠損・腐朽",csv:"樹皮枯死・欠損・腐朽"},
   {g:3,label:"病虫害（穿孔痕、フラス）",csv:"病虫害（穿孔痕、フラス）"},
   {g:3,label:"揺れ",csv:"揺れ"},
-  {g:3,label:"不自然な傾斜",csv:"不自然な傾斜"}
+  {g:3,label:"不自然な傾斜",csv:"不自然な傾斜"},
+  // 新様式（R8〜）で追加された「その他」。保存済みデータの並びを崩さないよう末尾に足し、画面では各分類の最後に並ぶ
+  {g:1,label:"その他",csv:"その他（維持管理）"},
+  {g:3,label:"その他",csv:"その他（樹木の異常）"}
 ];
 const load = (k,d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
 const store = (k,v) => localStorage.setItem(k, JSON.stringify(v));
@@ -1232,8 +1235,8 @@ $("sp").addEventListener("input", ()=>{ calc(); girthWarnUpd(); });
 
 function judgeOf(items, sp){
   if(isNoTree(sp)) return String(sp).trim();
-  const on1 = items.slice(0,6).filter(v => v === "○").length;
-  const on23 = items.slice(6).filter(v => v === "○").length;
+  const on1 = ITEMS.filter((it, i) => it.g === 1 && items[i] === "○").length;
+  const on23 = ITEMS.filter((it, i) => it.g !== 1 && items[i] === "○").length;
   if(on23 > 0) return "樹木の外観診断が必要";
   if(on1 > 0) return "維持管理の処置が必要";
   return "概ね良好・異常なし";
@@ -1259,7 +1262,9 @@ function saveAndMove(move){
   const startIdx = findListIndex($("tno").value.trim(), $("hojo").value.trim());
   const dup = routeRecords().find(r => r.no === no && r.id !== editingId);
   if(dup){ toast("樹木番号 " + no + " はこの路線で保存済みです"); return; }
-  const items = [...document.querySelectorAll(".itm")].map(b => b.classList.contains("on") ? "○" : "");
+  // 画面の並びと保存の並びが違うので、ボタンに持たせた番号で並べる
+  const items = new Array(ITEMS.length).fill("");
+  document.querySelectorAll(".itm").forEach(b => { if(b.classList.contains("on")) items[+b.dataset.i] = "○"; });
   // 撮り忘れチェック: 必要枚数（異常あり2枚/なし1枚）に足りなければ警告
   const needP = photosOf(items, $("sp").value), haveP = pdb ? photosFor(routeKey(), no).length : 0;
   if(pdb && haveP < needP && !confirm("⚠ 写真が " + haveP + "/" + needP + " 枚です。\n撮影せずに保存しますか？\n（キャンセル→📷ボタンで撮影できます）")) return;
@@ -1373,7 +1378,7 @@ function startEdit(id, quiet){
   $("girthPrev").value = r.girthPrev || "";
   if(stems.length){ $("kabuNote").textContent = r.kabuNote; $("memoAutoHint").textContent = "　※株立ちの計算式は自動で追記されます"; }
   else { $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; }
-  document.querySelectorAll(".itm").forEach((b,i) => b.classList.toggle("on", r.items[i] === "○"));
+  document.querySelectorAll(".itm").forEach(b => b.classList.toggle("on", r.items[+b.dataset.i] === "○"));
   $("editBanner").style.display = "block"; $("editBanner").textContent = r.no + " を編集中（上書きされます）";
   $("saveHere").textContent = "上書き保存"; $("cancelEdit").style.display = "block";
   if(!quiet){
@@ -1460,7 +1465,7 @@ $("csvBtn").onclick = ()=>{
     (r.masu != null && r.masu !== "") ? r.masu : splitHojo(r.no).base,
     (r.hojo != null && r.hojo !== "") ? r.hojo : splitHojo(r.no).hojo,
     r.sp, r.girth || "", r.girthPrev || "", r.city || "", r.town || "",
-    (r.dt || "").replace("T"," "), settings.inspector, ...r.items, fullMemo(r), judgeOf(r.items, r.sp), photosOf(r.items, r.sp)]
+    (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), fullMemo(r), judgeOf(r.items, r.sp), photosOf(r.items, r.sp)]
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();

@@ -1,0 +1,16 @@
+{
+  "name": "事前調査（街路樹の現況確認・幹周測定）",
+  "short_name": "事前調査",
+  "description": "台帳図面をタップして幹周・伐採済を記録し、集計表まで作る現場アプリ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F4F4F0",
+  "theme_color": "#0F6E56",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

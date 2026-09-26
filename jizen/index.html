@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0F6E56">
+<title>事前調査</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root{--g:#0F6E56;--g-dark:#08403A;--bg:#F4F4F0;--card:#fff;--line:#D8D6CC;--tx:#1c1c1a;--tx2:#6b6a64;
+--acc:#185FA5;--acc-bg:#E6F1FB;--ok:#2E7D32;--ok-bg:#EAF3DE;--ng:#C62828;--ng-bg:#FBEBEB;--warn:#E07B00;--warn-bg:#FDF3E2;
+--gray:#555;--gray-bg:#E8E7E1}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
+body{font-family:-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;background:var(--bg);color:var(--tx);
+  display:flex;flex-direction:column;height:100dvh;-webkit-user-select:none;user-select:none}
+input,select,textarea{-webkit-user-select:text;user-select:text}
+button{font-family:inherit;cursor:pointer}
+
+/* ---- ヘッダー ---- */
+header{background:var(--g);color:#fff;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+header .t{font-weight:600;font-size:15px;white-space:nowrap;margin-right:2px}
+header select{font-size:15px;padding:7px 6px;border-radius:8px;border:none;background:rgba(255,255,255,.95);color:var(--tx);max-width:40vw}
+.hb{font-size:14px;padding:8px 11px;border-radius:8px;border:none;background:rgba(255,255,255,.18);color:#fff;white-space:nowrap;min-height:36px}
+.hb:active{background:rgba(255,255,255,.32)}
+.hb.on{background:#fff;color:var(--g);font-weight:600}
+#prog{font-size:12px;opacity:.9;white-space:nowrap;margin-left:auto}
+
+/* ---- 本体（図面＋入力パネル） ---- */
+#main{flex:1;min-height:0;display:grid;grid-template-rows:1fr auto;grid-template-columns:1fr}
+@media (orientation:landscape) and (min-width:900px){
+  #main{grid-template-rows:1fr;grid-template-columns:1fr auto}
+  #sheet{width:390px;max-height:none!important;border-top:none!important;border-left:1px solid var(--line)}
+}
+#view{position:relative;overflow:hidden;touch-action:none;background:#E9E8E2;min-height:0}
+#stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+#stage img{display:block;pointer-events:none;-webkit-user-drag:none;background:#fff;box-shadow:0 0 0 1px #bbb}
+#marks{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.mk{position:absolute;left:0;top:0;border-radius:50%;border:3px solid var(--warn);background:rgba(224,123,0,.08)}
+.mk.ok{border-color:var(--ok);background:rgba(46,125,50,.25)}
+.mk.gone{border-color:var(--ng);background:rgba(198,40,40,.35)}
+.mk.nomasu{border-color:#333;background:rgba(40,40,40,.35)}
+.mk.gone::after,.mk.nomasu::after{content:"×";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px}
+.mk.chg{box-shadow:0 0 0 3px #FFD400}
+.mk.sel{border-width:4px;border-color:var(--acc);box-shadow:0 0 0 4px rgba(24,95,165,.35)}
+.mk.add{border-style:dashed}
+.mk.flag{border-color:var(--ng);border-style:dashed;background:rgba(198,40,40,.12)}
+.tag{position:absolute;left:0;top:0;font-size:11px;font-weight:700;padding:1px 4px;border-radius:5px;background:rgba(255,255,255,.92);color:var(--tx);white-space:nowrap;border:1px solid #bbb}
+.tag.chg{background:#FFF3A0;border-color:#D4B000}
+#tools{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}
+.tb{min-width:44px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.95);font-size:13px;color:var(--tx);padding:4px 8px}
+.tb.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+#legend{position:absolute;left:8px;top:8px;background:rgba(255,255,255,.93);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font-size:12px;line-height:1.7}
+#legend i{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid;margin:0 3px -1px 6px}
+#legend i:first-child{margin-left:0}
+#nopos{position:absolute;left:8px;bottom:8px;right:70px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12px}
+#nopos b{background:rgba(255,255,255,.93);padding:4px 8px;border-radius:8px;font-weight:600}
+#nopos button{font-size:13px;padding:6px 10px;border-radius:8px;border:2px dashed var(--warn);background:#fff}
+#nopos button.done{border-color:var(--ok);border-style:solid}
+#pinBar{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:var(--acc);color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;display:none;gap:10px;align-items:center;z-index:5}
+#pinBar button{background:#fff;color:var(--acc);border:none;border-radius:7px;padding:5px 10px;font-size:13px}
+#nodraw{position:absolute;inset:0;display:none;overflow:auto;padding:16px;background:var(--bg)}
+#nodraw h3{margin:4px 0 8px;font-size:16px}
+#nodraw p{font-size:13px;color:var(--tx2);margin:0 0 12px;line-height:1.6}
+.tlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.tlist button{text-align:left;padding:10px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:14px;line-height:1.5}
+.tlist button.ok{border-color:var(--ok);background:var(--ok-bg)}
+.tlist button.gone{border-color:var(--ng);background:var(--ng-bg)}
+.tlist button.nomasu{border-color:#333;background:var(--gray-bg)}
+.tlist button small{color:var(--tx2);font-size:12px}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--tx2);font-size:15px;line-height:1.9}
+
+/* ---- 入力パネル ---- */
+#sheet{background:var(--card);border-top:1px solid var(--line);max-height:52vh;overflow:auto;display:none;padding:10px 12px calc(env(safe-area-inset-bottom) + 10px)}
+body.selOpen #sheet{display:block}
+.sh1{display:flex;align-items:flex-start;gap:8px}
+.sh1 .no{font-size:28px;font-weight:700;line-height:1.1}
+.sh1 .sub{font-size:13px;color:var(--tx2);line-height:1.5}
+.sh1 .x{margin-left:auto;font-size:15px;border:1px solid var(--line);background:#fff;border-radius:9px;min-width:44px;min-height:40px}
+.info{font-size:13px;line-height:1.6;margin:6px 0 0;padding:7px 9px;background:#F7F7F3;border-radius:8px}
+.info .bk{color:var(--ng);font-weight:600}
+.seg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px}
+.seg button{min-height:48px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:15px;font-weight:600;color:var(--tx)}
+.seg button.on[data-st=ok]{background:var(--ok);border-color:var(--ok);color:#fff}
+.seg button.on[data-st=gone]{background:var(--ng);border-color:var(--ng);color:#fff}
+.seg button.on[data-st=nomasu]{background:#333;border-color:#333;color:#fff}
+.gRow{display:flex;align-items:center;gap:8px;margin-top:10px}
+#gDisp{flex:1;font-size:26px;font-weight:700;padding:6px 10px;border:2px solid var(--line);border-radius:10px;min-height:50px;background:#fff;display:flex;align-items:baseline;gap:6px}
+#gDisp.act{border-color:var(--acc)}
+#gDisp small{font-size:14px;color:var(--tx2);font-weight:400}
+#gNote{font-size:12px;color:var(--acc);margin:4px 2px 0;min-height:16px;font-weight:600}
+#clsRow{font-size:13px;margin-top:4px}
+.cls{display:inline-block;padding:2px 8px;border-radius:6px;font-weight:600;font-size:12px}
+.cls.lt{background:var(--acc-bg);color:var(--acc)}
+.cls.ge{background:var(--warn-bg);color:var(--warn)}
+.cls.chg{background:#FFF3A0;color:#7A5C00}
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.pad button{min-height:50px;font-size:21px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--tx)}
+.pad button:active{background:#E6E5DF}
+.pad button.fn{font-size:15px;background:#F3F3EE}
+.pad button.nx{grid-column:span 2;background:var(--g);color:#fff;font-size:16px;font-weight:600;border:none}
+body.noTree .pad button:not(.nx),body.noTree #gDisp{opacity:.35;pointer-events:none}
+label.lbl{display:block;font-size:12px;color:var(--tx2);margin:12px 0 4px}
+.inp{width:100%;font-size:16px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--tx);font-family:inherit}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chips button{font-size:13px;padding:7px 11px;border-radius:16px;border:1px solid var(--line);background:#fff;color:var(--tx)}
+.chips button.on{background:var(--acc-bg);border-color:var(--acc);color:var(--acc);font-weight:600}
+.nav{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:12px}
+.nav button{min-height:48px;border-radius:10px;font-size:15px;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--tx)}
+.nav button.pri{background:var(--g);border-color:var(--g);color:#fff}
+.links{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:13px}
+.links a{color:var(--acc);text-decoration:underline}
+.links a.del{color:var(--ng)}
+
+/* ---- 全画面の一覧・集計・メニュー ---- */
+.modal{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;flex-direction:column}
+.modal.show{display:flex}
+.mh{background:var(--g);color:#fff;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;display:flex;align-items:center;gap:8px}
+.mh h2{font-size:16px;margin:0;font-weight:600;flex:1}
+.mb{flex:1;overflow:auto;padding:12px;-webkit-overflow-scrolling:touch}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.card h3{font-size:15px;margin:0 0 8px}
+table{border-collapse:collapse;width:100%;font-size:13px;background:#fff}
+th,td{border:1px solid var(--line);padding:6px 6px;text-align:left;white-space:nowrap}
+th{background:#F1F0EA;font-weight:600;position:sticky;top:0;z-index:1}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.gone td{background:var(--ng-bg)}
+tr.nomasu td{background:var(--gray-bg)}
+tr.ok td{background:#fff}
+tr.none td{background:#FFFBF2}
+td.chg{background:#FFF3A0!important;font-weight:600}
+.tblWrap{overflow:auto;border-radius:10px;border:1px solid var(--line);max-height:calc(100dvh - 190px)}
+.fl{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center}
+.fl button{font-size:13px;padding:8px 12px;border-radius:16px;border:1px solid var(--line);background:#fff;color:var(--tx)}
+.fl button.on{background:var(--g);border-color:var(--g);color:#fff}
+.fl select{font-size:14px;padding:7px;border-radius:8px;border:1px solid var(--line)}
+.btn{display:block;width:100%;min-height:48px;font-size:15px;font-weight:600;border:none;border-radius:12px;background:var(--g);color:#fff;margin-top:8px}
+.btn.sub{background:#fff;color:var(--g);border:1px solid var(--g)}
+.btn.del{background:#fff;color:var(--ng);border:1px solid var(--ng)}
+.note{font-size:12px;color:var(--tx2);line-height:1.7;margin:6px 0 0}
+.big{font-size:20px;font-weight:700}
+.bar{height:10px;background:#E4E3DC;border-radius:5px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--g)}
+#busy{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:none;align-items:center;justify-content:center}
+#busy div{background:#fff;border-radius:14px;padding:20px 26px;font-size:15px;text-align:center;line-height:1.8}
+.toast{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 16px);left:12px;right:12px;max-width:560px;margin:0 auto;background:var(--g-dark);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;z-index:60}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <a href="../" class="hb" style="text-decoration:none">◀</a>
+  <span class="t">事前調査</span>
+  <select id="routeSel" aria-label="路線"></select>
+  <button class="hb" id="prevDw" aria-label="前の図面">◀</button>
+  <select id="dwSel" aria-label="図面"></select>
+  <button class="hb" id="nextDw" aria-label="次の図面">▶</button>
+  <button class="hb" id="listBtn">一覧</button>
+  <button class="hb" id="sumBtn">集計</button>
+  <button class="hb" id="menuBtn">メニュー</button>
+  <span id="prog"></span>
+</header>
+
+<div id="main">
+  <div id="view">
+    <div id="stage"><img id="img" alt=""></div>
+    <div id="marks"></div>
+    <div id="legend"></div>
+    <div id="tools">
+      <button class="tb" id="fitBtn">全体</button>
+      <button class="tb" id="rotBtn">回転</button>
+      <button class="tb" id="zinBtn">＋</button>
+      <button class="tb" id="zoutBtn">－</button>
+    </div>
+    <div id="nopos"></div>
+    <div id="pinBar"><span id="pinMsg"></span><button id="pinCancel">やめる</button></div>
+    <div id="nodraw"></div>
+    <div id="empty"></div>
+  </div>
+
+  <div id="sheet">
+    <div class="sh1">
+      <div>
+        <div class="no" id="sNo"></div>
+        <div class="sub" id="sSub"></div>
+      </div>
+      <button class="x" id="sClose" aria-label="閉じる">✕</button>
+    </div>
+    <div class="info" id="sInfo"></div>
+    <div class="seg" id="seg">
+      <button data-st="ok">現存</button>
+      <button data-st="gone">伐採済・空桝</button>
+      <button data-st="nomasu">桝無し</button>
+    </div>
+    <div class="gRow">
+      <div id="gDisp"></div>
+    </div>
+    <div id="gNote"></div>
+    <div id="clsRow"></div>
+    <div class="pad" id="pad">
+      <button>7</button><button>8</button><button>9</button><button class="fn" data-k="bs">⌫</button>
+      <button>4</button><button>5</button><button>6</button><button class="fn" data-k="plus">＋幹</button>
+      <button>1</button><button>2</button><button>3</button><button class="fn" data-k="clr">消去</button>
+      <button>0</button><button>.</button><button class="nx" data-k="next">次の樹木 ▶</button>
+    </div>
+    <p class="note" style="margin-top:4px">株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7で自動計算）</p>
+
+    <label class="lbl">現地の樹種（台帳と違うときだけ）</label>
+    <input class="inp" id="sp2" list="spList" placeholder="例）新植でサクラになっている">
+    <datalist id="spList"></datalist>
+    <label class="lbl">メモ</label>
+    <div class="chips" id="memoChips"></div>
+    <input class="inp" id="memo" style="margin-top:6px" placeholder="自由記入">
+    <div class="nav">
+      <button id="prevTree">◀ 前の樹木</button>
+      <button class="pri" id="nextTree">次の樹木 ▶</button>
+    </div>
+    <div class="links">
+      <a href="#" id="pinLink">図面上の位置を直す</a>
+      <a href="#" id="undoLink">未調査に戻す</a>
+      <a href="#" id="delAdd" class="del" style="display:none">この追加樹木を削除</a>
+    </div>
+  </div>
+</div>
+
+<!-- 一覧 -->
+<div class="modal" id="listM">
+  <div class="mh"><h2>樹木一覧</h2><button class="hb" data-close>閉じる</button></div>
+  <div class="mb">
+    <div class="fl">
+      <select id="lRoute"></select>
+      <span id="lFilters"></span>
+    </div>
+    <div class="tblWrap"><table id="lTbl"></table></div>
+  </div>
+</div>
+
+<!-- 集計 -->
+<div class="modal" id="sumM">
+  <div class="mh"><h2>集計</h2><button class="hb" id="xlsBtn2">Excelで書き出す</button><button class="hb" data-close>閉じる</button></div>
+  <div class="mb" id="sumBody"></div>
+</div>
+
+<!-- メニュー -->
+<div class="modal" id="menuM">
+  <div class="mh"><h2>メニュー</h2><button class="hb" data-close>閉じる</button></div>
+  <div class="mb">
+    <div class="card">
+      <h3>調査データ</h3>
+      <div id="pkgList"></div>
+      <button class="btn sub" id="impBtn">事務所PCで作ったデータを取り込む</button>
+      <input type="file" id="impFile" accept=".json,application/json" style="display:none">
+      <p class="note">統合ハブの「事前調査」タブで作った「事前調査_〜.json」を選んでください（図面入り）。</p>
+    </div>
+    <div class="card">
+      <h3>書き出し</h3>
+      <button class="btn" id="xlsBtn">集計表をExcelで書き出す</button>
+      <button class="btn sub" id="bkBtn">調査結果のバックアップを書き出す</button>
+      <button class="btn sub" id="rsBtn">バックアップから読み込む</button>
+      <input type="file" id="rsFile" accept=".json,application/json" style="display:none">
+      <p class="note">Excelには集計シートと路線ごとの樹木一覧（現況・実測幹周・区分変更）が入ります。
+        入力した内容はiPadに自動保存されますが、1日の終わりにバックアップを書き出しておくと安心です。</p>
+    </div>
+    <div class="card">
+      <h3>表示</h3>
+      <div class="fl" id="optTags"></div>
+      <p class="note" id="verInfo"></p>
+    </div>
+  </div>
+</div>
+
+<div id="busy"><div id="busyMsg">処理中…</div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+const APP_VER = 2;   // このファイルを直したら1つ増やす
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
+const ST_LABEL = {"": "未調査", ok: "現存", gone: "伐採済（空桝）", nomasu: "桝無し"};
+/* 最新の台帳図面と数量一覧の食い違い（PC側で古い版の図面と比べて付ける） */
+const FLAG_TXT = {
+  red: "最新の台帳図面では番号が消え、赤い○（撤去）で描かれています。伐採済みの可能性があります",
+  nolabel: "最新の台帳図面ではこの樹木の記号と番号が消えています（古い図面の位置で表示）。伐採済みの可能性があります"
+};
+
+/* ================= 保存（IndexedDB：図面・台帳 ／ localStorage：調査結果） ================= */
+const DB_NAME = "jizen", DB_VER = 1;
+let dbp = null;
+function db(){
+  if(dbp) return dbp;
+  dbp = new Promise((ok, ng)=>{
+    const rq = indexedDB.open(DB_NAME, DB_VER);
+    rq.onupgradeneeded = ()=>{
+      const d = rq.result;
+      if(!d.objectStoreNames.contains("pkgs")) d.createObjectStore("pkgs", {keyPath: "id"});
+      if(!d.objectStoreNames.contains("imgs")) d.createObjectStore("imgs");
+    };
+    rq.onsuccess = ()=> ok(rq.result);
+    rq.onerror = ()=> ng(rq.error);
+  });
+  return dbp;
+}
+async function idb(store, mode, fn){
+  const d = await db();
+  return new Promise((ok, ng)=>{
+    const tx = d.transaction(store, mode);
+    const st = tx.objectStore(store);
+    let out;
+    Promise.resolve(fn(st)).then(r => { out = r; });
+    tx.oncomplete = ()=> ok(out);
+    tx.onerror = ()=> ng(tx.error);
+    tx.onabort = ()=> ng(tx.error || new Error("保存できませんでした（空き容量を確認してください）"));
+  });
+}
+const req2p = rq => new Promise((ok, ng)=>{ rq.onsuccess = ()=> ok(rq.result); rq.onerror = ()=> ng(rq.error); });
+const pkgList = ()=> idb("pkgs", "readonly", st => req2p(st.getAll()));
+const pkgGet = id => idb("pkgs", "readonly", st => req2p(st.get(id)));
+const imgGet = key => idb("imgs", "readonly", st => req2p(st.get(key)));
+
+function lsGet(k, d){ try{ const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ toast("保存に失敗しました：" + e.message); return false; } }
+
+/* ================= 状態 ================= */
+let pkg = null;           // 取り込んだ台帳と図面の情報（画像は別保存）
+let res = null;           // 調査結果 {trees:{id:rec}, added:[...], pins:{id:{x,y}}}
+let route = "";           // 表示中の路線
+let dwKey = "";           // 表示中の図面（drawing id か "nodraw|路線|図面番号"）
+let selId = null;         // 選択中の樹木
+let pinFor = null;        // 位置指定中の樹木
+let opt = lsGet("jizen_opt", {tags: true});
+const V = {s: 1, tx: 0, ty: 0, rot: 0, w: 0, h: 0};
+
+function resKey(){ return "jizen_res_" + pkg.id; }
+function saveRes(){ res.saved = Date.now(); lsSet(resKey(), res); }
+function rec(id){ return res.trees[id] || (res.trees[id] = {st: "", g: "", sp2: "", memo: "", t: 0}); }
+function recOf(id){ return res.trees[id] || {st: "", g: "", sp2: "", memo: "", t: 0}; }
+
+/* 台帳の樹木＋現地で追加した樹木 */
+function allTrees(){
+  return pkg.trees.concat((res.added || []).map(a => Object.assign({added: true, sp: "", c: "", cls: "", h: "", bikou: "", masu: "", row: ""}, a)));
+}
+function treeById(id){ return pkg.trees.find(t => t.id === id) || allTrees().find(t => t.id === id); }
+function posOf(t){
+  const p = res.pins && res.pins[t.id];
+  if(p) return p;
+  return (t.x == null) ? null : {x: t.x, y: t.y};
+}
+function routeTrees(r){ return allTrees().filter(t => t.route === r); }
+
+/* 幹周の入力文字列（例 "45+30"）→ 幹周cm と説明 */
+function girthOf(g){
+  const parts = String(g || "").split("+").map(s => parseFloat(s)).filter(v => v > 0);
+  if(!parts.length) return {c: null, note: "", kabu: false};
+  if(parts.length === 1) return {c: parts[0], note: "", kabu: false};
+  const c = Math.round(parts.reduce((a, b) => a + b, 0) * 0.7 * 10) / 10;
+  return {c, kabu: true, note: "株立ち" + parts.length + "本立ち　幹周り＝(" + parts.join("＋") + ")×0.7＝" + c + "cm"};
+}
+function ledgerCls(t){
+  if(t.cls === "lt" || t.cls === "ge") return t.cls;
+  const c = parseFloat(t.c);
+  if(!(c > 0)) return "";
+  return c < 60 ? "lt" : "ge";
+}
+/* 調査後の区分：伐採・桝無しは null（数えない）。実測が無ければ台帳の区分 */
+function afterCls(t, r){
+  if(r.st === "gone" || r.st === "nomasu") return null;
+  const g = girthOf(r.g);
+  if(g.c != null) return g.c < 60 ? "lt" : "ge";
+  return t.added ? "" : ledgerCls(t);
+}
+function clsChanged(t, r){
+  if(t.added) return false;
+  const g = girthOf(r.g);
+  if(g.c == null || r.st === "gone" || r.st === "nomasu") return false;
+  const a = ledgerCls(t);
+  return !!a && a !== (g.c < 60 ? "lt" : "ge");
+}
+const CLS_TXT = {lt: "60cm未満", ge: "60cm以上", "": "区分不明"};
+
+/* ================= 画面の組み立て ================= */
+function drawingsOf(r){
+  const list = pkg.drawings.filter(d => d.route === r).map(d => ({key: d.id, zumen: d.zumen, dw: d}));
+  // 図面PDFが無い図面番号も選べるようにする（樹木の一覧から入力）
+  const has = new Set(list.map(x => x.zumen));
+  routeTrees(r).forEach(t => {
+    if(!t.drawing && !has.has(t.zumen)){ has.add(t.zumen); list.push({key: "nodraw|" + r + "|" + t.zumen, zumen: t.zumen, dw: null}); }
+  });
+  return list.sort((a, b) => a.zumen < b.zumen ? -1 : a.zumen > b.zumen ? 1 : 0);
+}
+function treesOnKey(key){
+  if(key.startsWith("nodraw|")){
+    const [, r, z] = key.split("|");
+    return allTrees().filter(t => t.route === r && t.zumen === z && !t.drawing);
+  }
+  return allTrees().filter(t => t.drawing === key);
+}
+function zShort(z){ const p = String(z).split("-"); return p[p.length - 1]; }
+
+function fillRouteSel(){
+  const sel = $("routeSel");
+  sel.innerHTML = pkg.routes.map(r => '<option value="' + esc(r.name) + '">' + esc(r.name) + '</option>').join("");
+  sel.value = route;
+}
+function fillDwSel(){
+  const sel = $("dwSel");
+  sel.innerHTML = drawingsOf(route).map(d => {
+    const ts = treesOnKey(d.key);
+    const done = ts.filter(t => recOf(t.id).st).length;
+    const mark = done === ts.length && ts.length ? "✓ " : "";
+    return '<option value="' + esc(d.key) + '">' + mark + zShort(d.zumen) + (d.dw ? "" : "（図面なし）") +
+           "　" + done + "/" + ts.length + "</option>";
+  }).join("");
+  sel.value = dwKey;
+}
+function updProgress(){
+  const ts = routeTrees(route).filter(t => !t.added);
+  const done = ts.filter(t => recOf(t.id).st).length;
+  $("prog").textContent = done + " / " + ts.length + " 本（" + (ts.length ? Math.floor(done * 100 / ts.length) : 0) + "%）";
+}
+
+async function openPkg(id){
+  const p = await pkgGet(id);
+  if(!p){ showEmpty(); return; }
+  pkg = p;
+  res = lsGet(resKey(), null) || {trees: {}, added: [], pins: {}};
+  res.added = res.added || []; res.pins = res.pins || {};
+  lsSet("jizen_cur", pkg.id);
+  const last = lsGet("jizen_last_" + pkg.id, {});
+  route = pkg.routes.some(r => r.name === last.route) ? last.route : pkg.routes[0].name;
+  fillRouteSel();
+  const dws = drawingsOf(route);
+  const first = dws.find(d => d.dw) || dws[0];   // 最初は図面のあるページを開く
+  dwKey = dws.some(d => d.key === last.dw) ? last.dw : (first ? first.key : "");
+  $("spList").innerHTML = [...new Set(pkg.trees.map(t => t.sp).filter(Boolean))].map(s => '<option value="' + esc(s) + '">').join("");
+  $("empty").style.display = "none";
+  await showDrawing(dwKey, true);
+}
+function showEmpty(){
+  pkg = null;
+  $("empty").style.display = "flex";
+  $("empty").innerHTML = "調査データがまだありません。<br>右上の［メニュー］→「事務所PCで作ったデータを取り込む」から<br>統合ハブで作った「事前調査_〜.json」を選んでください。";
+  $("prog").textContent = "";
+  $("routeSel").innerHTML = ""; $("dwSel").innerHTML = "";
+}
+
+let imgUrl = null;
+async function showDrawing(key, fit){
+  dwKey = key;
+  lsSet("jizen_last_" + pkg.id, {route, dw: key});
+  fillDwSel(); updProgress();
+  const img = $("img");
+  const d = pkg.drawings.find(x => x.id === key);
+  if(!d){
+    img.removeAttribute("src"); $("stage").style.display = "none";
+    renderNoDraw(key);
+    renderMarks();
+    return;
+  }
+  $("nodraw").style.display = "none";
+  $("stage").style.display = "";
+  const blob = await imgGet(pkg.id + "|" + d.id);
+  if(imgUrl) URL.revokeObjectURL(imgUrl);
+  imgUrl = blob ? URL.createObjectURL(blob) : "";
+  V.w = d.w; V.h = d.h;
+  img.style.width = d.w + "px"; img.style.height = d.h + "px";
+  img.src = imgUrl;
+  if(fit) fitView();
+  applyView();
+}
+function renderNoDraw(key){
+  const [, r, z] = key.split("|");
+  const box = $("nodraw");
+  box.style.display = "block";
+  const ts = treesOnKey(key);
+  box.innerHTML = "<h3>図面番号 " + esc(z) + "</h3><p>この図面番号の図面PDFが取り込まれていません。樹木を選んで入力してください。</p>" +
+    '<div class="tlist">' + ts.map(t => {
+      const r0 = recOf(t.id);
+      const g = girthOf(r0.g);
+      return '<button data-id="' + esc(t.id) + '" class="' + r0.st + '"><b>' + esc(t.no) + '</b>　' + esc(t.sp) +
+             '<br><small>桝 ' + esc(t.masu) + '　台帳C ' + esc(t.c || "—") + (g.c != null ? '　実測 ' + g.c : '') +
+             '　' + ST_LABEL[r0.st] + '</small></button>';
+    }).join("") + "</div>";
+  box.querySelectorAll("button[data-id]").forEach(b => b.onclick = ()=> select(b.dataset.id, false));
+}
+
+/* ================= 図面の拡大・移動 ================= */
+function viewSize(){ const r = $("view").getBoundingClientRect(); return {w: r.width, h: r.height}; }
+function rotDims(){ return (V.rot % 180) ? {w: V.h, h: V.w} : {w: V.w, h: V.h}; }
+function fitView(){
+  const vs = viewSize(), rd = rotDims();
+  if(!rd.w) return;
+  V.s = Math.min(vs.w / rd.w, vs.h / rd.h) * 0.96;
+  V.tx = vs.w / 2; V.ty = vs.h / 2;
+}
+function applyView(){
+  $("stage").style.transform = "translate(" + V.tx + "px," + V.ty + "px) scale(" + V.s + ") rotate(" + V.rot + "deg) translate(" + (-V.w / 2) + "px," + (-V.h / 2) + "px)";
+  scheduleMarks();
+}
+/* 図面の画素座標 → 画面座標 */
+function toScreen(x, y){
+  const dx = x - V.w / 2, dy = y - V.h / 2, a = V.rot * Math.PI / 180;
+  const rx = dx * Math.cos(a) - dy * Math.sin(a), ry = dx * Math.sin(a) + dy * Math.cos(a);
+  return {x: V.tx + V.s * rx, y: V.ty + V.s * ry};
+}
+function toImage(sx, sy){
+  const px = (sx - V.tx) / V.s, py = (sy - V.ty) / V.s, a = -V.rot * Math.PI / 180;
+  return {x: px * Math.cos(a) - py * Math.sin(a) + V.w / 2, y: px * Math.sin(a) + py * Math.cos(a) + V.h / 2};
+}
+function zoomAt(sx, sy, f){
+  const ns = Math.max(0.05, Math.min(4, V.s * f));
+  const k = ns / V.s;
+  V.tx = sx - (sx - V.tx) * k; V.ty = sy - (sy - V.ty) * k; V.s = ns;
+  applyView();
+}
+function centerOn(t, minScale){
+  const p = posOf(t); if(!p || t.drawing !== dwKey) return;
+  const vs = viewSize();
+  if(minScale && V.s < minScale) V.s = minScale;
+  const cur = toScreen(p.x, p.y);
+  V.tx += vs.w / 2 - cur.x; V.ty += vs.h / 2 - cur.y;
+  applyView();
+}
+function ensureVisible(t){
+  const p = posOf(t); if(!p || t.drawing !== dwKey) return;
+  const vs = viewSize(), q = toScreen(p.x, p.y), m = 50;
+  if(q.x < m || q.y < m || q.x > vs.w - m || q.y > vs.h - m) centerOn(t);
+}
+
+/* ---- 樹木の印 ---- */
+let markRaf = 0;
+function scheduleMarks(){
+  if(markRaf) return;
+  // 描画のたびにまとめて1回。画面が裏に回って requestAnimationFrame が止まっていても描けるよう時間でも補う
+  const run = ()=>{ if(!markRaf) return; cancelAnimationFrame(markRaf.a); clearTimeout(markRaf.b); markRaf = 0; renderMarks(); };
+  markRaf = {a: requestAnimationFrame(run), b: setTimeout(run, 60)};
+}
+function markSize(){ return Math.max(16, Math.min(34, V.s * 44)); }
+function renderMarks(){
+  const box = $("marks");
+  if(!pkg || dwKey.startsWith("nodraw|") || !dwKey){ box.innerHTML = ""; renderNoPos(); renderLegend(); return; }
+  const d = markSize(), vs = viewSize(), showTag = opt.tags && V.s > 0.45;
+  let html = "";
+  treesOnKey(dwKey).forEach(t => {
+    const p = posOf(t); if(!p) return;
+    const q = toScreen(p.x, p.y);
+    if(q.x < -40 || q.y < -40 || q.x > vs.w + 40 || q.y > vs.h + 40) return;
+    const r = recOf(t.id);
+    const chg = clsChanged(t, r);
+    const cls = "mk " + (r.st || "") + (chg ? " chg" : "") + (t.id === selId ? " sel" : "") + (t.added ? " add" : "") +
+                (t.flag && !r.st ? " flag" : "");
+    const dd = t.id === selId ? d + 8 : d;
+    html += '<div class="' + cls + '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
+    if(showTag){
+      const g = girthOf(r.g);
+      let txt = "";
+      if(t.added || (res.pins && res.pins[t.id])) txt = t.no;
+      if(g.c != null) txt += (txt ? " " : "") + g.c;
+      if(txt) html += '<div class="tag' + (chg ? " chg" : "") + '" style="transform:translate(' + (q.x + dd / 2 + 1) + 'px,' + (q.y - dd / 2 - 6) + 'px)">' + esc(txt) + '</div>';
+    }
+  });
+  box.innerHTML = html;
+  renderNoPos(); renderLegend();
+}
+function renderLegend(){
+  if(!pkg || !dwKey){ $("legend").style.display = "none"; return; }
+  const ts = treesOnKey(dwKey);
+  const c = {"": 0, ok: 0, gone: 0, nomasu: 0};
+  ts.forEach(t => c[recOf(t.id).st || ""]++);
+  const nFlag = ts.filter(t => t.flag && !recOf(t.id).st).length;
+  const dw = pkg.drawings.find(d => d.id === dwKey);
+  $("legend").style.display = "";
+  $("legend").innerHTML =
+    '<i style="border-color:var(--warn)"></i>未調査 ' + c[""] +
+    '<i style="border-color:var(--ok);background:rgba(46,125,50,.3)"></i>現存 ' + c.ok +
+    '<i style="border-color:var(--ng);background:rgba(198,40,40,.4)"></i>伐採 ' + c.gone +
+    '<i style="border-color:#333;background:rgba(40,40,40,.4)"></i>桝無し ' + c.nomasu +
+    (nFlag ? '<i style="border-color:var(--ng);border-style:dashed"></i>図面で撤去 ' + nFlag : '') +
+    (dw && dw.rev ? '<br><span style="color:var(--tx2)">台帳図面 ' + esc(dw.rev) + ' 修正版</span>' : '');
+}
+function renderNoPos(){
+  const box = $("nopos");
+  if(!pkg || !dwKey || dwKey.startsWith("nodraw|")){ box.innerHTML = ""; return; }
+  const ts = treesOnKey(dwKey).filter(t => !posOf(t));
+  if(!ts.length){ box.innerHTML = ""; return; }
+  box.innerHTML = "<b>図面で見つからない樹木</b>" + ts.map(t =>
+    '<button data-id="' + esc(t.id) + '" class="' + (recOf(t.id).st ? "done" : "") + '">' + esc(t.no) + '</button>').join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); select(b.dataset.id, false); });
+}
+
+/* ---- 指の操作（1本指で移動、2本指で拡大、タップで選択、長押しで追加） ---- */
+const ptrs = new Map();
+let gest = null, lastTap = {t: 0, x: 0, y: 0}, lpTimer = 0;
+const view = $("view");
+function vpos(e){ const r = view.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
+view.addEventListener("pointerdown", e => {
+  if(e.target.closest("#tools,#nopos,#pinBar,#nodraw,#legend")) return;
+  if(!pkg || dwKey.startsWith("nodraw|")) return;
+  view.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, vpos(e));
+  if(ptrs.size === 1){
+    const p = vpos(e);
+    gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, t0: Date.now(), moved: false, multi: false};
+    clearTimeout(lpTimer);
+    lpTimer = setTimeout(()=>{ if(gest && !gest.moved && !gest.multi && ptrs.size === 1){ gest.long = true; longPress(gest.sx, gest.sy); } }, 650);
+  } else if(ptrs.size === 2){
+    clearTimeout(lpTimer);
+    const [a, b] = [...ptrs.values()];
+    gest = {mode: "pinch", d0: Math.hypot(a.x - b.x, a.y - b.y), s0: V.s,
+            m0: {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}, t0x: V.tx, t0y: V.ty, multi: true, moved: true};
+  }
+});
+view.addEventListener("pointermove", e => {
+  if(!ptrs.has(e.pointerId) || !gest) return;
+  ptrs.set(e.pointerId, vpos(e));
+  if(gest.mode === "pan" && ptrs.size === 1){
+    const p = vpos(e);
+    if(!gest.moved && Math.hypot(p.x - gest.sx, p.y - gest.sy) > 8){ gest.moved = true; clearTimeout(lpTimer); }
+    if(gest.moved){ V.tx += p.x - gest.lx; V.ty += p.y - gest.ly; applyView(); }
+    gest.lx = p.x; gest.ly = p.y;
+  } else if(gest.mode === "pinch" && ptrs.size >= 2){
+    const [a, b] = [...ptrs.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y), m = {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2};
+    const ns = Math.max(0.05, Math.min(4, gest.s0 * d / gest.d0));
+    const px = (gest.m0.x - gest.t0x) / gest.s0, py = (gest.m0.y - gest.t0y) / gest.s0;
+    V.s = ns; V.tx = m.x - ns * px; V.ty = m.y - ns * py;
+    applyView();
+  }
+});
+function ptrEnd(e){
+  if(!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  clearTimeout(lpTimer);
+  if(!gest) return;
+  if(gest.mode === "pinch"){
+    if(ptrs.size === 1){   // 1本指に戻ったら移動を続ける
+      const p = [...ptrs.values()][0];
+      gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, t0: Date.now(), moved: true, multi: true};
+    } else if(!ptrs.size) gest = null;
+    return;
+  }
+  if(ptrs.size) return;
+  const g = gest; gest = null;
+  if(g.moved || g.multi || g.long || e.type === "pointercancel") return;
+  const now = Date.now();
+  if(now - lastTap.t < 320 && Math.hypot(g.sx - lastTap.x, g.sy - lastTap.y) < 30){
+    lastTap.t = 0; zoomAt(g.sx, g.sy, 2); return;
+  }
+  lastTap = {t: now, x: g.sx, y: g.sy};
+  tapAt(g.sx, g.sy);
+}
+view.addEventListener("pointerup", ptrEnd);
+view.addEventListener("pointercancel", ptrEnd);
+view.addEventListener("wheel", e => {
+  if(!pkg || dwKey.startsWith("nodraw|")) return;
+  e.preventDefault();
+  const p = vpos(e);
+  zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015));
+}, {passive: false});
+document.addEventListener("gesturestart", e => e.preventDefault());
+
+function nearestTree(sx, sy, lim){
+  let best = null, bd = lim;
+  treesOnKey(dwKey).forEach(t => {
+    const p = posOf(t); if(!p) return;
+    const q = toScreen(p.x, p.y);
+    const d = Math.hypot(q.x - sx, q.y - sy);
+    if(d < bd){ bd = d; best = t; }
+  });
+  return best;
+}
+function tapAt(sx, sy){
+  if(pinFor){ placePin(sx, sy); return; }
+  const t = nearestTree(sx, sy, Math.max(30, markSize() * 0.9));
+  if(t) select(t.id, false);
+}
+function longPress(sx, sy){
+  if(pinFor) return;
+  const near = nearestTree(sx, sy, 20);
+  if(near){ select(near.id, false); return; }
+  if(!confirm("ここに台帳に無い樹木を追加しますか？\n（新植などで台帳に載っていない樹木）")) return;
+  const d = pkg.drawings.find(x => x.id === dwKey);
+  const n = (res.added || []).filter(a => a.drawing === dwKey).length + 1;
+  const no = prompt("樹木番号（分からなければそのままで）", "追加" + n);
+  if(no === null) return;
+  const p = toImage(sx, sy);
+  const a = {id: "add-" + Date.now().toString(36), route, zumen: d.zumen, drawing: dwKey,
+             no: no.trim() || ("追加" + n), x: Math.round(p.x), y: Math.round(p.y), order: 1e9 + Date.now() % 1e6};
+  res.added.push(a);
+  rec(a.id).st = "ok"; rec(a.id).t = Date.now();
+  saveRes();
+  fillDwSel(); select(a.id, false);
+  toast("追加しました。幹周と樹種を入力してください");
+}
+
+/* ---- 位置の指定 ---- */
+function startPin(id){
+  const t = treeById(id); if(!t) return;
+  if(!t.drawing){ toast("この樹木の図面がありません"); return; }
+  if(t.drawing !== dwKey){ route = t.route; fillRouteSel(); showDrawing(t.drawing, true); }
+  pinFor = id;
+  $("pinMsg").textContent = t.no + " の位置を図面上でタップしてください";
+  $("pinBar").style.display = "flex";
+}
+function endPin(){ pinFor = null; $("pinBar").style.display = "none"; }
+function placePin(sx, sy){
+  const t = treeById(pinFor);
+  const p = toImage(sx, sy);
+  if(t.added){ t.x = Math.round(p.x); t.y = Math.round(p.y); const a = res.added.find(x => x.id === t.id); a.x = t.x; a.y = t.y; }
+  else res.pins[t.id] = {x: Math.round(p.x), y: Math.round(p.y)};
+  saveRes();
+  const id = pinFor; endPin();
+  select(id, false);
+  toast(t.no + " の位置を記録しました");
+}
+$("pinCancel").onclick = endPin;
+
+/* ================= 入力パネル ================= */
+function select(id, center){
+  const t = treeById(id); if(!t) return;
+  endPin();
+  selId = id;
+  if(t.route !== route){ route = t.route; fillRouteSel(); }
+  const key = t.drawing || ("nodraw|" + t.route + "|" + t.zumen);
+  document.body.classList.add("selOpen");
+  const after = ()=>{
+    renderSheet();
+    setTimeout(()=>{ if(center) centerOn(t, 0.6); else ensureVisible(t); renderMarks(); }, 0);
+  };
+  if(key !== dwKey) showDrawing(key, true).then(after); else after();
+}
+function closeSheet(){ selId = null; document.body.classList.remove("selOpen"); renderMarks(); }
+$("sClose").onclick = closeSheet;
+
+function renderSheet(){
+  const t = treeById(selId); if(!t) return;
+  const r = recOf(t.id);
+  $("sNo").textContent = t.no;
+  $("sSub").innerHTML = esc(t.route) + "　図面 " + esc(zShort(t.zumen)) + (t.masu ? "　桝 " + esc(t.masu) : "") +
+                        (t.added ? '　<b style="color:var(--acc)">台帳外（追加）</b>' : "");
+  if(t.added){
+    $("sInfo").innerHTML = "現地で追加した樹木です。樹種と幹周を入力してください。";
+  } else {
+    const lc = ledgerCls(t);
+    $("sInfo").innerHTML = "<b>" + esc(t.sp || "（樹種なし）") + "</b>　台帳 H " + esc(t.h || "—") + "m　C " + esc(t.c || "—") + "cm" +
+      (lc ? '　<span class="cls ' + lc + '">' + CLS_TXT[lc] + "</span>" : "") +
+      (t.bikou ? '<br><span class="bk">台帳備考：' + esc(t.bikou) + "</span>" : "") +
+      (t.flag ? '<br><span class="bk">' + FLAG_TXT[t.flag] + "</span>" : "") +
+      (posOf(t) ? "" : '<br><span class="bk">図面上の位置が分かりません。下の「図面上の位置を直す」で指定できます。</span>');
+  }
+  $("seg").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.st === r.st));
+  document.body.classList.toggle("noTree", r.st === "gone" || r.st === "nomasu");
+  renderGirth();
+  $("sp2").value = r.sp2 || "";
+  $("memo").value = r.memo || "";
+  renderChips();
+  $("pinLink").textContent = posOf(t) ? "図面上の位置を直す" : "図面上の位置を指定する";
+  $("pinLink").style.display = t.drawing ? "" : "none";
+  $("delAdd").style.display = t.added ? "" : "none";
+  $("undoLink").style.display = t.added ? "none" : "";
+}
+function renderGirth(){
+  const t = treeById(selId); const r = recOf(selId);
+  const g = girthOf(r.g);
+  const raw = r.g ? esc(r.g).replace(/\+/g, " ＋ ") : '<small>幹周を入力（cm）</small>';
+  $("gDisp").innerHTML = (g.kabu ? raw + '<small>→ ' + g.c + ' cm</small>' : raw + (r.g ? "<small>cm</small>" : ""));
+  $("gDisp").classList.toggle("act", !!r.g);
+  $("gNote").textContent = g.note;
+  const lc = t.added ? "" : ledgerCls(t);
+  if(r.st === "gone" || r.st === "nomasu"){
+    $("clsRow").innerHTML = '<span class="cls chg">' + ST_LABEL[r.st] + '</span>　集計の本数から除きます';
+  } else if(g.c != null){
+    const ac = g.c < 60 ? "lt" : "ge";
+    const diff = t.added || !t.c ? "" : "　台帳比 " + (g.c - parseFloat(t.c) >= 0 ? "+" : "") + (Math.round((g.c - parseFloat(t.c)) * 10) / 10) + "cm";
+    $("clsRow").innerHTML = (lc && lc !== ac
+      ? '<span class="cls ' + lc + '">' + CLS_TXT[lc] + '</span> → <span class="cls chg">' + CLS_TXT[ac] + '　区分が変わります</span>'
+      : '<span class="cls ' + ac + '">' + CLS_TXT[ac] + '</span>') + diff;
+  } else $("clsRow").innerHTML = "";
+}
+function renderChips(){
+  const memo = recOf(selId).memo || "";
+  $("memoChips").innerHTML = MEMO_CHIPS.map(c => '<button class="' + (memo.split("、").includes(c) ? "on" : "") + '">' + c + '</button>').join("");
+  $("memoChips").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+    const r = rec(selId);
+    let parts = (r.memo || "").split("、").filter(Boolean);
+    parts = parts.includes(b.textContent) ? parts.filter(x => x !== b.textContent) : parts.concat(b.textContent);
+    r.memo = parts.join("、"); touch(r);
+    $("memo").value = r.memo; renderChips();
+  });
+}
+function touch(r){ r.t = Date.now(); saveRes(); scheduleMarks(); fillDwSel(); updProgress(); }
+
+$("seg").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+  const r = rec(selId);
+  const st = b.dataset.st;
+  if(r.st === st && st !== "ok"){ r.st = r.g ? "ok" : ""; }
+  else {
+    r.st = st;
+    if(st !== "ok") r.g = "";   // 樹木が無いので幹周は持たない
+  }
+  touch(r); renderSheet();
+});
+$("pad").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+  const k = b.dataset.k;
+  if(k === "next"){ goNext(1); return; }
+  const r = rec(selId);
+  if(r.st === "gone" || r.st === "nomasu") return;
+  let g = r.g || "";
+  if(k === "bs") g = g.slice(0, -1);
+  else if(k === "clr") g = "";
+  else if(k === "plus"){ if(g && !g.endsWith("+")) g += "+"; }
+  else {
+    const ch = b.textContent;
+    const last = g.split("+").pop();
+    if(ch === "." && (last.includes(".") || !last)) return;
+    if(last.replace(".", "").length >= 4) return;
+    g += ch;
+  }
+  r.g = g;
+  if(g && !r.st) r.st = "ok";
+  touch(r); renderGirth();
+  $("seg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.st === r.st));
+});
+$("sp2").addEventListener("input", ()=>{ const r = rec(selId); r.sp2 = $("sp2").value.trim(); touch(r); });
+$("memo").addEventListener("input", ()=>{ const r = rec(selId); r.memo = $("memo").value; touch(r); renderChips(); });
+
+/* 前後の樹木（路線の並び順。図面が変われば図面も切り替える） */
+function goNext(dir){
+  const t0 = treeById(selId); if(!t0) return;
+  const ts = routeTrees(t0.route).sort((a, b) => (a.zumen < b.zumen ? -1 : a.zumen > b.zumen ? 1 : 0) || (a.order - b.order));
+  const i = ts.findIndex(t => t.id === selId);
+  const n = ts[i + dir];
+  if(!n){ toast(dir > 0 ? "この路線の最後の樹木です" : "この路線の最初の樹木です"); return; }
+  if(n.zumen !== t0.zumen) toast("図面 " + zShort(n.zumen) + " に移ります");
+  select(n.id, n.zumen !== t0.zumen);
+}
+$("nextTree").onclick = ()=> goNext(1);
+$("prevTree").onclick = ()=> goNext(-1);
+$("pinLink").onclick = e => { e.preventDefault(); startPin(selId); };
+$("undoLink").onclick = e => {
+  e.preventDefault();
+  if(!confirm("この樹木の入力を消して未調査に戻しますか？")) return;
+  delete res.trees[selId]; saveRes(); scheduleMarks(); fillDwSel(); updProgress(); renderSheet();
+};
+$("delAdd").onclick = e => {
+  e.preventDefault();
+  if(!confirm("この追加樹木を削除しますか？")) return;
+  if(!confirm("本当に削除しますか？（元に戻せません）")) return;
+  res.added = res.added.filter(a => a.id !== selId); delete res.trees[selId];
+  saveRes(); closeSheet(); fillDwSel(); toast("削除しました");
+};
+
+/* ================= ヘッダー操作 ================= */
+$("routeSel").onchange = ()=>{
+  route = $("routeSel").value; closeSheet();
+  const ds = drawingsOf(route), d = ds.find(x => x.dw) || ds[0];
+  showDrawing(d ? d.key : "", true);
+};
+$("dwSel").onchange = ()=>{ closeSheet(); showDrawing($("dwSel").value, true); };
+function stepDw(dir){
+  const list = drawingsOf(route);
+  const i = list.findIndex(d => d.key === dwKey);
+  const n = list[i + dir];
+  if(!n){ toast(dir > 0 ? "最後の図面です" : "最初の図面です"); return; }
+  closeSheet(); showDrawing(n.key, true);
+}
+$("prevDw").onclick = ()=> stepDw(-1);
+$("nextDw").onclick = ()=> stepDw(1);
+$("fitBtn").onclick = ()=>{ fitView(); applyView(); };
+$("rotBtn").onclick = ()=>{ V.rot = (V.rot + 90) % 360; fitView(); applyView(); };
+$("zinBtn").onclick = ()=>{ const v = viewSize(); zoomAt(v.w / 2, v.h / 2, 1.6); };
+$("zoutBtn").onclick = ()=>{ const v = viewSize(); zoomAt(v.w / 2, v.h / 2, 1 / 1.6); };
+window.addEventListener("resize", ()=>{ scheduleMarks(); });
+new ResizeObserver(()=> scheduleMarks()).observe(view);
+
+/* ================= 一覧 ================= */
+let lFilter = "all";
+const FILTERS = [["all", "すべて"], ["none", "未調査"], ["ok", "現存"], ["gone", "伐採・桝無し"], ["chg", "区分変更"], ["flag", "図面で撤去"], ["nopos", "位置不明"], ["add", "追加"]];
+function openList(){
+  $("lRoute").innerHTML = pkg.routes.map(r => '<option>' + esc(r.name) + '</option>').join("");
+  $("lRoute").value = route;
+  renderList();
+  $("listM").classList.add("show");
+}
+function renderList(){
+  $("lFilters").innerHTML = FILTERS.map(([k, v]) => '<button data-f="' + k + '" class="' + (k === lFilter ? "on" : "") + '">' + v + '</button>').join(" ");
+  $("lFilters").querySelectorAll("button").forEach(b => b.onclick = ()=>{ lFilter = b.dataset.f; renderList(); });
+  const r0 = $("lRoute").value;
+  const ts = routeTrees(r0).sort((a, b) => (a.zumen < b.zumen ? -1 : a.zumen > b.zumen ? 1 : 0) || (a.order - b.order)).filter(t => {
+    const r = recOf(t.id);
+    switch(lFilter){
+      case "none": return !r.st;
+      case "ok": return r.st === "ok";
+      case "gone": return r.st === "gone" || r.st === "nomasu";
+      case "chg": return clsChanged(t, r);
+      case "nopos": return !posOf(t);
+      case "add": return !!t.added;
+      case "flag": return !!t.flag;
+      default: return true;
+    }
+  });
+  let h = "<tr><th>図面</th><th>桝</th><th>樹木No</th><th>樹種</th><th>台帳C</th><th>現況</th><th>実測C</th><th>区分</th><th>メモ</th></tr>";
+  ts.forEach(t => {
+    const r = recOf(t.id), g = girthOf(r.g), chg = clsChanged(t, r), ac = afterCls(t, r);
+    h += '<tr data-id="' + esc(t.id) + '" class="' + (r.st || "none") + '"><td>' + esc(zShort(t.zumen)) + "</td><td>" + esc(t.masu) +
+         "</td><td><b>" + esc(t.no) + "</b>" + (t.added ? "（追加）" : "") + (t.flag ? ' <span style="color:var(--ng)">図面で撤去</span>' : "") + "</td><td>" + esc(r.sp2 ? r.sp2 + "（台帳 " + (t.sp || "—") + "）" : t.sp) +
+         '</td><td class="n">' + esc(t.c) + "</td><td>" + ST_LABEL[r.st] + '</td><td class="n">' + (g.c != null ? g.c : "") +
+         '</td><td class="' + (chg ? "chg" : "") + '">' + (ac ? CLS_TXT[ac] : (ac === null ? "—" : "")) + "</td><td>" + esc(r.memo) + "</td></tr>";
+  });
+  if(!ts.length) h += '<tr><td colspan="9" style="text-align:center;color:var(--tx2);padding:20px">該当する樹木はありません</td></tr>';
+  $("lTbl").innerHTML = h;
+  $("lTbl").querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = ()=>{
+    $("listM").classList.remove("show"); select(tr.dataset.id, true);
+  });
+}
+$("lRoute").onchange = renderList;
+$("listBtn").onclick = ()=>{ if(pkg) openList(); };
+
+/* ================= 集計 ================= */
+function tally(r0){
+  const ts = routeTrees(r0);
+  const o = {n: 0, before: {lt: 0, ge: 0, x: 0}, after: {lt: 0, ge: 0, x: 0}, none: 0, ok: 0, gone: 0, nomasu: 0, add: 0, chg: 0, nog: 0, flag: 0, flagOpen: 0};
+  ts.forEach(t => {
+    const r = recOf(t.id);
+    if(t.added){ if(r.st === "ok"){ o.add++; const a = afterCls(t, r); o.after[a || "x"]++; } return; }
+    o.n++;
+    o.before[ledgerCls(t) || "x"]++;
+    if(t.flag){ o.flag++; if(!r.st) o.flagOpen++; }
+    if(!r.st) o.none++; else o[r.st]++;
+    if(r.st === "ok" && girthOf(r.g).c == null) o.nog++;
+    if(clsChanged(t, r)) o.chg++;
+    const a = afterCls(t, r);
+    if(a !== null) o.after[a || "x"]++;
+  });
+  return o;
+}
+function openSum(){
+  let h = "";
+  const tot = {bl: 0, bg: 0, al: 0, ag: 0};
+  let rows = "";
+  pkg.routes.forEach(rt => {
+    const o = tally(rt.name);
+    const done = o.n - o.none;
+    tot.bl += o.before.lt; tot.bg += o.before.ge; tot.al += o.after.lt; tot.ag += o.after.ge;
+    h += '<div class="card"><h3>' + esc(rt.name) + '</h3>' +
+      '<div class="big">' + done + ' / ' + o.n + ' 本 調査済み（' + (o.n ? Math.floor(done * 100 / o.n) : 0) + '%）</div>' +
+      '<div class="bar"><i style="width:' + (o.n ? done * 100 / o.n : 0) + '%"></i></div>' +
+      '<p class="note">現存 ' + o.ok + '本（うち幹周未測定 ' + o.nog + '本）　伐採済・空桝 ' + o.gone + '本　桝無し ' + o.nomasu +
+      '本　台帳外の追加 ' + o.add + '本　区分が変わる樹木 ' + o.chg + '本' +
+      (o.flag ? '<br>最新の台帳図面で撤去になっている樹木 ' + o.flag + '本（うち未調査 ' + o.flagOpen + '本）' : '') + '</p></div>';
+    const d = k => { const v = o.after[k] - o.before[k]; return (v > 0 ? "+" : "") + v; };
+    rows += '<tr><td rowspan="3"><b>' + esc(rt.name) + '</b></td><td>台帳（集計表）</td><td class="n">' + o.before.lt + '</td><td class="n">' + o.before.ge +
+            '</td><td class="n">' + (o.before.lt + o.before.ge) + '</td></tr>' +
+            '<tr><td>事前調査後</td><td class="n">' + o.after.lt + '</td><td class="n">' + o.after.ge + '</td><td class="n">' + (o.after.lt + o.after.ge) + '</td></tr>' +
+            '<tr><td>増減</td><td class="n">' + d("lt") + '</td><td class="n">' + d("ge") + '</td><td class="n">' +
+            ((o.after.lt + o.after.ge) - (o.before.lt + o.before.ge) > 0 ? "+" : "") + ((o.after.lt + o.after.ge) - (o.before.lt + o.before.ge)) + '</td></tr>';
+  });
+  rows += '<tr><td rowspan="2"><b>合計</b></td><td>台帳（集計表）</td><td class="n">' + tot.bl + '</td><td class="n">' + tot.bg + '</td><td class="n">' + (tot.bl + tot.bg) + '</td></tr>' +
+          '<tr><td>事前調査後</td><td class="n">' + tot.al + '</td><td class="n">' + tot.ag + '</td><td class="n">' + (tot.al + tot.ag) + '</td></tr>';
+  h += '<div class="card"><h3>樹木点検の本数（幹周区分）</h3><div class="tblWrap" style="max-height:none"><table>' +
+       '<tr><th>対象路線</th><th>区分</th><th>幹周60cm未満</th><th>幹周60cm以上</th><th>計</th></tr>' + rows + '</table></div>' +
+       '<p class="note">事前調査後＝台帳の樹木から伐採済・空桝と桝無しを除き、台帳外の追加樹木を加えた本数。' +
+       '幹周は実測値で区分し、未調査・未測定の樹木は台帳の区分のまま数えています。</p></div>';
+  $("sumBody").innerHTML = h;
+  $("sumM").classList.add("show");
+}
+$("sumBtn").onclick = ()=>{ if(pkg) openSum(); };
+
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = ()=> b.closest(".modal").classList.remove("show"));
+
+/* ================= メニュー・取り込み ================= */
+async function openMenu(){
+  const list = await pkgList();
+  $("pkgList").innerHTML = list.length ? list.map(p =>
+    '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)">' +
+    '<div style="flex:1"><b>' + esc(p.name) + '</b>' + (pkg && pkg.id === p.id ? '　<span class="cls lt">表示中</span>' : '') +
+    '<div class="note" style="margin:2px 0 0">' + esc(p.office || "") + '　' + p.routes.map(r => esc(r.name) + " " + r.count + "本").join("、") +
+    '<br>作成 ' + esc(p.created) + '　元データ ' + esc(p.source) + '</div></div>' +
+    (pkg && pkg.id === p.id ? '' : '<button class="fl" data-open="' + p.id + '" style="font-size:13px;padding:8px 12px;border-radius:8px;border:1px solid var(--g);color:var(--g);background:#fff">開く</button>') +
+    '<button data-del="' + p.id + '" style="font-size:13px;padding:8px 12px;border-radius:8px;border:1px solid var(--ng);color:var(--ng);background:#fff">削除</button></div>'
+  ).join("") : '<p class="note">まだ取り込まれていません。</p>';
+  $("pkgList").querySelectorAll("[data-open]").forEach(b => b.onclick = async ()=>{
+    closeSheet(); await openPkg(b.dataset.open); $("menuM").classList.remove("show"); toast("切り替えました");
+  });
+  $("pkgList").querySelectorAll("[data-del]").forEach(b => b.onclick = async ()=>{
+    const p = list.find(x => x.id === b.dataset.del);
+    if(!confirm("「" + p.name + "」を削除しますか？\n図面と入力した調査結果がiPadから消えます。")) return;
+    if(!confirm("本当に削除しますか？\n必要ならキャンセルして先にバックアップを書き出してください。")) return;
+    await idb("imgs", "readwrite", st => { p.drawings.forEach(d => st.delete(p.id + "|" + d.id)); });
+    await idb("pkgs", "readwrite", st => { st.delete(p.id); });
+    localStorage.removeItem("jizen_res_" + p.id);
+    localStorage.removeItem("jizen_last_" + p.id);
+    if(pkg && pkg.id === p.id){ closeSheet(); const rest = await pkgList(); if(rest.length) await openPkg(rest[0].id); else showEmpty(); }
+    openMenu(); toast("削除しました");
+  });
+  $("optTags").innerHTML = '<button class="' + (opt.tags ? "on" : "") + '" id="optTag">図面に実測幹周を表示</button>';
+  $("optTag").onclick = ()=>{ opt.tags = !opt.tags; lsSet("jizen_opt", opt); openMenu(); scheduleMarks(); };
+  $("verInfo").textContent = "事前調査 画面 v" + APP_VER;
+  $("menuM").classList.add("show");
+}
+$("menuBtn").onclick = openMenu;
+$("impBtn").onclick = ()=> $("impFile").click();
+$("impFile").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if(!f) return;
+  busy("読み込んでいます…");
+  try{
+    const data = JSON.parse(await f.text());
+    if(data.type !== "gairoju-jizen") throw new Error("事前調査用のファイルではありません");
+    const old = await pkgGet(data.id);
+    if(old && !confirm("同じデータが取り込み済みです。図面と台帳を入れ替えますか？\n（入力済みの調査結果はそのまま残ります）")){ busy(); return; }
+    let i = 0;
+    for(const d of data.drawings){
+      busy("図面を保存しています… " + (++i) + " / " + data.drawings.length);
+      const blob = await (await fetch(d.img)).blob();
+      await idb("imgs", "readwrite", st => { st.put(blob, data.id + "|" + d.id); });
+      delete d.img;
+    }
+    await idb("pkgs", "readwrite", st => { st.put(data); });
+    busy();
+    closeSheet();
+    await openPkg(data.id);
+    $("menuM").classList.remove("show");
+    toast("取り込みました：" + data.routes.map(r => r.name + " " + r.count + "本").join("、"));
+  }catch(err){ busy(); alert("取り込みに失敗しました\n" + err.message); }
+});
+function busy(msg){ $("busy").style.display = msg ? "flex" : "none"; if(msg) $("busyMsg").textContent = msg; }
+
+/* ---- バックアップ ---- */
+function stamp(){ const d = new Date(), p = n => String(n).padStart(2, "0"); return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "_" + p(d.getHours()) + p(d.getMinutes()); }
+$("bkBtn").onclick = ()=>{
+  if(!pkg) return;
+  const body = JSON.stringify({type: "gairoju-jizen-result", version: 1, pkgId: pkg.id, pkgName: pkg.name, exported: new Date().toISOString(), res}, null, 1);
+  share(new Blob([body], {type: "application/json"}), "事前調査結果_" + stamp() + ".json");
+};
+$("rsBtn").onclick = ()=> $("rsFile").click();
+$("rsFile").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if(!f || !pkg) return;
+  try{
+    const d = JSON.parse(await f.text());
+    if(d.type !== "gairoju-jizen-result") throw new Error("バックアップのファイルではありません");
+    if(d.pkgId !== pkg.id && !confirm("表示中のデータ（" + pkg.name + "）と別のデータのバックアップです。読み込みますか？")) return;
+    let n = 0;
+    Object.entries(d.res.trees || {}).forEach(([id, r]) => {
+      const cur = res.trees[id];
+      if(!cur || (r.t || 0) > (cur.t || 0)){ res.trees[id] = r; n++; }
+    });
+    (d.res.added || []).forEach(a => { if(!res.added.some(x => x.id === a.id)){ res.added.push(a); n++; } });
+    Object.assign(res.pins, d.res.pins || {});
+    saveRes(); fillDwSel(); updProgress(); scheduleMarks();
+    toast(n + " 件を読み込みました（新しい方を採用）");
+  }catch(err){ alert("読み込めませんでした\n" + err.message); }
+});
+function share(blob, fname){
+  const file = new File([blob], fname, {type: blob.type});
+  if(navigator.canShare && navigator.canShare({files: [file]})){
+    navigator.share({files: [file], title: fname}).catch(err => { if(err.name !== "AbortError") dl(blob, fname); });
+  } else dl(blob, fname);
+}
+function dl(blob, fname){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = fname;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+}
+
+/* ================= Excel（xlsx）の書き出し ================= */
+/* ライブラリを使わずに最小限の xlsx を組み立てる（オフラインでも動くように） */
+const XL = (()=>{
+  const crcT = (()=>{ const t = new Uint32Array(256); for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(u8){ let c = 0xFFFFFFFF; for(let i = 0; i < u8.length; i++) c = crcT[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files){   // files: [{name, data:Uint8Array}]（無圧縮）
+    const enc = new TextEncoder(), parts = [], cen = [];
+    let off = 0;
+    files.forEach(f => {
+      const nm = enc.encode(f.name), crc = crc32(f.data), sz = f.data.length;
+      const h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+      h.setUint16(10, 0, true); h.setUint16(12, 0x21, true); h.setUint32(14, crc, true); h.setUint32(18, sz, true); h.setUint32(22, sz, true);
+      h.setUint16(26, nm.length, true); h.setUint16(28, 0, true);
+      parts.push(new Uint8Array(h.buffer), nm, f.data);
+      const c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
+      c.setUint16(12, 0, true); c.setUint16(14, 0x21, true); c.setUint32(16, crc, true); c.setUint32(20, sz, true); c.setUint32(24, sz, true);
+      c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
+      cen.push(new Uint8Array(c.buffer), nm);
+      off += 30 + nm.length + sz;
+    });
+    const cenSize = cen.reduce((a, b) => a + b.length, 0);
+    const e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+    e.setUint32(12, cenSize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(cen, [new Uint8Array(e.buffer)]), {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  }
+  const x = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+  function col(n){ let s = ""; n++; while(n){ const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+  /* セルの見た目：0標準 1見出し 2枠 3伐採 4桝無し 5区分変更 6表題 7未調査 8太字枠 9追加 */
+  const STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="3"><font><sz val="10"/><name val="游ゴシック"/><family val="3"/><charset val="128"/></font>' +
+    '<font><b/><sz val="10"/><name val="游ゴシック"/><family val="3"/><charset val="128"/></font>' +
+    '<font><b/><sz val="14"/><name val="游ゴシック"/><family val="3"/><charset val="128"/></font></fonts>' +
+    '<fills count="8"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFE8E7E0"/></patternFill></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFF8D7D7"/></patternFill></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/></patternFill></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF2A0"/></patternFill></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF7E6"/></patternFill></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFE3EEF9"/></patternFill></fill></fills>' +
+    '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+    '<border><left style="thin"><color rgb="FF999999"/></left><right style="thin"><color rgb="FF999999"/></right>' +
+    '<top style="thin"><color rgb="FF999999"/></top><bottom style="thin"><color rgb="FF999999"/></bottom><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="10">' +
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>' +
+    '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>' +
+    '<xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>' +
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+    '<xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>' +
+    '<xf numFmtId="0" fontId="0" fillId="7" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>' +
+    '</cellXfs><cellStyles count="1"><cellStyle name="標準" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  /* sheet: {name, rows:[[{v, s}|value...]], widths:[..], freeze:行数, filter:"A3:P10", merges:[..]} */
+  function sheetXml(sh){
+    let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
+    xml += '<sheetViews><sheetView workbookViewId="0"' + (sh.freeze ? '><pane ySplit="' + sh.freeze + '" topLeftCell="A' + (sh.freeze + 1) + '" activePane="bottomLeft" state="frozen"/></sheetView>' : '/>') + '</sheetViews>';
+    xml += '<sheetFormatPr defaultRowHeight="15"/>';
+    if(sh.widths) xml += '<cols>' + sh.widths.map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>').join("") + '</cols>';
+    xml += '<sheetData>';
+    sh.rows.forEach((row, ri) => {
+      xml += '<row r="' + (ri + 1) + '">';
+      row.forEach((c, ci) => {
+        if(c == null) return;
+        const o = (typeof c === "object") ? c : {v: c};
+        const ref = col(ci) + (ri + 1), s = o.s ? ' s="' + o.s + '"' : "";
+        if(o.v === "" || o.v == null){ if(o.s) xml += '<c r="' + ref + '"' + s + '/>'; return; }
+        if(typeof o.v === "number" && isFinite(o.v)) xml += '<c r="' + ref + '"' + s + '><v>' + o.v + '</v></c>';
+        else xml += '<c r="' + ref + '"' + s + ' t="inlineStr"><is><t xml:space="preserve">' + x(o.v) + '</t></is></c>';
+      });
+      xml += '</row>';
+    });
+    xml += '</sheetData>';
+    if(sh.filter) xml += '<autoFilter ref="' + sh.filter + '"/>';
+    if(sh.merges && sh.merges.length) xml += '<mergeCells count="' + sh.merges.length + '">' + sh.merges.map(m => '<mergeCell ref="' + m + '"/>').join("") + '</mergeCells>';
+    xml += '<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>';
+    xml += '<pageSetup paperSize="9" orientation="landscape" fitToHeight="0"/></worksheet>';
+    return xml;
+  }
+  function safeName(n, used){
+    let s = String(n).replace(/[\[\]:*?\/\\]/g, "_").slice(0, 31) || "Sheet";
+    let k = 2, b = s;
+    while(used.has(s)){ s = b.slice(0, 28) + "(" + k++ + ")"; }
+    used.add(s); return s;
+  }
+  function build(sheets){
+    const enc = new TextEncoder(), used = new Set();
+    sheets.forEach(s => s.safe = safeName(s.name, used));
+    const files = [];
+    const add = (name, str) => files.push({name, data: enc.encode(str)});
+    add("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+      sheets.map((s, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("") + '</Types>');
+    add("_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+    const dn = sheets.map((s, i) => s.filter ? '<definedName name="_xlnm._FilterDatabase" localSheetId="' + i + '" hidden="1">\'' + x(s.safe).replace(/'/g, "''") + '\'!' + s.filter.replace(/([A-Z]+)(\d+)/g, "$$$1$$$2") + '</definedName>' : "").join("");
+    add("xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+      sheets.map((s, i) => '<sheet name="' + x(s.safe) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join("") + '</sheets>' +
+      (dn ? '<definedNames>' + dn + '</definedNames>' : '') + '</workbook>');
+    add("xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      sheets.map((s, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join("") +
+      '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+    add("xl/styles.xml", STYLES);
+    sheets.forEach((s, i) => add("xl/worksheets/sheet" + (i + 1) + ".xml", sheetXml(s)));
+    return zip(files);
+  }
+  return {build, col};
+})();
+
+function fmtT(t){ if(!t) return ""; const d = new Date(t), p = n => String(n).padStart(2, "0"); return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes()); }
+function buildWorkbook(){
+  const H = v => ({v, s: 1}), B = v => ({v, s: 2}), N = v => ({v: (v === "" || v == null || isNaN(+v)) ? v : +v, s: 2});
+  const sheets = [];
+  /* 集計シート */
+  const S = {name: "集計", rows: [], widths: [22, 16, 14, 14, 10, 60], merges: []};
+  S.rows.push([{v: "事前調査 集計表", s: 6}]);
+  S.rows.push([pkg.name + "（元データ：" + pkg.source + "）"]);
+  S.rows.push(["書き出し " + fmtT(Date.now())]);
+  S.rows.push([]);
+  S.rows.push([H("対象路線"), H("区分"), H("幹周60cm未満"), H("幹周60cm以上"), H("計"), H("内訳")]);
+  const tot = {bl: 0, bg: 0, al: 0, ag: 0};
+  pkg.routes.forEach(rt => {
+    const o = tally(rt.name);
+    const r0 = S.rows.length + 1;
+    tot.bl += o.before.lt; tot.bg += o.before.ge; tot.al += o.after.lt; tot.ag += o.after.ge;
+    S.rows.push([{v: rt.name, s: 8}, B("台帳（集計表）"), N(o.before.lt), N(o.before.ge), N(o.before.lt + o.before.ge), B("対象 " + o.n + "本")]);
+    S.rows.push([{v: "", s: 8}, B("事前調査後"), N(o.after.lt), N(o.after.ge), N(o.after.lt + o.after.ge),
+      B("伐採済・空桝 " + o.gone + "本、桝無し " + o.nomasu + "本、台帳外の追加 " + o.add + "本、区分変更 " + o.chg + "本、未調査 " + o.none + "本")]);
+    S.rows.push([{v: "", s: 8}, {v: "増減", s: 5}, {v: o.after.lt - o.before.lt, s: 5}, {v: o.after.ge - o.before.ge, s: 5},
+      {v: (o.after.lt + o.after.ge) - (o.before.lt + o.before.ge), s: 5}, B("")]);
+    S.merges.push("A" + r0 + ":A" + (r0 + 2));
+  });
+  const r1 = S.rows.length + 1;
+  S.rows.push([{v: "合計", s: 8}, B("台帳（集計表）"), N(tot.bl), N(tot.bg), N(tot.bl + tot.bg), B("")]);
+  S.rows.push([{v: "", s: 8}, B("事前調査後"), N(tot.al), N(tot.ag), N(tot.al + tot.ag), B("")]);
+  S.rows.push([{v: "", s: 8}, {v: "増減", s: 5}, {v: tot.al - tot.bl, s: 5}, {v: tot.ag - tot.bg, s: 5}, {v: (tot.al + tot.ag) - (tot.bl + tot.bg), s: 5}, B("")]);
+  S.merges.push("A" + r1 + ":A" + (r1 + 2));
+  S.rows.push([]);
+  S.rows.push(["※事前調査後＝台帳の樹木から伐採済・空桝と桝無しを除き、台帳外の追加樹木を加えた本数。"]);
+  S.rows.push(["※幹周は実測値で区分し、未調査・幹周未測定の樹木は台帳の区分のまま数えています。株立ちは各幹周の合計×0.7。"]);
+  S.rows.push([]);
+  S.rows.push([H("対象路線"), H("対象本数"), H("調査済"), H("未調査"), H("現存"), H("伐採済・空桝 ／ 桝無し ／ 追加 ／ 区分変更 ／ 幹周未測定")]);
+  pkg.routes.forEach(rt => {
+    const o = tally(rt.name);
+    S.rows.push([B(rt.name), N(o.n), N(o.n - o.none), N(o.none), N(o.ok), B(o.gone + " ／ " + o.nomasu + " ／ " + o.add + " ／ " + o.chg + " ／ " + o.nog)]);
+  });
+  sheets.push(S);
+  /* 路線ごとの樹木一覧 */
+  const heads = ["No", "図面番号", "桝No", "樹木No", "樹種名（台帳）", "H", "台帳C", "台帳区分", "現況", "実測幹周", "株立ち", "調査後区分", "区分変更", "現地の樹種", "メモ", "台帳備考", "最新の台帳図面", "調査日時", "台帳の行"];
+  pkg.routes.forEach(rt => {
+    const R = {name: rt.name, rows: [], widths: [5, 12, 7, 8, 14, 5, 7, 10, 13, 9, 30, 10, 8, 14, 24, 18, 22, 16, 8], freeze: 3};
+    R.rows.push([{v: rt.name + "　事前調査結果", s: 6}]);
+    R.rows.push(["赤＝伐採済・空桝　灰＝桝無し　黄＝幹周区分が変わる　薄橙＝未調査　青＝台帳外の追加樹木"]);
+    R.rows.push(heads.map(H));
+    const ts = routeTrees(rt.name).sort((a, b) => (a.added ? 1 : 0) - (b.added ? 1 : 0) || (a.zumen < b.zumen ? -1 : a.zumen > b.zumen ? 1 : 0) || (a.order - b.order));
+    ts.forEach((t, i) => {
+      const r = recOf(t.id), g = girthOf(r.g), chg = clsChanged(t, r), ac = afterCls(t, r), lc = t.added ? "" : ledgerCls(t);
+      const s = t.added ? 9 : r.st === "gone" ? 3 : r.st === "nomasu" ? 4 : !r.st ? 7 : 2;
+      const c = v => ({v, s}), cn = v => ({v: (v === "" || v == null || isNaN(+v)) ? (v == null ? "" : v) : +v, s});
+      R.rows.push([cn(i + 1), c(t.zumen), c(t.masu), c(t.no), c(t.sp), cn(t.h), cn(t.c), c(lc ? CLS_TXT[lc] : ""),
+        c(t.added ? "追加（台帳外）" : ST_LABEL[r.st]), cn(g.c != null ? g.c : ""), c(g.note),
+        chg ? {v: ac ? CLS_TXT[ac] : "", s: 5} : c(ac ? CLS_TXT[ac] : (ac === null ? "—" : "")),
+        chg ? {v: "変更", s: 5} : c(""), c(r.sp2), c(r.memo), c(t.bikou),
+        c(t.flag === "red" ? "赤い○（撤去）" : t.flag === "nolabel" ? "記号・番号なし" : ""), c(fmtT(r.t)), cn(t.row)]);
+    });
+    R.filter = "A3:" + XL.col(heads.length - 1) + (R.rows.length);
+    sheets.push(R);
+  });
+  return XL.build(sheets);
+}
+function exportXlsx(){
+  if(!pkg) return;
+  try{ share(buildWorkbook(), "事前調査集計_" + stamp() + ".xlsx"); }
+  catch(err){ alert("Excelを作れませんでした\n" + err.message); }
+}
+$("xlsBtn").onclick = exportXlsx;
+$("xlsBtn2").onclick = exportXlsx;
+
+/* ================= 起動 ================= */
+let toastTimer;
+function toast(msg){
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=> t.classList.remove("show"), 2600);
+}
+(async ()=>{
+  try{
+    const list = await pkgList();
+    const cur = lsGet("jizen_cur", null);
+    const p = list.find(x => x.id === cur) || list[0];
+    if(p) await openPkg(p.id); else showEmpty();
+  }catch(err){ showEmpty(); toast("データを開けませんでした：" + err.message); }
+})();
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
+</script>
+</body>
+</html>

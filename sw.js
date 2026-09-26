@@ -3,7 +3,8 @@
    HTML・JS は「まず通信、だめならキャッシュ」。
    古いキャッシュのまま新しい画面と食い違うのを防ぐため、コードは常に最新を取りに行く。
    アイコンなどは「まずキャッシュ」で速さを優先する。 */
-const VERSION = "sys-v7";
+// 古い版のキャッシュだけ消す（同じ場所にある他のアプリのキャッシュは残す）
+const VERSION = "sys-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -25,7 +26,7 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== VERSION && k.startsWith(VERSION.replace(/\d+$/, ""))).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
