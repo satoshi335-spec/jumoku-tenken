@@ -1608,6 +1608,19 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
 
 <!-- ===== 案件連携（街路樹診断システム） ===== -->
 <script src="../common/project.js"></script>
+<script src="../common/keypad.js"></script>
+<script>
+/* 寸法の入力は事前調査と同じテンキーで（樹高 → 幹周 → 枝張 の順に「次へ」で進む） */
+(function(){
+  if(!window.SysKeypad) return;
+  const $k = id => document.getElementById(id);
+  SysKeypad.attach($k("th"), {label: "樹高H", unit: "m", next: $k("tc")});
+  SysKeypad.attach($k("tc"), {label: "幹周C", unit: "m", next: $k("tw")});
+  SysKeypad.attach($k("tw"), {label: "枝張W", unit: "m"});
+  SysKeypad.attach($k("fukyu1"), {label: "腐朽空洞率①", unit: "%", next: $k("fukyu2")});
+  SysKeypad.attach($k("fukyu2"), {label: "腐朽空洞率②", unit: "%"});
+})();
+</script>
 <script>
 SysProject.attachBar("gaikan", {
   apply: function(p){

@@ -1,5 +1,5 @@
 // 古い版のキャッシュだけ消す（同じ場所にある他のアプリのキャッシュは残す）
-const VERSION = "gj-v19";
+const VERSION = "gj-v20";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,6 +7,8 @@ const ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png",
+  "../common/project.js",
+  "../common/keypad.js",
   "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
 ];
 
@@ -32,6 +34,17 @@ self.addEventListener("fetch", e => {
         caches.open(VERSION).then(c => { c.put("./index.html", clone.clone()); c.put("./", clone); });
         return res;
       }).catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
+  // 共通部品（../common/*.js）などのコードは「まず通信」。古い版と新しい画面が食い違わないように
+  const u = new URL(e.request.url);
+  if (u.origin === location.origin && /\.(?:js|html|webmanifest)$/.test(u.pathname)) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok) { const clone = res.clone(); caches.open(VERSION).then(c => c.put(e.request, clone)); }
+        return res;
+      }).catch(() => caches.match(e.request, { ignoreSearch: true }))
     );
     return;
   }

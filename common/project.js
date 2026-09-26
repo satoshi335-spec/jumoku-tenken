@@ -7,7 +7,7 @@
 (function (global) {
   "use strict";
 
-  var VERSION = 8;   // project.js を直したら1つ増やす（画面下に表示される）
+  var VERSION = 9;   // project.js を直したら1つ増やす（画面下に表示される）
   var KEY_P = "sys_projects", KEY_C = "sys_current";
 
   var TERM_PRESETS = {
@@ -88,6 +88,13 @@
 
     var bar = document.createElement("div");
     bar.id = "sysBar";
+    // ホーム画面から開いたとき、iPadOSのウィンドウ操作ボタン（左上の ×・－）と重ならないよう左を空ける
+    if (!document.getElementById("sysBarStyle")) {
+      var st = document.createElement("style");
+      st.id = "sysBarStyle";
+      st.textContent = "@media (display-mode: standalone){#sysBar{padding-left:max(92px, calc(env(safe-area-inset-left) + 12px))!important}}";
+      document.head.appendChild(st);
+    }
     bar.style.cssText =
       "display:flex;align-items:center;gap:8px;padding:7px 12px;background:#08403A;color:#fff;" +
       "font-size:13px;font-family:-apple-system,'Hiragino Sans','Yu Gothic UI',sans-serif;" +

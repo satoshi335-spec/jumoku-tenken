@@ -119,6 +119,11 @@ label.lbl{display:block;font-size:12px;color:var(--tx2);margin:12px 0 4px}
 .modal{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;flex-direction:column}
 .modal.show{display:flex}
 .mh{background:var(--g);color:#fff;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;display:flex;align-items:center;gap:8px}
+/* ホーム画面から開いたとき、iPadOSのウィンドウ操作ボタン（左上の ×・－）が上に重なるので左を空ける */
+@media (display-mode: standalone){
+  header,.mh{padding-left:max(92px, calc(env(safe-area-inset-left) + 8px))}
+}
+html.standalone header,html.standalone .mh{padding-left:max(92px, calc(env(safe-area-inset-left) + 8px))}
 .mh h2{font-size:16px;margin:0;font-weight:600;flex:1}
 .mb{flex:1;overflow:auto;padding:12px;-webkit-overflow-scrolling:touch}
 .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
@@ -240,7 +245,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 
 <!-- 集計 -->
 <div class="modal" id="sumM">
-  <div class="mh"><h2>集計</h2><button class="hb" id="xlsBtn2">Excelで書き出す</button><button class="hb" data-close>閉じる</button></div>
+  <div class="mh"><h2>集計</h2><button class="hb" id="pdfBtn2">図面PDF</button><button class="hb" id="xlsBtn2">Excelで書き出す</button><button class="hb" data-close>閉じる</button></div>
   <div class="mb" id="sumBody"></div>
 </div>
 
@@ -258,10 +263,13 @@ td.chg{background:#FFF3A0!important;font-weight:600}
     <div class="card">
       <h3>書き出し</h3>
       <button class="btn" id="xlsBtn">集計表をExcelで書き出す</button>
+      <button class="btn" id="pdfCurBtn">表示中の図面をPDFで書き出す</button>
+      <button class="btn sub" id="pdfAllBtn">すべての図面をPDFで書き出す</button>
       <button class="btn sub" id="bkBtn">調査結果のバックアップを書き出す</button>
       <button class="btn sub" id="rsBtn">バックアップから読み込む</button>
       <input type="file" id="rsFile" accept=".json,application/json" style="display:none">
-      <p class="note">Excelには集計シートと路線ごとの樹木一覧（現況・実測幹周・区分変更）が入ります。
+      <p class="note">図面のPDFには、調査結果（現存＝緑・実測幹周、伐採＝赤×、桝無し＝黒×、未調査＝橙、区分変更＝黄）を書き込みます。1図面1ページです。<br>
+        Excelには集計シートと路線ごとの樹木一覧（現況・実測幹周・区分変更）が入ります。
         入力した内容はiPadに自動保存されますが、1日の終わりにバックアップを書き出しておくと安心です。</p>
     </div>
     <div class="card">
@@ -277,7 +285,8 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 
 <script>
 "use strict";
-const APP_VER = 2;   // このファイルを直したら1つ増やす
+if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
+const APP_VER = 3;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -1252,6 +1261,208 @@ function exportXlsx(){
   try{ share(buildWorkbook(), "事前調査集計_" + stamp() + ".xlsx"); }
   catch(err){ alert("Excelを作れませんでした\n" + err.message); }
 }
+
+/* ================= 図面のPDF書き出し ================= */
+/* 図面画像に調査結果を描き込み、JPEGにしてPDFの1ページに貼る（ライブラリなし・オフラインで動く） */
+function loadImg(blob){
+  return new Promise((ok, ng)=>{
+    const u = URL.createObjectURL(blob), im = new Image();
+    im.onload = ()=>{ URL.revokeObjectURL(u); ok(im); };
+    im.onerror = ()=>{ URL.revokeObjectURL(u); ng(new Error("図面の画像を開けません")); };
+    im.src = u;
+  });
+}
+function roundRect(g, x, y, w, h, r){
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+async function drawSheet(cv, dw){
+  const blob = await imgGet(pkg.id + "|" + dw.id);
+  if(!blob) throw new Error("図面 " + dw.zumen + " の画像がありません");
+  const im = await loadImg(blob);
+  cv.width = dw.w; cv.height = dw.h;
+  const g = cv.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height);
+  g.drawImage(im, 0, 0, dw.w, dw.h);
+  const k = dw.w / 4096;                         // 文字や印の大きさの基準
+  const R = 21 * k, LW = 5 * k, FS = Math.round(21 * k);
+  const ts = treesOnKey(dw.id);
+  const COL = {ok: "#2E7D32", gone: "#C62828", nomasu: "#222222", "": "#E07B00"};
+  const tags = [], marks = [];
+  ts.forEach(t => {
+    const p = posOf(t); if(!p) return;
+    marks.push({x: p.x - R, y: p.y - R, w: R * 2, h: R * 2});
+    const r = recOf(t.id), chg = clsChanged(t, r), gg = girthOf(r.g);
+    g.save();
+    if(chg){ g.beginPath(); g.arc(p.x, p.y, R + 7 * k, 0, Math.PI * 2); g.fillStyle = "rgba(255,212,0,.55)"; g.fill(); }
+    g.beginPath(); g.arc(p.x, p.y, R, 0, Math.PI * 2);
+    g.lineWidth = LW; g.strokeStyle = COL[r.st || ""];
+    if(t.flag && !r.st){ g.setLineDash([9 * k, 6 * k]); g.strokeStyle = COL.gone; }
+    if(t.added) g.setLineDash([9 * k, 6 * k]);
+    g.stroke(); g.setLineDash([]);
+    if(r.st === "gone" || r.st === "nomasu"){
+      const d = R * 0.62;
+      g.beginPath(); g.moveTo(p.x - d, p.y - d); g.lineTo(p.x + d, p.y + d); g.moveTo(p.x + d, p.y - d); g.lineTo(p.x - d, p.y + d);
+      g.strokeStyle = COL[r.st]; g.lineWidth = LW; g.stroke();
+    }
+    g.restore();
+    let txt = "";
+    if(t.added || (res.pins && res.pins[t.id])) txt = t.no + " ";
+    if(r.st === "gone") txt += "伐採";
+    else if(r.st === "nomasu") txt += "桝無し";
+    else if(gg.c != null) txt += gg.c + (gg.kabu ? "(株)" : "");
+    else if(t.flag && !r.st) txt += "図面撤去";
+    if(r.sp2) txt += " " + r.sp2;
+    if(txt.trim()) tags.push({px: p.x, py: p.y, txt: txt.trim(), chg, st: r.st});
+  });
+  g.font = "bold " + FS + "px -apple-system, 'Hiragino Sans', sans-serif";
+  g.textBaseline = "middle";
+  // 近くの樹木どうしで札が重ならないよう、上下左右の候補から空いている所に置く
+  const placed = marks.slice(), h = FS + 8 * k, gap = 3 * k;   // 印の上にも札を重ねない
+  const hit = (a) => placed.some(b => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h);
+  tags.sort((a, b) => a.px - b.px).forEach(tg => {
+    const w = g.measureText(tg.txt).width + 10 * k;
+    const cands = [];
+    for(const lv of [0, 1, 2, 3]){
+      cands.push({x: tg.px + R * 0.5, y: tg.py - R - h - lv * (h + gap)});          // 上
+      cands.push({x: tg.px + R * 0.5, y: tg.py + R + lv * (h + gap)});              // 下
+      cands.push({x: tg.px - R * 0.5 - w, y: tg.py - R - h - lv * (h + gap)});      // 左上
+      cands.push({x: tg.px - R * 0.5 - w, y: tg.py + R + lv * (h + gap)});          // 左下
+    }
+    const box = cands.map(c => ({x: c.x, y: c.y, w, h})).find(b => !hit(b)) || {x: cands[0].x, y: cands[0].y, w, h};
+    placed.push(box);
+    // 印から札へ細い線を引く（離れた所に置いたときも対応が分かるように）
+    const ax = Math.max(box.x, Math.min(tg.px, box.x + w)), ay = box.y + (box.y > tg.py ? 0 : h);
+    if(Math.hypot(ax - tg.px, ay - tg.py) > R + 6 * k){
+      g.beginPath(); g.moveTo(tg.px, tg.py); g.lineTo(ax, ay); g.lineWidth = 1.5 * k; g.strokeStyle = "#666"; g.stroke();
+    }
+    tg.x = box.x; tg.y = box.y + h / 2;
+    roundRect(g, tg.x, tg.y - h / 2, w, h, 5 * k);
+    g.fillStyle = tg.chg ? "#FFF3A0" : "rgba(255,255,255,.92)"; g.fill();
+    g.lineWidth = 1.5 * k; g.strokeStyle = tg.chg ? "#C9A800" : "#888"; g.stroke();
+    g.fillStyle = tg.st === "gone" ? COL.gone : tg.st === "nomasu" ? COL.nomasu : "#111";
+    g.fillText(tg.txt, tg.x + 5 * k, tg.y + 1);
+  });
+  // 見出し（左上）
+  const c = {"": 0, ok: 0, gone: 0, nomasu: 0};
+  let nChg = 0;
+  ts.filter(t => !t.added).forEach(t => { const r = recOf(t.id); c[r.st || ""]++; if(clsChanged(t, r)) nChg++; });
+  const nAdd = ts.filter(t => t.added).length;
+  const nopos = ts.filter(t => !posOf(t));
+  const L = [
+    {t: "事前調査結果　" + dw.route + "　図面 " + dw.zumen, b: true, s: 1.5},
+    {t: (dw.rev ? "台帳図面 " + dw.rev + " 修正版　" : "") + "出力 " + fmtT(Date.now())},
+    {t: "対象 " + (ts.length - nAdd) + "本　現存 " + c.ok + "　伐採済・空桝 " + c.gone + "　桝無し " + c.nomasu +
+        "　未調査 " + c[""] + "　区分変更 " + nChg + (nAdd ? "　台帳外の追加 " + nAdd : "")},
+    {legend: true},
+  ];
+  if(nopos.length) L.push({t: "図面上の位置不明: " + nopos.map(t => t.no + "（" + ST_LABEL[recOf(t.id).st] + (girthOf(recOf(t.id).g).c != null ? " " + girthOf(recOf(t.id).g).c : "") + "）").join("、")});
+  const F = Math.round(30 * k), pad = 18 * k, lh = F * 1.55;
+  g.font = F + "px -apple-system, 'Hiragino Sans', sans-serif";
+  let bw = 0;
+  L.forEach(l => { if(!l.legend){ g.font = (l.b ? "bold " : "") + Math.round(F * (l.s || 1)) + "px -apple-system, 'Hiragino Sans', sans-serif"; bw = Math.max(bw, g.measureText(l.t).width); } });
+  // 凡例の行の長さも測って枠に収める
+  g.font = Math.round(F * 0.9) + "px -apple-system, 'Hiragino Sans', sans-serif";
+  const LEG = ["現存（数字＝実測幹周cm）", "伐採済・空桝", "桝無し", "未調査", "最新図面で撤去（未調査）", "60cm区分が変わる"];
+  const legW = LEG.reduce((a, t) => a + R * 2 + 8 * k + g.measureText(t).width + 28 * k, 0);
+  bw = Math.min(Math.max(bw, legW), dw.w - 80 * k);
+  const bh = L.reduce((a, l) => a + lh * (l.s || 1), 0) + pad * 2;
+  const bx = 40 * k, by = 40 * k;
+  roundRect(g, bx, by, bw + pad * 2, bh, 10 * k);
+  g.fillStyle = "rgba(255,255,255,.95)"; g.fill(); g.lineWidth = 3 * k; g.strokeStyle = "#0F6E56"; g.stroke();
+  let y = by + pad;
+  L.forEach(l => {
+    const hh = lh * (l.s || 1);
+    if(l.legend){
+      let x = bx + pad;
+      const items = [["ok", "現存（数字＝実測幹周cm）"], ["gone", "伐採済・空桝"], ["nomasu", "桝無し"], ["", "未調査"], ["flag", "最新図面で撤去（未調査）"], ["chg", "60cm区分が変わる"]];
+      g.font = Math.round(F * 0.9) + "px -apple-system, 'Hiragino Sans', sans-serif";
+      items.forEach(([st, label]) => {
+        const cx = x + R, cy = y + hh / 2;
+        if(st === "chg"){ g.beginPath(); g.arc(cx, cy, R + 5 * k, 0, Math.PI * 2); g.fillStyle = "rgba(255,212,0,.6)"; g.fill(); }
+        g.beginPath(); g.arc(cx, cy, R * 0.8, 0, Math.PI * 2);
+        g.lineWidth = LW * 0.8;
+        g.strokeStyle = st === "flag" ? COL.gone : st === "chg" ? COL.ok : COL[st];
+        if(st === "flag") g.setLineDash([8 * k, 5 * k]);
+        g.stroke(); g.setLineDash([]);
+        if(st === "gone" || st === "nomasu"){
+          const d = R * 0.5;
+          g.beginPath(); g.moveTo(cx - d, cy - d); g.lineTo(cx + d, cy + d); g.moveTo(cx + d, cy - d); g.lineTo(cx - d, cy + d); g.stroke();
+        }
+        g.fillStyle = "#222"; g.fillText(label, cx + R + 8 * k, cy + 1);
+        x = cx + R + 8 * k + g.measureText(label).width + 28 * k;
+      });
+    } else {
+      g.font = (l.b ? "bold " : "") + Math.round(F * (l.s || 1)) + "px -apple-system, 'Hiragino Sans', sans-serif";
+      g.fillStyle = l.b ? "#08403A" : "#222";
+      g.fillText(l.t, bx + pad, y + hh / 2, bw);
+    }
+    y += hh;
+  });
+}
+function canvasJpeg(cv, q){
+  return new Promise((ok, ng) => cv.toBlob(b => b ? ok(b) : ng(new Error("画像を作れませんでした（メモリ不足の可能性）")), "image/jpeg", q));
+}
+/* JPEG画像を1枚ずつ貼ったPDFを組み立てる */
+function buildPdf(pages){   // pages: [{jpg:Uint8Array, w, h}]（w,hは画素）
+  const enc = new TextEncoder(), parts = [], offs = [];
+  let size = 0;
+  const put = x => { const u = typeof x === "string" ? enc.encode(x) : x; parts.push(u); size += u.length; };
+  const obj = (n, body) => { offs[n] = size; put(n + " 0 obj\n"); body(); put("\nendobj\n"); };
+  put("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+  const nPages = pages.length, kids = [];
+  for(let i = 0; i < nPages; i++) kids.push((3 + i * 3) + " 0 R");
+  obj(1, ()=> put("<< /Type /Catalog /Pages 2 0 R >>"));
+  obj(2, ()=> put("<< /Type /Pages /Kids [" + kids.join(" ") + "] /Count " + nPages + " >>"));
+  pages.forEach((pg, i) => {
+    const pn = 3 + i * 3, cn = pn + 1, iname = pn + 2;
+    // A3に合わせる（長辺 1190.55pt）
+    const land = pg.w >= pg.h, pw = land ? 1190.55 : 841.89, ph = land ? 841.89 : 1190.55;
+    const sc = Math.min(pw / pg.w, ph / pg.h), dw = pg.w * sc, dh = pg.h * sc;
+    const dx = (pw - dw) / 2, dy = (ph - dh) / 2;
+    obj(pn, ()=> put("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pw.toFixed(2) + " " + ph.toFixed(2) + "] " +
+                     "/Resources << /XObject << /Im" + i + " " + iname + " 0 R >> >> /Contents " + cn + " 0 R >>"));
+    const cs = "q " + dw.toFixed(2) + " 0 0 " + dh.toFixed(2) + " " + dx.toFixed(2) + " " + dy.toFixed(2) + " cm /Im" + i + " Do Q";
+    obj(cn, ()=>{ put("<< /Length " + cs.length + " >>\nstream\n" + cs + "\nendstream"); });
+    obj(iname, ()=>{
+      put("<< /Type /XObject /Subtype /Image /Width " + pg.w + " /Height " + pg.h +
+          " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + pg.jpg.length + " >>\nstream\n");
+      put(pg.jpg); put("\nendstream");
+    });
+  });
+  const nObj = 3 + nPages * 3, xref = size;
+  let x = "xref\n0 " + nObj + "\n0000000000 65535 f \n";
+  for(let n = 1; n < nObj; n++) x += String(offs[n]).padStart(10, "0") + " 00000 n \n";
+  put(x + "trailer\n<< /Size " + nObj + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
+  return new Blob(parts, {type: "application/pdf"});
+}
+async function exportPdf(all){
+  if(!pkg) return;
+  const list = all ? pkg.drawings.slice() : pkg.drawings.filter(d => d.id === dwKey);
+  if(!list.length){ toast("この図面番号には図面がありません"); return; }
+  if(all) list.sort((a, b) => (pkg.routes.findIndex(r => r.name === a.route) - pkg.routes.findIndex(r => r.name === b.route)) || (a.zumen < b.zumen ? -1 : 1));
+  const cv = document.createElement("canvas"), pages = [];
+  try{
+    for(let i = 0; i < list.length; i++){
+      busy("図面を作っています… " + (i + 1) + " / " + list.length);
+      await drawSheet(cv, list[i]);
+      const jb = await canvasJpeg(cv, 0.82);
+      pages.push({jpg: new Uint8Array(await jb.arrayBuffer()), w: cv.width, h: cv.height});
+      await new Promise(r => setTimeout(r, 0));
+    }
+    cv.width = cv.height = 1;   // メモリを返す
+    busy();
+    const name = all ? "事前調査図面_全" + list.length + "枚_" : "事前調査図面_" + zShort(list[0].zumen) + "_";
+    share(buildPdf(pages), name + stamp() + ".pdf");
+  }catch(err){ busy(); alert("図面のPDFを作れませんでした\n" + err.message); }
+}
+$("pdfCurBtn").onclick = ()=> exportPdf(false);
+$("pdfAllBtn").onclick = ()=> exportPdf(true);
+$("pdfBtn2").onclick = ()=>{
+  const all = confirm("すべての図面を書き出しますか？\n［キャンセル］で表示中の図面だけを書き出します");
+  exportPdf(all);
+};
+
 $("xlsBtn").onclick = exportXlsx;
 $("xlsBtn2").onclick = exportXlsx;
 

@@ -4,12 +4,13 @@
    古いキャッシュのまま新しい画面と食い違うのを防ぐため、コードは常に最新を取りに行く。
    アイコンなどは「まずキャッシュ」で速さを優先する。 */
 // 古い版のキャッシュだけ消す（同じ場所にある他のアプリのキャッシュは残す）
-const VERSION = "sys-v8";
+const VERSION = "sys-v9";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./common/project.js",
+  "./common/keypad.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png"

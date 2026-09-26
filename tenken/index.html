@@ -84,6 +84,11 @@ details .card{border-radius:0 0 14px 14px;margin-bottom:0}
 #kabuBox.show{display:block}
 #kabuBox input{font-size:15px;padding:8px 4px;text-align:center}
 #kabuNote{font-size:12px;color:var(--acc);margin:8px 0 0;font-weight:600;word-break:break-all}
+/* テンキー入力のとき（common/keypad.js）は株立ちのチェック欄・幹ごとの入力欄は使わない */
+body.padGirth .kabuRow,body.padGirth #stems,body.padGirth #kabuBox > p.note{display:none}
+body.padGirth #kabuBox{padding:6px 10px;margin-top:6px}
+.padHint{display:none}
+body.padGirth .padHint{display:block}
 #sumChips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .sumChip{flex:1;min-width:90px;text-align:center;padding:10px 4px;border-radius:10px;font-size:12px}
 .sumChip b{display:block;font-size:20px}
@@ -276,6 +281,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
       </div>
     </div>
     <p id="girthDiff" class="note" style="margin-top:5px"></p>
+    <p class="note padHint" style="margin-top:2px">幹周りをタップするとテンキーが出ます。株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7）</p>
     <div class="kabuRow">
       <input type="checkbox" id="kabuChk">
       <label for="kabuChk">株立ち（各幹の周長から自動計算）</label>
@@ -1165,7 +1171,6 @@ $("girth").addEventListener("input", girthWarnUpd);
 $("kabuChk").addEventListener("change", ()=>{
   const on = $("kabuChk").checked;
   $("kabuBox").classList.toggle("show", on);
-  $("girth").readOnly = on;
   if(!on){ $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; }
   kabuCalc();
 });
@@ -1217,7 +1222,7 @@ function setNoTree(label){
   const cur = $("sp").value.trim();
   if(cur === label){ clearNoTree(); return; }
   $("sp").value = label;
-  $("girth").value = ""; $("girth").readOnly = false;
+  $("girth").value = "";
   $("kabuChk").checked = false; $("kabuBox").classList.remove("show");
   $("kabuNote").textContent = ""; $("memoAutoHint").textContent = "";
   document.querySelectorAll(".stem").forEach(i => i.value = "");
@@ -1342,7 +1347,7 @@ function saveAndMove(move){
   window.scrollTo({top:0, behavior:"smooth"});
 }
 function clearTreeFields(){
-  $("sp").value = ""; $("girth").value = ""; $("girth").readOnly = false;
+  $("sp").value = ""; $("girth").value = "";
   $("girthPrev").value = ""; $("girthDiff").textContent = "";
   $("memo").value = ""; $("dt").value = nowStr();
   $("kabuChk").checked = false; $("kabuBox").classList.remove("show");
@@ -1958,6 +1963,33 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
 
 <!-- ===== 案件連携（街路樹診断システム） ===== -->
 <script src="../common/project.js"></script>
+<script src="../common/keypad.js"></script>
+<script>
+/* 幹周りは事前調査と同じテンキーで入力する。株立ちは「＋幹」で各幹を続けて入力し、
+   これまでの株立ち欄（チェック＋幹ごとの入力欄）に値を流し込んで、保存・計算は従来の処理を使う */
+(function(){
+  if(!window.SysKeypad) return;          // 読めなかったときは従来の入力のまま
+  const g = document.getElementById("girth"), chk = document.getElementById("kabuChk");
+  document.body.classList.add("padGirth");
+  SysKeypad.attach(g, {
+    label: "今回の幹周り", unit: "cm", kabu: true,
+    canEdit: () => !document.body.classList.contains("noTree"),
+    get: () => chk.checked ? stemVals().join("+") : g.value,
+    set: (raw, info) => {
+      const stems = document.querySelectorAll(".stem");
+      if(info.kabu){
+        stems.forEach((inp, i) => { inp.value = info.stems[i] != null ? info.stems[i] : ""; });
+        if(!chk.checked){ chk.checked = true; chk.dispatchEvent(new Event("change")); }
+        else kabuCalc();
+      } else {
+        if(chk.checked){ stems.forEach(inp => { inp.value = ""; }); chk.checked = false; chk.dispatchEvent(new Event("change")); }
+        g.value = raw.replace(/\+$/, "").replace(/\.$/, "");
+      }
+      girthWarnUpd(); girthDiffUpd();
+    }
+  });
+})();
+</script>
 <script>
 SysProject.attachBar("tenken", {
   apply: function(p){
