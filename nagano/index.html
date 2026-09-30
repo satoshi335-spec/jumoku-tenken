@@ -14,7 +14,7 @@
 --acc:#185FA5;--acc-bg:#E6F1FB;--ok:#2E7D32;--ok-bg:#E8F3E3;--ng:#C62828;--ng-bg:#FBEBEB;--warn:#E07B00;--warn-bg:#FDF3E2;
 --pur:#6A3FA0;--pur-bg:#EFE7F8;--gray:#777;--gray-bg:#E8E7E1}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;touch-action:manipulation}
 body{font-family:-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;background:var(--bg);color:var(--tx);
   display:flex;flex-direction:column;height:100dvh;-webkit-user-select:none;user-select:none}
 input,select,textarea{-webkit-user-select:text;user-select:text;font-family:inherit}
@@ -409,7 +409,7 @@ tr.need td{background:var(--pur-bg)}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 2;
+const APP_VER = 3;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -702,10 +702,15 @@ const ptrs = new Map();
 let gest = null, lastTap = {t: 0, x: 0, y: 0}, lpTimer = 0;
 const view = $("view");
 function vpos(e){ const r = view.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
+/* iPad では2本指の操作のあと「指が離れた」知らせが来ないことがある。残った指の記録があると、
+   1本指で動かしても拡大・縮小になり、タップも効かなくなる → 新しく触れ始めたときと、全部の指が離れたときに記録を消す */
+function resetPtrs(){ ptrs.clear(); gest = null; clearTimeout(lpTimer); }
 view.addEventListener("pointerdown", e => {
   if(e.target.closest("#tools,#hint,#legend")) return;
   if(!pkg) return;
-  view.setPointerCapture(e.pointerId);
+  if(e.isPrimary) resetPtrs();                  // 1本目の指（前の指は全部離れている）
+  try{ view.setPointerCapture(e.pointerId); }catch(err){}
+  if(ptrs.size >= 2) resetPtrs();               // 3本目が来たら数え直し
   ptrs.set(e.pointerId, vpos(e));
   if(ptrs.size === 1){
     const p = vpos(e);
@@ -753,8 +758,17 @@ function ptrEnd(e){
 }
 view.addEventListener("pointerup", ptrEnd);
 view.addEventListener("pointercancel", ptrEnd);
+view.addEventListener("lostpointercapture", ptrEnd);
+// 画面から指が全部離れたのに記録が残っていたら消す（pointerup の後に来るので、タップの処理はそのまま）
+["touchend", "touchcancel"].forEach(t => view.addEventListener(t, e => {
+  if(e.touches.length === 0) setTimeout(()=>{ if(ptrs.size) resetPtrs(); }, 0);
+}, {passive: true}));
+addEventListener("blur", resetPtrs);
+document.addEventListener("visibilitychange", resetPtrs);
 view.addEventListener("wheel", e => { if(!pkg) return; e.preventDefault(); const p = vpos(e); zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015)); }, {passive: false});
-document.addEventListener("gesturestart", e => e.preventDefault());
+// Safari が画面全体を拡大しないようにする（入力欄が画面の外に出てしまう）
+["gesturestart", "gesturechange", "gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault(), {passive: false}));
+document.addEventListener("touchmove", e => { if(e.touches.length > 1) e.preventDefault(); }, {passive: false});
 
 function nearestTree(sx, sy, lim){
   let best = null, bd = lim;
