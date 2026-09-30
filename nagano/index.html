@@ -360,6 +360,7 @@ tr.need td{background:var(--pur-bg)}
       <button class="btn" id="bkBtn">調査結果を書き出す（JSON）</button>
       <button class="btn" id="zipBtn">まだ送っていない写真を書き出す（ZIP）</button>
       <button class="btn sub" id="zipAllBtn">すべての写真を書き出す（ZIP）</button>
+      <button class="btn sub" id="freeBtn">事務所PCに送った写真を iPad から消す（空きを作る）</button>
       <p class="note" id="bkInfo"></p>
     </div>
     <div class="card">
@@ -409,7 +410,7 @@ tr.need td{background:var(--pur-bg)}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 3;
+const APP_VER = 4;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -470,7 +471,18 @@ let selId = null, mode = null;     // mode: "add"|"move"
 let photoMeta = [];                // [{key, name, no, kind, t, sent}]
 const V = {s: 1, tx: 0, ty: 0};
 
-function saveR(){ R.t = Date.now(); lsSet("nagano_res", R); }
+/* 調査結果と写真の一覧は IndexedDB（容量が大きい）を本体にし、localStorage（約5MB・同じサイトの他のアプリと共用）は控え。
+   2,000本の入力で約1.3MB、写真3,000枚の一覧で約0.7MB になるので、localStorage だけだと他のアプリと合わせて溢れるおそれがある */
+let lsFull = false;
+function lsQuiet(k, v){ if(lsFull) return; try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ lsFull = true; try{ localStorage.removeItem(k); }catch(e2){} } }
+const kvBusy = {}, kvNext = {};
+function kvSave(k, getv){
+  if(kvBusy[k]){ kvNext[k] = getv; return; }
+  kvBusy[k] = true;
+  idbPut("kv", k, getv()).catch(e => { if(lsFull) toast("保存に失敗しました：" + e.message + "（すぐに［調査結果を書き出す］をしてください）"); })
+    .finally(()=>{ kvBusy[k] = false; const g = kvNext[k]; if(g){ kvNext[k] = null; kvSave(k, g); } });
+}
+function saveR(){ R.t = Date.now(); kvSave("res", ()=> R); lsQuiet("nagano_res", R); }
 function saveS(){ lsSet("nagano_set", S); }
 function rec(id){ return R.trees[id] || (R.trees[id] = {}); }
 function recOf(id){ return R.trees[id] || {}; }
@@ -1146,8 +1158,34 @@ $("undoLink").onclick = e => { e.preventDefault(); if(!confirm("この樹木の�
 $("delLink").onclick = e => { e.preventDefault(); if(!confirm("この新木を削除しますか？")) return; R.added = R.added.filter(a => a.id !== selId); delete R.trees[selId]; reindex(); saveR(); closeSheet(); updProg(); };
 
 /* ================= 写真（小黒板つきで撮影） ================= */
-async function loadPhotoMeta(){ photoMeta = lsGet("nagano_photos", []); }
-function savePhotoMeta(){ lsSet("nagano_photos", photoMeta); }
+let photoT = 0;
+async function loadPhotoMeta(){
+  photoMeta = lsGet("nagano_photos", []); photoT = lsGet("nagano_photos_t", 0);
+  try{ const v = await idbGet("kv", "photos"); if(v && (v.t || 0) >= photoT && v.list){ photoMeta = v.list; photoT = v.t; } }catch(e){}
+}
+function savePhotoMeta(){
+  photoT = Date.now();
+  kvSave("photos", ()=> ({t: photoT, list: photoMeta}));
+  lsQuiet("nagano_photos", photoMeta); lsQuiet("nagano_photos_t", photoT);
+}
+/* 起動時：IndexedDB の方が新しければそちらを使う（localStorage が溢れていたとき） */
+async function loadRes(){
+  try{
+    const v = await idbGet("kv", "res");
+    if(v && (v.t || 0) > (R.t || 0)){ R = v; R.trees = R.trees || {}; R.added = R.added || []; R.moved = R.moved || {}; R.renamed = R.renamed || {}; }
+    else if(R.t) kvSave("res", ()=> R);   // 前の版（localStorage だけ）で入れた結果を IndexedDB にも写す
+  }catch(e){}
+}
+/* 事務所PCに送った写真を iPad から消して空きを作る（一覧・写真の有無の記録は残す） */
+async function freeSentPhotos(){
+  const list = photoMeta.filter(m => m.sent && !m.gone);
+  if(!list.length){ toast("消せる写真はありません（送った写真だけ消せます）"); return; }
+  if(!confirm("事務所PCに送った写真 " + list.length + " 枚を iPad から消します。\n事務所PCで写真ZIPを取り込んだことを確かめてから押してください。\n（撮った記録は残るので、写真不足の表示にはなりません）")) return;
+  busy("写真を消しています…");
+  try{ for(const m of list){ await idbDel("photos", m.key); m.gone = true; } savePhotoMeta(); }
+  finally{ busy(false); }
+  toast(list.length + " 枚を消しました"); if(selId) renderPhotos(); $("menuBtn").onclick();
+}
 function photosOf(no){ return photoMeta.filter(m => m.no === no); }
 function renderPhotos(){
   const t = treeById(selId); if(!t) return;
@@ -1163,17 +1201,23 @@ function renderPhotos(){
   if(r.tenken && !has("1")) need.push("全景");
   if(r.tenken && tkResult(r).n23 + tkResult(r).n1 > 0 && !n2) need.push("被害部");
   $("phHint").innerHTML = need.length ? '<span style="color:var(--ng);font-weight:700">未撮影：' + need.join("・") + "</span>" : (ps.length ? ps.length + "枚" : "");
+  // 見本の画像は写真が変わったときだけ作り直す（入力のたびに作り直すとメモリがたまって落ちる）
+  const tk = selId + "|" + ps.map(m => m.key + (m.gone ? "g" : "")).join(",");
+  if(tk === thumbKey) return;
+  thumbKey = tk;
+  thumbUrls.forEach(u => URL.revokeObjectURL(u)); thumbUrls = [];
   const box = $("thumbs"); box.innerHTML = "";
   ps.forEach(async m => {
     const d = document.createElement("div");
-    d.innerHTML = '<img alt=""><span>' + esc(m.name.replace(/\.jpg$/, "")) + '</span><button>✕</button>';
+    d.innerHTML = '<img alt=""><span>' + esc(m.name.replace(/\.jpg$/, "")) + (m.gone ? "（送信済）" : "") + '</span><button>✕</button>';
     box.appendChild(d);
-    const b = await idbGet("photos", m.key);
-    if(b) d.querySelector("img").src = URL.createObjectURL(b);
-    d.querySelector("img").onclick = ()=>{ if(b) window.open(URL.createObjectURL(b)); };
+    const b = m.gone ? null : await idbGet("photos", m.key);
+    if(b && thumbKey === tk){ const u = URL.createObjectURL(b); thumbUrls.push(u); d.querySelector("img").src = u; }
+    d.querySelector("img").onclick = ()=>{ if(!b) return; const u = URL.createObjectURL(b); window.open(u); setTimeout(()=> URL.revokeObjectURL(u), 60000); };
     d.querySelector("button").onclick = async ()=>{ if(!confirm(m.name + " を削除しますか？")) return; await idbDel("photos", m.key); photoMeta = photoMeta.filter(x => x.key !== m.key); savePhotoMeta(); renderPhotos(); };
   });
 }
+let thumbKey = "", thumbUrls = [];
 const KIND_TXT = {P: "樹木プレート", "1": "全景・主要部", "2": "被害部", S: "調査状況"};
 let cam = {stream: null, kind: "1", no: "", sp: "", cmts: [], z: 1, track: null, hw: null};
 function photoName(no, kind){
@@ -1284,6 +1328,8 @@ $("camShutter").onclick = async ()=>{
     }
     drawBoard(c.getContext("2d"), c.width, c.height);
     const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.86));
+    c.width = c.height = 0;   // Safari は画像用のメモリの上限が低いので、使い終わった画像はすぐ返す
+    if(!blob) throw new Error("写真を作れませんでした（iPad のメモリ不足）。アプリを開き直してください");
     const name = photoName(cam.no, cam.kind);
     const old = photoMeta.find(m => m.name === name);
     if(old){ await idbDel("photos", old.key); photoMeta = photoMeta.filter(m => m !== old); }
@@ -1295,7 +1341,8 @@ $("camShutter").onclick = async ()=>{
     toast(name + " を保存しました");
     if(cam.kind !== "S"){ const r = rec(selId); if(!r.st) r.st = "done"; touch(r); }
     closeCam(); if(selId) renderPhotos();
-  } finally { shooting = false; }
+  } catch(e){ alert(e.message); }
+  finally { shooting = false; }
 };
 $("phP").onclick = ()=> openCam("P");
 $("ph1").onclick = ()=> openCam("1");
@@ -1505,9 +1552,17 @@ $("sumBtn").onclick = ()=>{ if(pkg) openSum(); };
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = ()=> b.closest(".modal").classList.remove("show"));
 $("menuBtn").onclick = ()=>{
   $("setInsp").value = S.insp || ""; $("setKoji").value = S.koji || (pkg ? pkg.project.short : ""); $("setNext").value = S.nextNo || 1;
-  const unsent = photoMeta.filter(m => !m.sent).length;
-  $("bkInfo").innerHTML = "写真 " + photoMeta.length + " 枚（未送信 " + unsent + " 枚）。" + (S.lastBk ? "前回の書き出し：" + esc(S.lastBk) : "まだ書き出していません") +
-    "<br>書き出したファイルを AirDrop・OneDrive などで事務所PCへ送り、システムの［iPadの結果を取り込む］で読み込みます。";
+  const unsent = photoMeta.filter(m => !m.sent).length, gone = photoMeta.filter(m => m.gone).length;
+  $("bkInfo").innerHTML = "写真 " + photoMeta.length + " 枚（未送信 " + unsent + " 枚" + (gone ? "・送信済みで iPad から消した " + gone + " 枚" : "") + "）。" +
+    (S.lastBk ? "前回の書き出し：" + esc(S.lastBk) : "まだ書き出していません") +
+    "<br>書き出したファイルを AirDrop・OneDrive などで事務所PCへ送り、システムの［iPadの結果を取り込む］で読み込みます。" +
+    '<br><span id="stoInfo"></span>';
+  if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => {
+    const mb = v => v > 1e9 ? (v / 1e9).toFixed(1) + "GB" : Math.round(v / 1e6) + "MB";
+    const el = $("stoInfo"); if(!el) return;
+    el.innerHTML = "このアプリの使用量 約 " + mb(e.usage || 0) + (e.quota ? "（使える量 約 " + mb(e.quota) + "）" : "") +
+      ((e.quota && e.usage / e.quota > 0.7) ? '　<b style="color:var(--ng)">残りが少なくなっています。送った写真を消してください</b>' : "");
+  }).catch(()=>{});
   if(opt.range == null) opt.range = true;
   $("optTags").innerHTML = '<button class="' + (opt.tags ? "on" : "") + '" data-o="tags">番号を表示</button>' +
     '<button class="' + (opt.range ? "on" : "") + '" data-o="range">調査範囲を表示</button>';
@@ -1560,7 +1615,7 @@ async function makeZip(files){
   return new Blob([...parts, ...central, end.buffer], {type: "application/zip"});
 }
 async function exportPhotos(all){
-  const list = photoMeta.filter(m => all || !m.sent).sort((a, b) => a.name < b.name ? -1 : 1);
+  const list = photoMeta.filter(m => !m.gone && (all || !m.sent)).sort((a, b) => a.name < b.name ? -1 : 1);
   if(!list.length){ toast("書き出す写真はありません"); return; }
   const CH = 60, n = Math.ceil(list.length / CH), st = stampName();
   for(let i = 0; i < n; i++){
@@ -1577,6 +1632,7 @@ async function exportPhotos(all){
 }
 $("zipBtn").onclick = ()=> exportPhotos(false);
 $("zipAllBtn").onclick = ()=> exportPhotos(true);
+$("freeBtn").onclick = freeSentPhotos;
 $("rsBtn").onclick = ()=> $("rsFile").click();
 $("rsFile").onchange = async e => {
   const f = e.target.files[0]; e.target.value = ""; if(!f) return;
@@ -1610,6 +1666,7 @@ function renderAll(){ renderWx(); updProg(); scheduleMarks(); if(selId) renderSh
 (async ()=>{
   if("serviceWorker" in navigator){ try{ await navigator.serviceWorker.register("sw.js"); }catch(e){} }
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+  await loadRes();
   await loadPhotoMeta();
   renderWx();
   await openPkg();
