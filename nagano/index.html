@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2F5D3A">
+<title>長野公園 危険木調査</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root{--g:#2F5D3A;--g2:#1E3D26;--bg:#F3F3EE;--card:#fff;--line:#D6D4C8;--tx:#1c1c1a;--tx2:#6b6a64;
+--acc:#185FA5;--acc-bg:#E6F1FB;--ok:#2E7D32;--ok-bg:#E8F3E3;--ng:#C62828;--ng-bg:#FBEBEB;--warn:#E07B00;--warn-bg:#FDF3E2;
+--pur:#6A3FA0;--pur-bg:#EFE7F8;--gray:#777;--gray-bg:#E8E7E1}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
+body{font-family:-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;background:var(--bg);color:var(--tx);
+  display:flex;flex-direction:column;height:100dvh;-webkit-user-select:none;user-select:none}
+input,select,textarea{-webkit-user-select:text;user-select:text;font-family:inherit}
+button{font-family:inherit;cursor:pointer}
+header{background:var(--g);color:#fff;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+@media (display-mode: standalone){ header,.mh{padding-left:max(92px, calc(env(safe-area-inset-left) + 8px))} }
+html.standalone header,html.standalone .mh{padding-left:max(92px, calc(env(safe-area-inset-left) + 8px))}
+header .t{font-weight:700;font-size:15px;white-space:nowrap}
+header select{font-size:15px;padding:7px 6px;border-radius:8px;border:none;background:rgba(255,255,255,.95);color:var(--tx)}
+.hb{font-size:14px;padding:8px 11px;border-radius:8px;border:none;background:rgba(255,255,255,.18);color:#fff;white-space:nowrap;min-height:36px}
+.hb:active{background:rgba(255,255,255,.32)}
+.hb.on{background:#fff;color:var(--g);font-weight:700}
+#wx{display:flex;gap:3px}
+#wx button{padding:8px 9px}
+#search{width:92px;font-size:15px;padding:7px 8px;border-radius:8px;border:none}
+#prog{font-size:12px;opacity:.95;white-space:nowrap;margin-left:auto;line-height:1.35;text-align:right}
+
+#main{flex:1;min-height:0;display:grid;grid-template-rows:1fr auto;grid-template-columns:1fr}
+@media (orientation:landscape) and (min-width:900px){
+  #main{grid-template-rows:1fr;grid-template-columns:1fr auto}
+  #sheet{width:430px;max-height:none!important;border-top:none!important;border-left:1px solid var(--line)}
+}
+#view{position:relative;overflow:hidden;touch-action:none;background:#E4E3DC;min-height:0}
+#stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+#stage img{position:absolute;display:block;pointer-events:none;-webkit-user-drag:none}
+#ovimg{background:#fff}
+#marks{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.mk{position:absolute;left:0;top:0;border-radius:50%;border:3px solid var(--warn);background:rgba(224,123,0,.10)}
+.mk.lbl{border-style:dashed}
+.mk.circ{border-color:#999;border-width:2px;background:rgba(0,0,0,.05)}
+.mk.done{border-color:var(--ok);background:rgba(46,125,50,.35)}
+.mk.need{border-color:var(--pur);background:rgba(106,63,160,.30);box-shadow:0 0 0 2px #fff}
+.mk.insp{border-color:var(--acc);background:rgba(24,95,165,.55)}
+.mk.gone{border-color:#222;background:rgba(0,0,0,.45)}
+.mk.gone::after{content:"×";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px}
+.mk.skip{border-color:#999;background:rgba(150,150,150,.45)}
+.mk.new{border-style:dashed}
+.mk.kin{box-shadow:0 0 0 3px var(--ng)}
+.mk.out{opacity:.45;border-style:dotted}
+.mk.pg{border-color:#555;border-style:dashed;background:rgba(0,0,0,.08)}
+.mk.pg::after{content:"×";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#555;font-weight:700;font-size:12px}
+#rng{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+#rng path{fill:rgba(220,40,40,.10);stroke:rgba(200,30,30,.75);stroke-width:2px;vector-effect:non-scaling-stroke;fill-rule:evenodd}
+.plate{margin-top:8px;border:2px solid var(--g);border-radius:12px;padding:6px 9px 9px}
+.plate .lbl{margin-top:4px}
+.plate .seg button{font-size:13px;line-height:1.25}
+.spok{display:flex;gap:6px;align-items:center;margin-top:5px}
+.spok button{min-height:42px;border-radius:9px;border:2px solid var(--g);background:#fff;color:var(--g);font-size:14px;font-weight:700;padding:2px 12px}
+.spok button.on{background:var(--g);color:#fff}
+.spok span{font-size:12px;color:var(--tx2)}
+.tagx{color:var(--warn);font-weight:700}
+.mk.sel{border-width:4px;border-color:#FF2D55!important;box-shadow:0 0 0 5px rgba(255,45,85,.3)}
+.tag{position:absolute;left:0;top:0;font-size:11px;font-weight:700;padding:0 3px;border-radius:4px;background:rgba(255,255,255,.88);color:#223;white-space:nowrap}
+.tag.n{color:var(--acc)}
+#gps{position:absolute;width:18px;height:18px;border-radius:50%;background:#1E88E5;border:3px solid #fff;box-shadow:0 0 0 2px #1E88E5;left:0;top:0;display:none}
+#gpsAcc{position:absolute;border-radius:50%;background:rgba(30,136,229,.12);border:1px solid rgba(30,136,229,.5);left:0;top:0;display:none}
+#tools{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}
+.tb{min-width:48px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.95);font-size:13px;color:var(--tx);padding:4px 8px}
+.tb.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.tb.add{background:var(--g);color:#fff;border-color:var(--g);font-weight:700}
+#legend{position:absolute;left:8px;top:8px;background:rgba(255,255,255,.93);border:1px solid var(--line);border-radius:10px;padding:5px 9px;font-size:12px;line-height:1.75}
+#legend i{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid;margin:0 3px -1px 7px}
+#legend i:first-child{margin-left:0}
+#hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:var(--acc);color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;display:none;gap:10px;align-items:center;z-index:5}
+#hint button{background:#fff;color:var(--acc);border:none;border-radius:7px;padding:5px 10px;font-size:13px}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--tx2);font-size:15px;line-height:1.9}
+
+#sheet{background:var(--card);border-top:1px solid var(--line);max-height:55vh;overflow:auto;display:none;padding:8px 12px calc(env(safe-area-inset-bottom) + 12px);-webkit-overflow-scrolling:touch}
+body.selOpen #sheet{display:block}
+.sh1{display:flex;align-items:flex-start;gap:8px;position:sticky;top:-8px;background:#fff;padding-top:6px;z-index:3;padding-bottom:4px;border-bottom:1px solid #eee}
+.sh1 .no{font-size:28px;font-weight:800;line-height:1.1}
+.sh1 .sub{font-size:12px;color:var(--tx2);line-height:1.5}
+.sh1 .x{margin-left:auto;font-size:15px;border:1px solid var(--line);background:#fff;border-radius:9px;min-width:44px;min-height:40px}
+.info{font-size:13px;line-height:1.6;margin:6px 0 0;padding:6px 9px;background:#F7F7F3;border-radius:8px}
+.info b{color:var(--g2)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:5px;margin-top:6px}
+.seg button{min-height:42px;border-radius:9px;border:2px solid var(--line);background:#fff;font-size:14px;font-weight:600;color:var(--tx);padding:2px 4px}
+.seg button.on{background:var(--g);border-color:var(--g);color:#fff}
+.seg.st button.on[data-v=gone]{background:#222;border-color:#222}
+.seg.st button.on[data-v=skip]{background:var(--gray);border-color:var(--gray)}
+.seg.yn button.on[data-v=y]{background:var(--ng);border-color:var(--ng)}
+.lbl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tx2);margin:11px 0 3px;font-weight:600}
+.lbl .r{margin-left:auto;font-weight:400}
+.inp{width:100%;font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--tx)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.chips button{font-size:13px;padding:6px 10px;border-radius:15px;border:1px solid var(--line);background:#fff;color:var(--tx)}
+.chips button.on{background:var(--acc-bg);border-color:var(--acc);color:var(--acc);font-weight:700}
+.nums{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}
+.nd{border:2px solid var(--line);border-radius:10px;padding:4px 8px;background:#fff;min-height:54px}
+.nd small{display:block;font-size:11px;color:var(--tx2)}
+.nd span{font-size:22px;font-weight:700}
+.nd.act{border-color:var(--acc);background:var(--acc-bg)}
+.nd em{font-style:normal;font-size:11px;color:var(--acc);display:block}
+.pad{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:6px}
+.pad button{min-height:44px;font-size:20px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--tx)}
+.pad button:active{background:#E6E5DF}
+.pad button.fn{font-size:14px;background:#F3F3EE}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chk{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px}
+.chk button{min-height:42px;border-radius:9px;border:2px solid var(--line);background:#fff;font-size:14px;font-weight:600}
+.chk button.on{background:var(--warn);border-color:var(--warn);color:#fff}
+.chk button.on.red{background:var(--ng);border-color:var(--ng)}
+.bigtg{display:flex;gap:6px;margin-top:8px}
+.bigtg button{flex:1;min-height:48px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:15px;font-weight:700}
+.bigtg button.on.p{background:var(--pur);border-color:var(--pur);color:#fff}
+.bigtg button.on.k{background:var(--ng);border-color:var(--ng);color:#fff}
+.photos{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.photos .pb{flex:1;min-width:110px;min-height:46px;border-radius:10px;border:2px dashed var(--acc);background:#fff;color:var(--acc);font-size:14px;font-weight:700}
+.photos .pb.done{border-style:solid;background:var(--acc-bg)}
+.thumbs{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.thumbs div{position:relative}
+.thumbs img{width:74px;height:98px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.thumbs span{position:absolute;left:2px;bottom:2px;font-size:10px;background:rgba(0,0,0,.6);color:#fff;padding:0 3px;border-radius:3px}
+.thumbs button{position:absolute;right:1px;top:1px;border:none;background:rgba(0,0,0,.55);color:#fff;border-radius:50%;width:22px;height:22px;font-size:12px;padding:0}
+.tk{margin-top:10px;border:2px solid var(--pur);border-radius:12px;padding:8px 10px;background:var(--pur-bg)}
+.tk h4{margin:0 0 4px;font-size:14px;color:var(--pur)}
+.tkres{font-size:13px;font-weight:700;color:var(--pur)}
+.nav{display:grid;grid-template-columns:1fr 1.5fr;gap:8px;margin-top:14px}
+.nav button{min-height:50px;border-radius:10px;font-size:15px;font-weight:700;border:1px solid var(--line);background:#fff;color:var(--tx)}
+.nav button.pri{background:var(--g);border-color:var(--g);color:#fff}
+.links{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:13px}
+.links a{color:var(--acc);text-decoration:underline}
+.links a.del{color:var(--ng)}
+.warn{font-size:12px;color:var(--ng);font-weight:700;margin-top:4px}
+
+.modal{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;flex-direction:column}
+.modal.show{display:flex}
+.mh{background:var(--g);color:#fff;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;display:flex;align-items:center;gap:8px}
+.mh h2{font-size:16px;margin:0;font-weight:700;flex:1}
+.mb{flex:1;overflow:auto;padding:12px;-webkit-overflow-scrolling:touch}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.card h3{font-size:15px;margin:0 0 8px}
+table{border-collapse:collapse;width:100%;font-size:13px;background:#fff}
+th,td{border:1px solid var(--line);padding:5px 6px;text-align:left;white-space:nowrap}
+th{background:#F1F0EA;font-weight:600;position:sticky;top:0;z-index:1}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.done td{background:var(--ok-bg)}
+tr.gone td,tr.skip td{background:var(--gray-bg)}
+tr.need td{background:var(--pur-bg)}
+.tblWrap{overflow:auto;border-radius:10px;border:1px solid var(--line);max-height:calc(100dvh - 170px)}
+.fl{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center}
+.fl button{font-size:13px;padding:8px 12px;border-radius:16px;border:1px solid var(--line);background:#fff;color:var(--tx)}
+.fl button.on{background:var(--g);border-color:var(--g);color:#fff}
+.btn{display:block;width:100%;min-height:48px;font-size:15px;font-weight:700;border:none;border-radius:12px;background:var(--g);color:#fff;margin-top:8px}
+.btn.sub{background:#fff;color:var(--g);border:1px solid var(--g)}
+.note{font-size:12px;color:var(--tx2);line-height:1.7;margin:6px 0 0}
+.big{font-size:22px;font-weight:800}
+.bar{height:10px;background:#E4E3DC;border-radius:5px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--g)}
+.dlg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:30;display:none;align-items:center;justify-content:center;padding:16px}
+.dlg.show{display:flex}
+.dlgBox{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:460px;max-height:92dvh;overflow:auto}
+.dlgBox h3{margin:0 0 6px;font-size:17px}
+.dlg .nav{margin-top:14px}
+#busy{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:none;align-items:center;justify-content:center}
+#busy div{background:#fff;border-radius:14px;padding:20px 26px;font-size:15px;text-align:center;line-height:1.8}
+.toast{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 16px);left:12px;right:12px;max-width:560px;margin:0 auto;background:var(--g2);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;z-index:80}
+.toast.show{opacity:1}
+
+/* カメラ */
+#cam{position:fixed;inset:0;background:#000;z-index:60;display:none;flex-direction:column}
+#cam.show{display:flex}
+#camTop{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 6px) 10px 6px;color:#fff;font-size:15px;flex-wrap:wrap}
+#camTop b{font-size:18px}
+#camTop button{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:14px}
+#camWrap{flex:1;position:relative;overflow:hidden}
+#camFrame{position:absolute;overflow:hidden;background:#111}
+#camVideo{width:100%;height:100%;object-fit:cover;transform-origin:center}
+#camBoard{position:absolute;left:3%;bottom:3%;width:46%;background:#1b6b5f;border:2px solid #fff;color:#fff;pointer-events:none}
+#camBoard .k{display:flex;border-bottom:1px solid #fff;font-size:12px}
+#camBoard .k span{padding:3px 5px;border-right:1px solid #fff;white-space:nowrap}
+#camBoard .k em{font-style:normal;padding:3px 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#camBoard .b{text-align:center;padding:6px 4px;font-weight:600;line-height:1.3;font-size:18px}
+#camBot{display:flex;align-items:center;justify-content:center;gap:18px;padding:10px 10px calc(env(safe-area-inset-bottom) + 12px)}
+#camShutter{width:74px;height:74px;border-radius:50%;border:5px solid #fff;background:#FF2D55}
+#camBot button.s{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:10px 12px;font-size:14px}
+#camCmts{position:absolute;right:8px;top:8px;max-width:48%;display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}
+#camCmts button{font-size:13px;padding:6px 10px;border-radius:15px;border:none;background:rgba(255,255,255,.85)}
+#camCmts button.on{background:#FFD400;font-weight:700}
+#camNoCam{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#ccc;text-align:center;padding:20px;line-height:1.8}
+#camFlash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .15s}
+</style>
+</head>
+<body>
+<header>
+  <span class="t">長野公園</span>
+  <select id="distSel" aria-label="地区"></select>
+  <div id="wx"></div>
+  <input id="search" inputmode="numeric" placeholder="番号検索" autocomplete="off">
+  <button class="hb" id="listBtn">一覧</button>
+  <button class="hb" id="sumBtn">集計</button>
+  <button class="hb" id="menuBtn">メニュー</button>
+  <span id="prog"></span>
+</header>
+
+<div id="main">
+  <div id="view">
+    <div id="stage"><img id="ovimg" alt=""><div id="tiles"></div><svg id="rng"></svg></div>
+    <div id="gpsAcc"></div><div id="gps"></div>
+    <div id="marks"></div>
+    <div id="legend"></div>
+    <div id="tools">
+      <button class="tb add" id="addBtn">＋新木</button>
+      <button class="tb" id="gpsBtn">現在地</button>
+      <button class="tb" id="fitBtn">全体</button>
+      <button class="tb" id="zinBtn">＋</button>
+      <button class="tb" id="zoutBtn">－</button>
+    </div>
+    <div id="hint"><span id="hintMsg"></span><button id="hintCancel">やめる</button></div>
+    <div id="empty"></div>
+  </div>
+
+  <div id="sheet">
+    <div class="sh1">
+      <div>
+        <div class="no" id="sNo"></div>
+        <div class="sub" id="sSub"></div>
+      </div>
+      <button class="x" id="sClose" aria-label="閉じる">✕</button>
+    </div>
+    <div class="info" id="sInfo"></div>
+
+    <div class="seg st" id="stSeg">
+      <button data-v="done">調査済</button><button data-v="gone">消失・倒木</button><button data-v="skip">対象外</button>
+    </div>
+
+    <div class="plate">
+      <div class="lbl">① 樹木プレート（番号札）を確認</div>
+      <div class="seg" id="plSeg"><button data-v="ok">付いている<br>（この番号）</button><button data-v="new">無い → 新しい札<br><span id="plNext"></span></button><button data-v="other">違う番号が<br>付いている</button></div>
+      <div class="warn" id="plWarn"></div>
+      <div class="lbl">② 樹種を確認 <span class="r" id="spPrev"></span></div>
+      <div class="spok"><button id="spOk">✓ 前回どおり</button><span id="spOkTxt"></span></div>
+    </div>
+    <div class="lbl">樹種（違うときに入れる）</div>
+    <input class="inp" id="sp" list="spList" placeholder="樹種">
+    <datalist id="spList"></datalist>
+    <div class="chips" id="spChips"></div>
+
+    <div class="nums">
+      <div class="nd" data-f="h"><small>樹高 (m)</small><span id="dH"></span><em id="eH"></em></div>
+      <div class="nd" data-f="c"><small>幹周 (cm)</small><span id="dC"></span><em id="eC"></em></div>
+      <div class="nd" data-f="slope"><small>斜度 (度)</small><span id="dSlope"></span><em id="eSlope"></em></div>
+    </div>
+    <div class="pad" id="pad">
+      <button>7</button><button>8</button><button>9</button><button class="fn" data-k="bs">⌫</button><button class="fn" data-k="clr">消去</button>
+      <button>4</button><button>5</button><button>6</button><button class="fn" data-k="plus">＋幹</button><button class="fn" data-k="prev">◀項目</button>
+      <button>1</button><button>2</button><button>3</button><button>0</button><button class="fn" data-k="next">項目▶</button>
+      <button>.</button>
+    </div>
+    <div class="chips" id="slopeChips"></div>
+
+    <div class="lbl">生育地（園路等から見て）</div>
+    <div class="seg" id="seiSeg"><button data-v="上">上</button><button data-v="中">中</button><button data-v="下">下</button><button data-v="その他">その他</button></div>
+
+    <div class="lbl">公園施設等への支障</div>
+    <div class="seg yn" id="shiSeg"><button data-v="y">あり</button><button data-v="n">なし</button></div>
+    <div class="chips" id="shiChips"></div>
+    <input class="inp" id="shiNote" placeholder="特記事項（支障）" style="margin-top:5px">
+
+    <div class="lbl">太枝や幹の枯れ・折れ・腐朽等／枯死</div>
+    <div class="seg yn" id="kareSeg"><button data-v="y">あり</button><button data-v="n">なし</button></div>
+    <div class="chips" id="kareChips"></div>
+    <input class="inp" id="kareNote" placeholder="特記事項（例 枯枝φ0.15ｍＬ3ｍ）" style="margin-top:5px">
+
+    <div class="bigtg">
+      <button id="tkTg" class="p">要樹木点検</button>
+      <button id="kinTg" class="k">緊急対応が必要</button>
+    </div>
+    <div class="lbl">維持管理の処置</div>
+    <div class="chk" id="kanri"><button data-v="senS">剪定推薦</button><button data-v="sen" class="red">要剪定</button><button data-v="basS">伐採推薦</button><button data-v="bas" class="red">要伐採</button></div>
+    <div class="lbl">原因・欠陥等の内容・処置等</div>
+    <div class="chips" id="genChips"></div>
+    <input class="inp" id="gennin" placeholder="例）根元法面の流亡あり" style="margin-top:5px">
+
+
+    <div id="tkBox" class="tk" style="display:none">
+      <h4>樹木点検</h4>
+      <div id="tkItems"></div>
+      <div class="lbl">その他特記事項（異常の位置・内容・程度）</div>
+      <div class="chips" id="tkChips"></div>
+      <input class="inp" id="tkNote" placeholder="例）根元に開口空洞、腐朽進行">
+      <div class="tkres" id="tkRes" style="margin-top:6px"></div>
+    </div>
+
+    <div class="lbl">写真 <span class="r" id="phHint"></span></div>
+    <div class="photos">
+      <button class="pb" id="phP">📷 プレート</button>
+      <button class="pb" id="ph1">📷 全景・主要部</button>
+      <button class="pb" id="ph2">📷 被害部</button>
+    </div>
+    <div class="thumbs" id="thumbs"></div>
+
+    <div class="lbl">メモ</div>
+    <input class="inp" id="memo" placeholder="自由記入（台帳の備考に入ります）">
+
+    <div class="nav">
+      <button id="prevTree">◀ 前へ</button>
+      <button class="pri" id="nextTree">近くの未調査へ ▶</button>
+    </div>
+    <div class="links">
+      <a href="#" id="renoLink">番号を変える</a>
+      <a href="#" id="moveLink">位置を直す</a>
+      <a href="#" id="calLink" style="display:none">この木の所にいる（現在地合わせ）</a>
+      <a href="#" id="undoLink">未調査に戻す</a>
+      <a href="#" id="delLink" class="del" style="display:none">この新木を削除</a>
+    </div>
+  </div>
+</div>
+
+<!-- 新しい樹木・番号 -->
+<div class="dlg" id="noDlg">
+  <div class="dlgBox">
+    <h3 id="noTitle">新しい樹木</h3>
+    <p class="note" id="noNote"></p>
+    <div class="lbl">樹木番号</div>
+    <input class="inp" id="noInp" autocomplete="off">
+    <div class="chips" id="noChips"></div>
+    <div class="lbl" id="noSpLbl">樹種</div>
+    <input class="inp" id="noSp" list="spList" placeholder="樹種（あとでも入れられます）">
+    <div class="nav"><button id="noCancel">やめる</button><button class="pri" id="noOk">決定</button></div>
+  </div>
+</div>
+
+<!-- 一覧 -->
+<div class="modal" id="listM">
+  <div class="mh"><h2>樹木一覧</h2><button class="hb" data-close>閉じる</button></div>
+  <div class="mb">
+    <div class="fl" id="lFilters"></div>
+    <div class="tblWrap"><table id="lTbl"></table></div>
+  </div>
+</div>
+<!-- 集計 -->
+<div class="modal" id="sumM">
+  <div class="mh"><h2>集計</h2><button class="hb" data-close>閉じる</button></div>
+  <div class="mb" id="sumBody"></div>
+</div>
+<!-- メニュー -->
+<div class="modal" id="menuM">
+  <div class="mh"><h2>メニュー</h2><button class="hb" data-close>閉じる</button></div>
+  <div class="mb">
+    <div class="card">
+      <h3>1日の終わりに（事務所PCへ送る）</h3>
+      <button class="btn" id="bkBtn">調査結果を書き出す（JSON）</button>
+      <button class="btn" id="zipBtn">まだ送っていない写真を書き出す（ZIP）</button>
+      <button class="btn sub" id="zipAllBtn">すべての写真を書き出す（ZIP）</button>
+      <p class="note" id="bkInfo"></p>
+    </div>
+    <div class="card">
+      <h3>調査の準備</h3>
+      <div class="lbl">点検者</div>
+      <input class="inp" id="setInsp">
+      <div class="lbl">黒板の業務名</div>
+      <input class="inp" id="setKoji">
+      <div class="lbl">次の新しい番号</div>
+      <input class="inp" id="setNext" inputmode="numeric">
+      <button class="btn sub" id="impBtn">事務所PCで作った図面データを取り込む</button>
+      <input type="file" id="impFile" accept=".json,application/json" style="display:none">
+      <button class="btn sub" id="rsBtn">書き出した調査結果から読み戻す</button>
+      <input type="file" id="rsFile" accept=".json,application/json" style="display:none">
+      <p class="note">図面データ（長野公園_図面_〜.json）は事務所PCの「iPad用データを作る」で作ります。取り込み直しても入力した結果は消えません。</p>
+    </div>
+    <div class="card">
+      <h3>表示</h3>
+      <div class="fl" id="optTags"></div>
+      <p class="note" id="calInfo"></p>
+      <button class="btn sub" id="calClr">現在地合わせをやり直す</button>
+      <p class="note" id="verInfo"></p>
+      <button class="btn sub" id="updBtn">アプリを最新版に更新する</button>
+      <button class="btn sub" id="wipeBtn" style="color:var(--ng);border-color:var(--ng)">練習の入力と写真をすべて消す</button>
+    </div>
+  </div>
+</div>
+
+<!-- カメラ -->
+<div id="cam">
+  <div id="camTop"><b id="camNo"></b><span id="camKind"></span><span style="margin-left:auto"></span><button id="camClose">閉じる</button></div>
+  <div id="camWrap">
+    <div id="camFrame">
+      <video id="camVideo" autoplay playsinline muted></video>
+      <div id="camBoard"><div class="k"><span>業務名</span><em id="camKoji"></em></div><div class="b" id="camBText"></div></div>
+      <div id="camCmts"></div>
+      <div id="camFlash"></div>
+    </div>
+    <div id="camNoCam">カメラを使えません。<br>（テスト用に灰色の画像で記録できます）</div>
+  </div>
+  <div id="camBot"><button class="s" id="zOut">－</button><span id="zVal" style="color:#fff">×1.0</span><button class="s" id="zIn">＋</button><button id="camShutter" aria-label="撮影"></button><button class="s" id="camEdit">コメント編集</button></div>
+</div>
+
+<div id="busy"><div id="busyMsg">処理中…</div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+if(navigator.standalone) document.documentElement.classList.add("standalone");
+const APP_VER = 2;
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pad2 = n => String(n).padStart(2, "0");
+const today = ()=>{ const d = new Date(); return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); };
+
+/* ---- 入力の候補（R7 の台帳でよく使った言い方） ---- */
+const SP_CHIPS = ["コナラ","アラカシ","コジイ","ヒノキ","スギ","クヌギ","ソメイヨシノ","ヤマザクラ","イロハモミジ","ソヨゴ","リョウブ","ヤマモモ","エノキ","クスノキ","ケヤキ","ムクノキ"];
+const SLOPE_CHIPS = [0,5,10,15,20,25,30,35,40,45,50,60];
+const SHI_CHIPS = ["園路に影響あり","車道に影響あり","広場に影響あり","施設に影響あり","園路離れている"];
+const KARE_CHIPS = ["枯枝あり","枝折れあり","幹折れあり","枯死している","穿孔虫痕あり","クビアカツヤカミキリのフラスあり","開口空洞あり","樹皮欠損あり","キノコあり","枝周/枝長比率大きい"];
+const GEN_CHIPS = ["根元法面の流亡あり","車道側下枝","園路側下枝","分岐部の入り皮あり","枝下高の高い樹形","腐朽進行","穿孔虫痕あり","要クビアカツヤカミキリ対策","要経過観察","傾斜あり（主幹持ち直しあり）"];
+const TK_CHIPS = ["開口空洞あり","根元腐朽","幹腐朽","キノコ発生","穿孔虫痕・フラス","樹皮欠損","枯枝落下のおそれ","園路側に傾斜","要経過観察"];
+const CAM_CMTS = ["全景","主要部","開口空洞","腐朽","キノコ","穿孔虫痕","フラス","樹皮欠損","枯枝","入り皮","根元","分岐部"];
+
+/* ================= 保存 ================= */
+const DB_NAME = "nagano", DB_VER = 1;
+let dbp = null;
+function db(){
+  if(dbp) return dbp;
+  dbp = new Promise((ok, ng)=>{
+    const rq = indexedDB.open(DB_NAME, DB_VER);
+    rq.onupgradeneeded = ()=>{
+      const d = rq.result;
+      ["pkg", "tiles", "photos", "kv"].forEach(s => { if(!d.objectStoreNames.contains(s)) d.createObjectStore(s); });
+    };
+    rq.onsuccess = ()=> ok(rq.result);
+    rq.onerror = ()=> ng(rq.error);
+  });
+  return dbp;
+}
+async function idb(store, mode, fn){
+  const d = await db();
+  return new Promise((ok, ng)=>{
+    const tx = d.transaction(store, mode);
+    let out;
+    Promise.resolve(fn(tx.objectStore(store))).then(r => { out = r; });
+    tx.oncomplete = ()=> ok(out);
+    tx.onerror = ()=> ng(tx.error);
+    tx.onabort = ()=> ng(tx.error || new Error("保存できませんでした（空き容量を確認してください）"));
+  });
+}
+const rq2p = rq => new Promise((ok, ng)=>{ rq.onsuccess = ()=> ok(rq.result); rq.onerror = ()=> ng(rq.error); });
+const idbGet = (s, k)=> idb(s, "readonly", st => rq2p(st.get(k)));
+const idbPut = (s, k, v)=> idb(s, "readwrite", st => { st.put(v, k); });
+const idbDel = (s, k)=> idb(s, "readwrite", st => { st.delete(k); });
+const idbAll = s => idb(s, "readonly", st => Promise.all([rq2p(st.getAllKeys()), rq2p(st.getAll())]).then(([k, v]) => k.map((x, i) => [x, v[i]])));
+
+function lsGet(k, d){ try{ const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ toast("保存に失敗しました：" + e.message); return false; } }
+
+/* ================= 状態 ================= */
+let pkg = null;           // 図面データ（タイル以外）
+let R = lsGet("nagano_res", null) || {trees: {}, added: [], moved: {}, renamed: {}, t: 0};
+R.trees = R.trees || {}; R.added = R.added || []; R.moved = R.moved || {}; R.renamed = R.renamed || {};
+let S = lsGet("nagano_set", {});   // 設定（地区・天候・点検者…）
+let opt = lsGet("nagano_opt", {tags: true, past: true});
+let selId = null, mode = null;     // mode: "add"|"move"
+let photoMeta = [];                // [{key, name, no, kind, t, sent}]
+const V = {s: 1, tx: 0, ty: 0};
+
+function saveR(){ R.t = Date.now(); lsSet("nagano_res", R); }
+function saveS(){ lsSet("nagano_set", S); }
+function rec(id){ return R.trees[id] || (R.trees[id] = {}); }
+function recOf(id){ return R.trees[id] || {}; }
+
+function allTrees(){
+  if(!pkg) return [];
+  return pkg.trees.concat(R.added.map(a => Object.assign({added: true, src: "new", past: null}, a)));
+}
+let treeIdx = new Map();
+function reindex(){ treeIdx = new Map(allTrees().map(t => [t.id, t])); }
+function treeById(id){ return treeIdx.get(id); }
+function posOf(t){ return R.moved[t.id] || {x: t.x, y: t.y}; }
+function noOf(t){ return R.renamed[t.id] || t.no || ""; }
+
+/* 地区ごとの図面の区画（地図の中で横に並べてある）。古い図面データは1区画 */
+function regions(){
+  const m = pkg.map;
+  return m.regions || [{district: "", x0: m.x0, y1: m.y1, ox: 0, oy: 0, w: m.W, h: m.H, geo: true}];
+}
+function regionOf(d){ return regions().find(r => r.district === d) || regions()[0]; }
+function regionAt(x, y){
+  let best = null, bd = Infinity;
+  for(const r of regions()){
+    const d = Math.max(r.ox - x, 0, x - r.ox - r.w) + Math.max(r.oy - y, 0, y - r.oy - r.h);
+    if(d < bd){ bd = d; best = r; }
+  }
+  return best;
+}
+function distOf(t){ return t.district || regionAt(posOf(t).x, posOf(t).y).district || S.dist; }
+
+/* 状態：未調査／調査済／要点検（点検未入力）／点検済／消失／対象外 */
+function stateOf(t){
+  const r = recOf(t.id);
+  if(r.st === "gone") return "gone";
+  if(r.st === "skip") return "skip";
+  if(r.st === "done"){
+    if(r.tenken) return tkDone(r) ? "insp" : "need";
+    return "done";
+  }
+  return "";
+}
+function tkDone(r){ return !!(r.tk && r.tk.t); }
+
+/* 幹周 "45+30" → 株立ち (合計×0.7) */
+function girthOf(g){
+  const parts = String(g || "").split("+").map(parseFloat).filter(v => v > 0);
+  if(!parts.length) return {c: null, note: "", kabu: false};
+  if(parts.length === 1) return {c: parts[0], note: "", kabu: false};
+  const c = Math.round(parts.reduce((a, b) => a + b, 0) * 0.7);
+  return {c, kabu: true, note: "株立ち(" + parts.join("+") + ")×0.7"};
+}
+
+/* ================= 取り込み ================= */
+async function importPkg(file){
+  busy("図面データを読み込んでいます…");
+  try{
+    const j = JSON.parse(await file.text());
+    if(j.type !== "nagano-pkg") throw new Error("長野公園の図面データではありません");
+    const tiles = j.map.tiles; delete j.map.tiles;
+    const ov = j.map.overview.data; delete j.map.overview.data;
+    await idb("tiles", "readwrite", st => st.clear());
+    for(let k = 0; k < tiles.length; k++){
+      const [i, jj, data] = tiles[k];
+      await idbPut("tiles", i + "," + jj, await (await fetch(data)).blob());
+      if(k % 5 === 0) $("busyMsg").textContent = "図面を保存しています… " + (k + 1) + "/" + tiles.length;
+    }
+    await idbPut("tiles", "ov", await (await fetch(ov)).blob());
+    j.map.tileSet = tiles.map(t => t[0] + "," + t[1]);
+    await idbPut("pkg", "cur", j);
+    if(!S.insp) S.insp = j.project.inspector;
+    if(!S.koji) S.koji = j.project.short;
+    if(!S.nextNo || S.nextNo < (j.project.next_no || 1)) S.nextNo = j.project.next_no || 1;
+    saveS();
+    await openPkg();
+    toast("図面データを取り込みました（樹木 " + j.trees.length + " 本）");
+  }catch(e){ alert("取り込めませんでした：" + e.message); }
+  finally{ busy(false); }
+}
+async function openPkg(){
+  pkg = await idbGet("pkg", "cur");
+  if(!pkg){ showEmpty(); return; }
+  reindex();
+  $("empty").style.display = "none";
+  if(!S.dist || !pkg.project.districts.includes(S.dist)) S.dist = pkg.project.districts[0];
+  $("distSel").innerHTML = pkg.project.districts.map(d => "<option>" + esc(d) + "</option>").join("");
+  $("distSel").value = S.dist;
+  const sps = new Set(SP_CHIPS);
+  pkg.trees.forEach(t => { if(t.past && t.past.sp) sps.add(t.past.sp.replace(/\(.*\)|（.*）/g, "")); });
+  $("spList").innerHTML = [...sps].map(s => '<option value="' + esc(s) + '">').join("");
+  await buildMap();
+  const last = lsGet("nagano_view", null);
+  if(last && last.pkg === pkg.id){ V.s = last.s; V.tx = last.tx; V.ty = last.ty; applyView(); } else { fitView(); applyView(); }
+  renderAll();
+}
+function showEmpty(){
+  $("empty").style.display = "flex";
+  $("empty").innerHTML = "図面データがまだありません。<br>［メニュー］→「事務所PCで作った図面データを取り込む」から<br>「長野公園_図面_〜.json」を選んでください。";
+}
+
+/* ================= 図面（タイル） ================= */
+let tileEls = new Map(), ovUrl = null;
+async function buildMap(){
+  const m = pkg.map;
+  $("stage").style.width = m.W + "px"; $("stage").style.height = m.H + "px";
+  const ov = await idbGet("tiles", "ov");
+  if(ovUrl) URL.revokeObjectURL(ovUrl);
+  ovUrl = ov ? URL.createObjectURL(ov) : "";
+  const oi = $("ovimg");
+  oi.src = ovUrl; oi.style.width = m.W + "px"; oi.style.height = m.H + "px"; oi.style.left = "0"; oi.style.top = "0";
+  $("tiles").innerHTML = ""; tileEls.forEach(e => e.url && URL.revokeObjectURL(e.url)); tileEls = new Map();
+  // 調査範囲（委託図面の範囲。穴は池・広場など）
+  const svg = $("rng");
+  svg.setAttribute("width", m.W); svg.setAttribute("height", m.H); svg.setAttribute("viewBox", "0 0 " + m.W + " " + m.H);
+  svg.innerHTML = (m.range || []).map(r => '<path d="' + (r.polys || []).concat(r.holes || []).map(pl => "M" + pl.map(q => q[0] + "," + q[1]).join("L") + "Z").join("") + '"/>').join("");
+  svg.style.display = opt.range === false ? "none" : "";
+}
+/* 見えているタイルだけ読み込む（拡大しているとき） */
+let tileBusy = false, tileAgain = false;
+async function updateTiles(){
+  if(!pkg) return;
+  if(tileBusy){ tileAgain = true; return; }   // 読み込み中に動かしたら、終わってからもう一度
+  const m = pkg.map, vs = viewSize();
+  const show = V.s > 0.22;
+  const need = new Set();
+  if(show){
+    const a = toImage(0, 0), b = toImage(vs.w, vs.h);
+    const i0 = Math.floor(Math.min(a.x, b.x) / m.tile), i1 = Math.floor(Math.max(a.x, b.x) / m.tile);
+    const j0 = Math.floor(Math.min(a.y, b.y) / m.tile), j1 = Math.floor(Math.max(a.y, b.y) / m.tile);
+    for(let i = i0; i <= i1; i++) for(let j = j0; j <= j1; j++){ const k = i + "," + j; if(m.tileSet.includes(k)) need.add(k); }
+  }
+  tileBusy = true;
+  try{
+    for(const [k, e] of tileEls){ if(!need.has(k) && tileEls.size > 30){ e.el.remove(); URL.revokeObjectURL(e.url); tileEls.delete(k); } }
+    for(const k of need){
+      if(tileEls.has(k)) continue;
+      const blob = await idbGet("tiles", k); if(!blob) continue;
+      const [i, j] = k.split(",").map(Number);
+      const im = document.createElement("img");
+      const url = URL.createObjectURL(blob);
+      im.src = url; im.style.left = i * m.tile + "px"; im.style.top = j * m.tile + "px";
+      im.style.width = m.tile + "px"; im.style.height = m.tile + "px";
+      $("tiles").appendChild(im); tileEls.set(k, {el: im, url});
+    }
+  } finally {
+    tileBusy = false;
+    if(tileAgain){ tileAgain = false; updateTiles(); }
+  }
+}
+
+function viewSize(){
+  const r = $("view").getBoundingClientRect();
+  return r.width > 0 ? {w: r.width, h: r.height} : {w: innerWidth, h: innerHeight};   // 画面が裏にあるときの保険
+}
+function fitView(){
+  if(!pkg) return;
+  const vs = viewSize(), r = regionOf(S.dist);
+  V.s = Math.min(vs.w / r.w, vs.h / r.h) * 0.96;
+  V.tx = (vs.w - r.w * V.s) / 2 - r.ox * V.s; V.ty = (vs.h - r.h * V.s) / 2 - r.oy * V.s;
+}
+let viewSaveT = 0;
+function applyView(){
+  $("stage").style.transform = "translate(" + V.tx + "px," + V.ty + "px) scale(" + V.s + ")";
+  scheduleMarks();
+  clearTimeout(viewSaveT); viewSaveT = setTimeout(()=>{ lsSet("nagano_view", {s: V.s, tx: V.tx, ty: V.ty, pkg: pkg && pkg.id}); updateTiles(); }, 120);
+}
+const toScreen = (x, y)=> ({x: V.tx + V.s * x, y: V.ty + V.s * y});
+const toImage = (sx, sy)=> ({x: (sx - V.tx) / V.s, y: (sy - V.ty) / V.s});
+function zoomAt(sx, sy, f){
+  const ns = Math.max(0.03, Math.min(6, V.s * f)), k = ns / V.s;
+  V.tx = sx - (sx - V.tx) * k; V.ty = sy - (sy - V.ty) * k; V.s = ns; applyView();
+}
+function centerOn(p, minScale){
+  const vs = viewSize();
+  if(minScale && V.s < minScale) V.s = minScale;
+  const q = toScreen(p.x, p.y);
+  V.tx += vs.w / 2 - q.x; V.ty += vs.h / 2 - q.y; applyView();
+}
+function ensureVisible(p){
+  const vs = viewSize(), q = toScreen(p.x, p.y), m = 60;
+  if(q.x < m || q.y < m || q.x > vs.w - m || q.y > vs.h - m) centerOn(p);
+}
+
+/* ---- 樹木の印 ---- */
+let markRaf = 0;
+function scheduleMarks(){
+  if(markRaf) return;
+  const run = ()=>{ if(!markRaf) return; cancelAnimationFrame(markRaf.a); clearTimeout(markRaf.b); markRaf = 0; renderMarks(); };
+  markRaf = {a: requestAnimationFrame(run), b: setTimeout(run, 60)};
+}
+function markSize(){ return Math.max(9, Math.min(30, V.s * 16)); }
+function renderMarks(){
+  const box = $("marks");
+  if(!pkg){ box.innerHTML = ""; return; }
+  const d = markSize(), vs = viewSize(), showTag = opt.tags && V.s > 0.55;
+  let h = "";
+  for(const t of allTrees()){
+    const p = posOf(t), q = toScreen(p.x, p.y);
+    if(q.x < -30 || q.y < -30 || q.x > vs.w + 30 || q.y > vs.h + 30) continue;
+    const st = stateOf(t), r = recOf(t.id);
+    const cls = "mk " + (st || (t.gone ? "pg" : t.src === "circle" ? "circ" : t.src === "label" ? "lbl" : "")) +
+                (t.added || R.renamed[t.id] ? " new" : "") + (r.kin ? " kin" : "") + (t.out && !st ? " out" : "") + (t.id === selId ? " sel" : "");
+    const dd = t.id === selId ? d + 8 : d;
+    h += '<div class="' + cls + '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
+    if(showTag){
+      const no = noOf(t);
+      if(no || t.src === "circle") h += '<div class="tag' + (t.added || R.renamed[t.id] ? " n" : "") + '" style="transform:translate(' + (q.x + dd / 2) + 'px,' + (q.y - dd / 2 - 5) + 'px)">' + esc(no || "番号なし") + '</div>';
+    }
+  }
+  box.innerHTML = h;
+  renderLegend(); renderGps();
+}
+function renderLegend(){
+  if(!pkg){ $("legend").style.display = "none"; return; }
+  $("legend").style.display = "";
+  $("legend").innerHTML =
+    '<i style="border-color:var(--warn)"></i>未調査' +
+    '<i style="border-color:var(--ok);background:rgba(46,125,50,.35)"></i>調査済' +
+    '<i style="border-color:var(--pur);background:rgba(106,63,160,.3)"></i>要点検' +
+    '<i style="border-color:var(--acc);background:rgba(24,95,165,.55)"></i>点検済' +
+    '<i style="border-color:#222;background:rgba(0,0,0,.45)"></i>消失' +
+    '<i style="border-color:#999;border-style:dashed"></i>新木・番号なし' +
+    '<br><i style="border-color:#555;border-style:dashed"></i>前回までに伐採・消失' +
+    ((pkg.map.range || []).length ? '<i style="border-radius:2px;border-color:rgba(200,30,30,.75);background:rgba(220,40,40,.1)"></i>調査範囲' +
+      '<i style="border-color:var(--warn);border-style:dotted;opacity:.5"></i>範囲の外' : "");
+}
+
+/* ---- 指の操作 ---- */
+const ptrs = new Map();
+let gest = null, lastTap = {t: 0, x: 0, y: 0}, lpTimer = 0;
+const view = $("view");
+function vpos(e){ const r = view.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
+view.addEventListener("pointerdown", e => {
+  if(e.target.closest("#tools,#hint,#legend")) return;
+  if(!pkg) return;
+  view.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, vpos(e));
+  if(ptrs.size === 1){
+    const p = vpos(e);
+    gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: false, multi: false};
+    clearTimeout(lpTimer);
+    lpTimer = setTimeout(()=>{ if(gest && !gest.moved && !gest.multi && ptrs.size === 1){ gest.long = true; longPress(gest.sx, gest.sy); } }, 650);
+  } else if(ptrs.size === 2){
+    clearTimeout(lpTimer);
+    const [a, b] = [...ptrs.values()];
+    gest = {mode: "pinch", d0: Math.hypot(a.x - b.x, a.y - b.y), s0: V.s, m0: {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}, t0x: V.tx, t0y: V.ty, multi: true, moved: true};
+  }
+});
+view.addEventListener("pointermove", e => {
+  if(!ptrs.has(e.pointerId) || !gest) return;
+  ptrs.set(e.pointerId, vpos(e));
+  if(gest.mode === "pan" && ptrs.size === 1){
+    const p = vpos(e);
+    if(!gest.moved && Math.hypot(p.x - gest.sx, p.y - gest.sy) > 8){ gest.moved = true; clearTimeout(lpTimer); }
+    if(gest.moved){ V.tx += p.x - gest.lx; V.ty += p.y - gest.ly; applyView(); }
+    gest.lx = p.x; gest.ly = p.y;
+  } else if(gest.mode === "pinch" && ptrs.size >= 2){
+    const [a, b] = [...ptrs.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y), m = {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2};
+    const ns = Math.max(0.03, Math.min(6, gest.s0 * d / gest.d0));
+    const px = (gest.m0.x - gest.t0x) / gest.s0, py = (gest.m0.y - gest.t0y) / gest.s0;
+    V.s = ns; V.tx = m.x - ns * px; V.ty = m.y - ns * py; applyView();
+  }
+});
+function ptrEnd(e){
+  if(!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId); clearTimeout(lpTimer);
+  if(!gest) return;
+  if(gest.mode === "pinch"){
+    if(ptrs.size === 1){ const p = [...ptrs.values()][0]; gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: true, multi: true}; }
+    else if(!ptrs.size) gest = null;
+    return;
+  }
+  if(ptrs.size) return;
+  const g = gest; gest = null;
+  if(g.moved || g.multi || g.long || e.type === "pointercancel") return;
+  const now = Date.now();
+  if(now - lastTap.t < 300 && Math.hypot(g.sx - lastTap.x, g.sy - lastTap.y) < 30){ lastTap.t = 0; zoomAt(g.sx, g.sy, 2); return; }
+  lastTap = {t: now, x: g.sx, y: g.sy};
+  tapAt(g.sx, g.sy);
+}
+view.addEventListener("pointerup", ptrEnd);
+view.addEventListener("pointercancel", ptrEnd);
+view.addEventListener("wheel", e => { if(!pkg) return; e.preventDefault(); const p = vpos(e); zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015)); }, {passive: false});
+document.addEventListener("gesturestart", e => e.preventDefault());
+
+function nearestTree(sx, sy, lim){
+  let best = null, bd = lim;
+  for(const t of allTrees()){
+    const q = toScreen(posOf(t).x, posOf(t).y), d = Math.hypot(q.x - sx, q.y - sy);
+    if(d < bd){ bd = d; best = t; }
+  }
+  return best;
+}
+function tapAt(sx, sy){
+  if(mode === "add"){ setMode(null); const p = toImage(sx, sy); openNoDlg({kind: "add", x: Math.round(p.x), y: Math.round(p.y)}); return; }
+  if(mode === "move"){ const p = toImage(sx, sy); R.moved[selId] = {x: Math.round(p.x), y: Math.round(p.y)}; const a = R.added.find(x => x.id === selId); if(a){ a.x = R.moved[selId].x; a.y = R.moved[selId].y; delete R.moved[selId]; reindex(); } saveR(); setMode(null); scheduleMarks(); toast("位置を直しました"); return; }
+  const t = nearestTree(sx, sy, Math.max(26, markSize() * 1.1));
+  if(t) select(t.id, false);
+}
+function longPress(sx, sy){
+  if(mode) return;
+  const near = nearestTree(sx, sy, 14);
+  if(near){ select(near.id, false); return; }
+  const p = toImage(sx, sy);
+  openNoDlg({kind: "add", x: Math.round(p.x), y: Math.round(p.y)});
+}
+function setMode(m, msg){
+  mode = m;
+  $("addBtn").classList.toggle("on", m === "add");
+  if(m){ $("hintMsg").textContent = msg; $("hint").style.display = "flex"; }
+  else $("hint").style.display = "none";
+}
+$("hintCancel").onclick = ()=> setMode(null);
+$("addBtn").onclick = ()=>{ if(!pkg) return; setMode(mode === "add" ? null : "add", "新しい樹木の位置を図面上でタップしてください（長押しでも追加できます）"); };
+
+/* ================= 番号（新木・番号の付け替え） ================= */
+const Y = ()=> (pkg && pkg.project.year) || "R8";
+function nextNoStr(){
+  const used = new Set(allTrees().map(t => noOf(t)));
+  let n = S.nextNo || 1, s;
+  do { s = Y() + "-" + String(n).padStart(3, "0"); n++; } while(used.has(s));
+  return s;
+}
+let noCtx = null;
+function openNoDlg(ctx){
+  noCtx = ctx;
+  const t = ctx.id ? treeById(ctx.id) : null;
+  $("noTitle").textContent = ctx.kind === "add" ? "新しい樹木（台帳・図面に無い木）" : ctx.kind === "assign" ? "番号なしの丸に番号を付ける" :
+    ctx.kind === "plate" ? "札に書いてある番号を入れる" : "番号を変える（プレートを付け替える）";
+  $("noNote").textContent = ctx.kind === "add" ? "新しいプレートを付けます。番号は自動で次の番号が入ります。" :
+    ctx.kind === "assign" ? "既にプレートが付いていればその番号を、無ければ新しい番号を入れてください。" :
+    ctx.kind === "plate" ? "図面の番号は " + (t ? (noOf(t) || "なし") : "") + "。札の番号が図面の別の位置にあれば、その木を開きます（図面の番号の付け違い）。" :
+    "元の番号 " + (t ? noOf(t) : "") + " は台帳の備考に残します。";
+  $("noInp").value = ctx.kind === "add" ? nextNoStr() : (ctx.kind === "assign" || ctx.kind === "plate" ? "" : nextNoStr());
+  $("noChips").innerHTML = ctx.kind === "plate" ? "" : '<button data-v="' + nextNoStr() + '">次の番号 ' + nextNoStr() + '</button>';
+  $("noChips").querySelectorAll("button").forEach(b => b.onclick = ()=> $("noInp").value = b.dataset.v);
+  $("noSp").value = "";
+  $("noSpLbl").style.display = $("noSp").style.display = ctx.kind === "add" ? "" : "none";
+  $("noDlg").classList.add("show");
+}
+$("noCancel").onclick = ()=> $("noDlg").classList.remove("show");
+function bumpNext(no){
+  const m = String(no).match(new RegExp("^" + Y() + "-(\\d+)$"));
+  if(m && +m[1] >= (S.nextNo || 1)){ S.nextNo = +m[1] + 1; saveS(); }
+}
+$("noOk").onclick = ()=>{
+  const no = $("noInp").value.trim().replace(/[ー－―]/g, "-").toUpperCase();
+  if(!no){ toast("番号を入れてください"); return; }
+  const c = noCtx;
+  const cur = c.id ? treeById(c.id) : null;
+  const dup = allTrees().find(t => noOf(t) === no && t.id !== c.id && (!cur || distOf(t) === distOf(cur))) ||
+              allTrees().find(t => noOf(t) === no && t.id !== c.id);
+  if(dup && c.kind === "plate" && distOf(dup) === distOf(cur)){
+    // 札の番号の木が図面の別の位置にある（図面の番号の付け違い）→ その木を開く。
+    // 近く（15m以内）なら2本の位置を入れ替え、遠ければ札の番号の木をこの位置に移す
+    const here = posOf(cur), there = posOf(dup);
+    const near = Math.hypot(here.x - there.x, here.y - there.y) < 15 * pkg.map.ppm;
+    $("noDlg").classList.remove("show");
+    if(confirm(no + " は図面の " + Math.round(Math.hypot(here.x - there.x, here.y - there.y) / pkg.map.ppm) + "m 離れた所にあります。" +
+               (near ? "\n［OK］で " + no + " と " + (noOf(cur) || "この記号") + " の図面の位置を入れ替えます（番号の付け違いの直し）"
+                     : "\n［OK］で " + no + " の位置をいまの木の位置に直します") + "（［キャンセル］なら位置はそのまま）")){
+      const put = (t, p) => { const a = R.added.find(x => x.id === t.id); if(a){ a.x = p.x; a.y = p.y; } else R.moved[t.id] = {x: p.x, y: p.y}; };
+      put(dup, here);
+      if(near) put(cur, there);
+      reindex(); saveR();
+    }
+    navHist.push(c.id); select(dup.id, true); scheduleMarks();
+    return;
+  }
+  if(dup && c.kind === "plate" && !confirm(no + " は" + distOf(dup) + "の番号です。この木の番号にしますか？")) return;
+  if(dup && c.kind !== "plate" && !confirm(no + " は既にあります（" + (dup.added ? "新木" : "図面") + "）。それでも使いますか？")) return;
+  if(c.kind === "add"){
+    const a = {id: "add-" + Date.now().toString(36), no, x: c.x, y: c.y, district: regionAt(c.x, c.y).district || S.dist};
+    R.added.push(a); reindex();
+    const r = rec(a.id); r.st = "done"; r.plate = "new"; r.dist = a.district; r.sp = $("noSp").value.trim(); stamp(r);
+    bumpNext(no); saveR();
+    $("noDlg").classList.remove("show");
+    select(a.id, false); toast(no + " を追加しました");
+  } else {
+    $("noDlg").classList.remove("show");
+    renumber(treeById(c.id), no, c.kind);
+  }
+};
+/* 番号を変える
+   kind: "reno"/"new"＝札が無いので新しい札（元の番号は台帳の備考に残す）
+         "plate"＝図面と違う番号の札が付いている／"assign"＝番号の無い記号に札の番号を付ける */
+function renumber(t, no, kind){
+  const r = rec(t.id), before = noOf(t);
+  // 付け替える前の番号で撮った写真も新しい番号の名前にする（新しい札のときはプレートの写真は撮り直し）
+  if(before && before !== no){
+    photoMeta.filter(m => m.no === before && (kind === "plate" || kind === "assign" || m.kind !== "P"))
+      .forEach(m => { m.no = no; m.name = m.name.replace(before + "_", no + "_"); m.sent = false; });
+    savePhotoMeta();
+  }
+  if(kind === "assign" || kind === "plate"){ R.renamed[t.id] = no; if(kind === "plate"){ r.plate = "ok"; r.drawNo = t.no || ""; } }
+  else { r.oldNo = before; R.renamed[t.id] = no; r.plate = "new"; }
+  if(!r.st) r.st = "done";
+  stamp(r);
+  if(t.added){ const a = R.added.find(x => x.id === t.id); a.no = no; delete R.renamed[t.id]; reindex(); }
+  bumpNext(no); saveR();
+  renderSheet(); scheduleMarks(); updProg(); toast("番号を " + no + " にしました");
+}
+
+/* ================= 入力パネル ================= */
+let wxWarned = false;
+function stamp(r){
+  r.t = Date.now();
+  if(!r.date) r.date = today();
+  if(!S.wx || S.wxDate !== today()){
+    if(!wxWarned){ wxWarned = true; toast("上の［晴・曇・雨］で今日の天候を選んでください（台帳の天候欄に入ります）"); $("wx").animate([{opacity: 1}, {opacity: .2}, {opacity: 1}], {duration: 600, iterations: 3}); }
+  }
+  if(!r.wx && S.wxDate === today()) r.wx = S.wx || "";
+  if(!r.dist){ const t = treeById(selId); r.dist = (t && distOf(t)) || S.dist; }
+}
+function select(id, center){
+  const t = treeById(id); if(!t) return;
+  setMode(null);
+  selId = id;
+  const d = distOf(t);
+  if(d && d !== S.dist && pkg.project.districts.includes(d)){ S.dist = d; $("distSel").value = d; saveS(); updProg(); }
+  document.body.classList.add("selOpen");
+  curField = "h";
+  renderSheet();
+  setTimeout(()=>{ const p = posOf(t); if(center) centerOn(p, 0.9); else ensureVisible(p); renderMarks(); }, 0);
+  lsSet("nagano_last", id);
+}
+function closeSheet(){ selId = null; document.body.classList.remove("selOpen"); scheduleMarks(); }
+$("sClose").onclick = closeSheet;
+
+function segSet(id, v){ $(id).querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === v)); }
+function chipsSet(id, list, text, onClick){
+  const parts = String(text || "").split("、");
+  $(id).innerHTML = list.map(c => '<button class="' + (parts.includes(String(c)) ? "on" : "") + '">' + esc(c) + '</button>').join("");
+  $(id).querySelectorAll("button").forEach(b => b.onclick = ()=> onClick(b.textContent));
+}
+function toggleWord(text, w){
+  let parts = String(text || "").split("、").filter(Boolean);
+  parts = parts.includes(w) ? parts.filter(x => x !== w) : parts.concat(w);
+  return parts.join("、");
+}
+function renderSheet(){
+  const t = treeById(selId); if(!t) return;
+  const r = recOf(t.id), no = noOf(t);
+  $("sNo").textContent = no || "番号なし";
+  const ren = R.renamed[t.id] && !t.added ? "（元 " + (t.no || "番号なし") + "）" : "";
+  const dupNo = !t.added && t.no && allTrees().some(o => o !== t && o.no === t.no && !o.added);
+  $("sSub").innerHTML = esc(distOf(t) + "　" + (t.added ? "新木（図面に無い木）" : t.src === "circle" ? "図面の番号なしの記号" : t.src === "label" ? "図面の番号（記号から離れた位置）" : "図面の既存木") + ren) +
+    (t.label ? "　図面の表記「" + esc(t.label) + "」" : "") +
+    (t.out ? '　<span class="tagx">調査範囲の外</span>' : "") +
+    (dupNo ? '　<span class="tagx">図面に同じ番号が2か所</span>' : "") +
+    (r.date ? "　" + esc(r.date + " " + (r.wx || "")) : "");
+  const p = t.past;
+  let info = p ? "<b>前回 " + esc(p.year || "") + "</b>　" + esc(p.sp || "—") + "　H " + esc(p.h || "—") + "m　C " + esc(p.c || "—") + "cm" +
+      (p.hist ? '<span style="color:var(--tx2)">' + p.hist.map(h => "　／" + esc(h.year + " " + (h.sp || "") + " H" + (h.h || "—") + " C" + (h.c || "—"))).join("") + "</span>" : "") +
+      (p.note ? '<br><span style="color:var(--tx2)">' + esc(p.note) + "</span>" : "")
+    : (t.added ? "新しく追加した樹木です。" : t.src === "circle" ? "図面に番号がありません。札が付いていれば［違う番号が付いている］で札の番号を、無ければ［無い → 新しい札］。" : "過去の台帳に記録がありません。");
+  if(t.marks) info += "<br>前回の図面：" + esc(t.marks.join("・"));
+  if(t.gone) info += '<br><b style="color:var(--ng)">前回の図面では伐採済み・消失（×）</b>　木が無ければ［消失・倒木］';
+  $("sInfo").innerHTML = info;
+  segSet("stSeg", r.st || "");
+  // ① プレート
+  segSet("plSeg", r.plate || (t.added ? "new" : ""));
+  $("plNext").textContent = r.plate === "new" || t.added ? noOf(t) : nextNoStr();
+  $("plWarn").textContent = !noOf(t) ? "図面に番号がありません。札が付いていれば［違う番号が付いている］、無ければ［無い → 新しい札］" :
+    (r.plate === "new" && r.oldNo ? "元の番号 " + r.oldNo + " は台帳の備考に残します" : (r.drawNo ? "図面の番号 " + r.drawNo + " → 札の番号 " + noOf(t) : ""));
+  // ② 樹種
+  const psp = p && p.sp ? p.sp : "";
+  $("spPrev").textContent = psp ? "前回：" + psp : "前回の樹種なし（下で入力）";
+  $("spOk").style.display = psp ? "" : "none";
+  $("spOk").classList.toggle("on", !!r.spOk);
+  $("spOk").textContent = r.spOk ? "✓ 前回どおり（" + psp + "）" : "✓ 前回どおり";
+  $("spOkTxt").innerHTML = r.spOk ? "" : (r.sp && psp && r.sp !== psp ? '<b style="color:var(--warn)">樹種訂正：' + esc(psp) + " → " + esc(r.sp) + "</b>（台帳の備考に入ります）" : (psp ? "違うときは下で選ぶ" : ""));
+  $("sp").value = r.sp != null ? r.sp : "";
+  $("sp").placeholder = "樹種";
+  chipsSet("spChips", SP_CHIPS, r.sp, w => { const rr = rec(selId); rr.sp = w; rr.spOk = !!psp && w === psp; if(!rr.st) rr.st = "done"; touch(rr); $("sp").value = w; renderSheet(); });
+  renderNums();
+  chipsSet("slopeChips", SLOPE_CHIPS.map(String), String(r.slope || ""), w => { const rr = rec(selId); rr.slope = w; touch(rr); renderNums(); renderSheetChips(); });
+  segSet("seiSeg", r.sei || "");
+  segSet("shiSeg", r.shi || ""); $("shiNote").value = r.shiNote || "";
+  segSet("kareSeg", r.kare || ""); $("kareNote").value = r.kareNote || "";
+  renderSheetChips();
+  $("tkTg").classList.toggle("on", !!r.tenken);
+  $("kinTg").classList.toggle("on", !!r.kin);
+  $("kanri").querySelectorAll("button").forEach(b => b.classList.toggle("on", !!(r.kanri && r.kanri[b.dataset.v])));
+  $("gennin").value = r.gennin || "";
+  $("memo").value = r.memo || "";
+  renderTenken();
+  renderPhotos();
+  $("delLink").style.display = t.added ? "" : "none";
+  $("renoLink").textContent = t.src === "circle" && !R.renamed[t.id] ? "番号を付ける" : "番号を変える（プレート付替え）";
+  $("calLink").style.display = gps && !regionOf(distOf(t)).geo ? "" : "none";
+}
+function renderSheetChips(){
+  const r = recOf(selId);
+  chipsSet("shiChips", SHI_CHIPS, r.shiNote, w => { const rr = rec(selId); rr.shiNote = toggleWord(rr.shiNote, w); if(w !== "園路離れている" && rr.shiNote.includes(w)) rr.shi = "y"; touch(rr); renderSheet(); });
+  chipsSet("kareChips", KARE_CHIPS, r.kareNote, w => {
+    const rr = rec(selId); rr.kareNote = toggleWord(rr.kareNote, w);
+    if(rr.kareNote.includes(w)){ rr.kare = "y"; autoTenken(rr); }
+    if(!rr.st) rr.st = "done";
+    touch(rr); renderSheet();
+  });
+  chipsSet("genChips", GEN_CHIPS, r.gennin, w => { const rr = rec(selId); rr.gennin = toggleWord(rr.gennin, w); touch(rr); renderSheet(); });
+}
+/* 数字の入力（樹高・幹周・斜度） */
+let curField = "h";
+const FIELDS = ["h", "c", "slope"];
+function renderNums(){
+  const r = recOf(selId), p = (treeById(selId) || {}).past || {};
+  const g = girthOf(r.c);
+  $("dH").textContent = r.h || ""; $("eH").textContent = r.h ? "" : (p.h ? "前回 " + p.h : "");
+  $("dC").textContent = r.c ? String(r.c).replace(/\+/g, "＋") : "";
+  $("eC").textContent = g.kabu ? g.note + "＝" + g.c : (!r.c && p.c ? "前回 " + p.c : (g.c != null && g.c < 60 ? "60cm未満" : ""));
+  $("dSlope").textContent = r.slope || ""; $("eSlope").textContent = "";
+  document.querySelectorAll(".nd").forEach(el => el.classList.toggle("act", el.dataset.f === curField));
+}
+document.querySelectorAll(".nd").forEach(el => el.onclick = ()=>{ curField = el.dataset.f; renderNums(); });
+$("pad").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+  const k = b.dataset.k;
+  if(k === "next" || k === "prev"){ const i = FIELDS.indexOf(curField); curField = FIELDS[(i + (k === "next" ? 1 : 2)) % 3]; renderNums(); return; }
+  const r = rec(selId);
+  let v = String(r[curField] || "");
+  if(k === "bs") v = v.slice(0, -1);
+  else if(k === "clr") v = "";
+  else if(k === "plus"){ if(curField !== "c"){ toast("「＋幹」は幹周だけです"); return; } if(v && !v.endsWith("+")) v += "+"; }
+  else {
+    const ch = b.textContent, last = v.split("+").pop();
+    if(ch === "." && (last.includes(".") || !last)) return;
+    if(last.replace(".", "").length >= 4) return;
+    v += ch;
+  }
+  r[curField] = v;
+  if(v && !r.st) r.st = "done";
+  touch(r); renderNums(); segSet("stSeg", r.st || "");
+  if(curField === "slope") renderSheetChips();
+});
+function touch(r){ stamp(r); saveR(); scheduleMarks(); updProg(); }
+
+$("stSeg").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+  const r = rec(selId); r.st = r.st === b.dataset.v ? "" : b.dataset.v; touch(r); renderSheet();
+});
+$("sp").addEventListener("input", ()=>{ const r = rec(selId), p = (treeById(selId) || {}).past; r.sp = $("sp").value.trim(); r.spOk = !!(p && p.sp) && r.sp === p.sp; if(!r.st) r.st = "done"; touch(r); });
+$("sp").addEventListener("change", ()=> renderSheet());
+$("spOk").onclick = ()=>{
+  const r = rec(selId), p = (treeById(selId) || {}).past; if(!p || !p.sp) return;
+  if(r.spOk){ r.spOk = false; if(r.sp === p.sp) r.sp = ""; } else { r.spOk = true; r.sp = p.sp; }
+  if(!r.st) r.st = "done"; touch(r); renderSheet();
+};
+[["seiSeg", "sei"], ["shiSeg", "shi"], ["kareSeg", "kare"]].forEach(([id, key]) =>
+  $(id).querySelectorAll("button").forEach(b => b.onclick = ()=>{
+    const r = rec(selId); r[key] = r[key] === b.dataset.v ? "" : b.dataset.v;
+    if(!r.st) r.st = "done";
+    if(key === "kare" && r.kare === "y") autoTenken(r);
+    touch(r); renderSheet();
+  }));
+/* ① プレートの確認：付いている／無い → 新しい札（次の R8 番号）／違う番号が付いている */
+$("plSeg").querySelectorAll("button").forEach(b => b.onclick = ()=> plateSet(b.dataset.v));
+function plateSet(v){
+  const t = treeById(selId), r = rec(selId);
+  if(r.plate === v){ if(v === "new" && !t.added){ undoNew(t, r); return; } r.plate = ""; touch(r); renderSheet(); return; }
+  if(r.plate === "new" && !t.added && R.renamed[t.id]){ if(!undoNew(t, r)) return; }
+  if(v === "other"){ openNoDlg({kind: "plate", id: selId}); return; }
+  if(v === "ok"){
+    if(!noOf(t)){ toast("図面に番号がありません。［違う番号が付いている］で札の番号を入れてください"); return; }
+    r.plate = "ok";
+  } else if(v === "new"){
+    if(!t.added){
+      const nn = nextNoStr();
+      if(!confirm("札が無いので、新しい札「" + nn + "」を付けます。" + (noOf(t) ? "\n元の番号 " + noOf(t) + " は台帳の備考に残します。" : ""))) return;
+      renumber(t, nn, "new"); return;
+    }
+    r.plate = "new";
+  }
+  if(!r.st) r.st = "done";
+  touch(r); renderSheet();
+}
+/* 新しい札をやめて元の番号に戻す */
+function undoNew(t, r){
+  const cur = noOf(t), old = r.oldNo || "";
+  if(!confirm("新しい札 " + cur + " をやめて、元の番号" + (old ? " " + old : "（番号なし）") + " に戻しますか？")) return false;
+  if(old){ photoMeta.filter(m => m.no === cur && m.kind !== "P").forEach(m => { m.no = old; m.name = m.name.replace(cur + "_", old + "_"); m.sent = false; }); savePhotoMeta(); }
+  delete R.renamed[t.id]; delete r.oldNo; r.plate = "";
+  const m = cur.match(new RegExp("^" + Y() + "-(\\d+)$"));
+  if(m && +m[1] === (S.nextNo || 1) - 1){ S.nextNo--; saveS(); }   // いちばん最後に出した番号なら次に使う
+  touch(r); renderSheet();
+  return true;
+}
+/* 枯れ・折れ等「あり」になったら要樹木点検を提案（一度外したら同じ木ではもう付けない） */
+function autoTenken(r){
+  if(r.tenken || r.tkOff) return;
+  r.tenken = true;
+  toast("枯れ・折れ等ありのため「要樹木点検」にしました（違えば外してください）");
+}
+$("shiNote").addEventListener("input", ()=>{ const r = rec(selId); r.shiNote = $("shiNote").value; touch(r); });
+$("kareNote").addEventListener("input", ()=>{ const r = rec(selId); r.kareNote = $("kareNote").value; touch(r); });
+$("gennin").addEventListener("input", ()=>{ const r = rec(selId); r.gennin = $("gennin").value; touch(r); });
+$("memo").addEventListener("input", ()=>{ const r = rec(selId); r.memo = $("memo").value; touch(r); });
+$("tkTg").onclick = ()=>{ const r = rec(selId); r.tenken = !r.tenken; if(!r.tenken) r.tkOff = true; if(!r.st) r.st = "done"; touch(r); renderSheet(); if(r.tenken) setTimeout(()=> $("tkBox").scrollIntoView({behavior: "smooth", block: "nearest"}), 50); };
+$("kinTg").onclick = ()=>{ const r = rec(selId); r.kin = !r.kin; if(r.kin) r.tenken = true; if(!r.st) r.st = "done"; touch(r); renderSheet(); if(r.kin) toast("緊急対応：写真を撮って、監督職員へ速やかに報告してください"); };
+$("kanri").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+  const r = rec(selId); r.kanri = r.kanri || {}; r.kanri[b.dataset.v] = !r.kanri[b.dataset.v]; if(!r.st) r.st = "done"; touch(r); renderSheet();
+});
+
+/* ---- 樹木点検 ---- */
+function tkItems(){ return pkg.tenkenItems.map((x, i) => Object.assign({i}, x)).filter(x => (S.form || pkg.project.tenken_form) !== "様式1" || pkg.form1.includes(x.i)); }
+function tkResult(r){
+  const s = new Set((r.tk && r.tk.items) || []);
+  const n1 = [...s].filter(i => pkg.tenkenItems[i].g === "①").length, n23 = [...s].filter(i => pkg.tenkenItems[i].g !== "①").length;
+  const out = []; if(n1) out.push("維持管理の処置が必要"); if(n23) out.push("樹木の外観診断が必要");
+  return {txt: out.length ? out.join("・") : "概ね良好・異常なし", n1, n23};
+}
+function renderTenken(){
+  const r = recOf(selId);
+  $("tkBox").style.display = r.tenken ? "" : "none";
+  if(!r.tenken) return;
+  const items = new Set((r.tk && r.tk.items) || []);
+  let h = "", g0 = "";
+  const GN = {"①": "①維持管理上の問題", "②": "②活力点検", "③": "③樹木の異常"};
+  tkItems().forEach(x => {
+    if(x.g !== g0){ h += (g0 ? "</div>" : "") + '<div class="lbl">' + GN[x.g] + '</div><div class="chips">'; g0 = x.g; }
+    h += '<button data-i="' + x.i + '" class="' + (items.has(x.i) ? "on" : "") + '">' + esc(x.t) + "</button>";
+  });
+  $("tkItems").innerHTML = h + "</div>";
+  $("tkItems").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+    const rr = rec(selId); rr.tk = rr.tk || {items: []};
+    const i = +b.dataset.i, s = new Set(rr.tk.items);
+    s.has(i) ? s.delete(i) : s.add(i);
+    rr.tk.items = [...s].sort((a, b) => a - b); rr.tk.t = Date.now(); rr.tk.date = rr.tk.date || today();
+    touch(rr); renderTenken();
+  });
+  $("tkNote").value = (r.tk && r.tk.note) || "";
+  chipsSet("tkChips", TK_CHIPS, r.tk && r.tk.note, w => { const rr = rec(selId); rr.tk = rr.tk || {items: []}; rr.tk.note = toggleWord(rr.tk.note, w); rr.tk.t = Date.now(); rr.tk.date = rr.tk.date || today(); touch(rr); renderTenken(); });
+  const res = tkResult(r);
+  $("tkRes").innerHTML = "点検結果：" + esc(res.txt) + "　（①の異常 " + res.n1 + "　②＋③ " + res.n23 + "）" +
+    (tkDone(r) ? "" : '<br><span style="color:var(--ng)">項目にひとつも該当が無ければ下の［異常なしで点検済］を押してください</span> <button id="tkOk" style="margin-top:4px;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--pur);background:#fff;color:var(--pur)">異常なしで点検済</button>');
+  const ok = $("tkOk"); if(ok) ok.onclick = ()=>{ const rr = rec(selId); rr.tk = rr.tk || {items: []}; rr.tk.t = Date.now(); rr.tk.date = rr.tk.date || today(); touch(rr); renderTenken(); };
+}
+$("tkNote").addEventListener("input", ()=>{ const r = rec(selId); r.tk = r.tk || {items: []}; r.tk.note = $("tkNote").value; r.tk.t = Date.now(); r.tk.date = r.tk.date || today(); touch(r); });
+
+/* ---- 前後・近くの未調査 ---- */
+let navHist = [];
+function goNearest(){
+  const t0 = treeById(selId); if(!t0) return;
+  const p0 = posOf(t0);
+  let best = null, bd = Infinity;
+  for(const t of allTrees()){
+    if(t.id === selId || stateOf(t)) continue;
+    const p = posOf(t), d = Math.hypot(p.x - p0.x, p.y - p0.y) * (t.out ? 3 : 1);   // 範囲の外の木は後回し
+    if(d < bd){ bd = d; best = t; }
+  }
+  if(!best){ toast("未調査の樹木はありません"); return; }
+  navHist.push(selId);
+  select(best.id, true);
+}
+$("nextTree").onclick = goNearest;
+$("prevTree").onclick = ()=>{ const id = navHist.pop(); if(id) select(id, true); else toast("前の樹木はありません"); };
+$("renoLink").onclick = e => { e.preventDefault(); const t = treeById(selId); openNoDlg({kind: t.src === "circle" && !R.renamed[t.id] ? "assign" : "reno", id: selId}); };
+$("moveLink").onclick = e => { e.preventDefault(); setMode("move", noOf(treeById(selId)) + " の正しい位置を図面上でタップしてください"); };
+$("undoLink").onclick = e => { e.preventDefault(); if(!confirm("この樹木の入力を消して未調査に戻しますか？（写真は残ります）")) return; delete R.trees[selId]; saveR(); renderSheet(); scheduleMarks(); updProg(); };
+$("delLink").onclick = e => { e.preventDefault(); if(!confirm("この新木を削除しますか？")) return; R.added = R.added.filter(a => a.id !== selId); delete R.trees[selId]; reindex(); saveR(); closeSheet(); updProg(); };
+
+/* ================= 写真（小黒板つきで撮影） ================= */
+async function loadPhotoMeta(){ photoMeta = lsGet("nagano_photos", []); }
+function savePhotoMeta(){ lsSet("nagano_photos", photoMeta); }
+function photosOf(no){ return photoMeta.filter(m => m.no === no); }
+function renderPhotos(){
+  const t = treeById(selId); if(!t) return;
+  const no = noOf(t), ps = photosOf(no), r = recOf(selId);
+  const has = k => ps.some(m => m.kind === k);
+  const n2 = ps.filter(m => m.kind === "2").length;
+  $("phP").classList.toggle("done", has("P")); $("phP").textContent = (has("P") ? "✔ " : "📷 ") + "プレート";
+  $("ph1").classList.toggle("done", has("1")); $("ph1").textContent = (has("1") ? "✔ " : "📷 ") + "全景・主要部";
+  $("ph2").classList.toggle("done", n2 > 0); $("ph2").textContent = "📷 被害部" + (n2 ? "（" + n2 + "枚）" : "");
+  const need = [];
+  // 新しい札を付けた木と、点検表を作る木（R7 の点検表は「樹木プレート」の写真が入る）はプレートの写真が要る
+  if((r.plate === "new" || t.added || r.tenken) && !has("P")) need.push("プレート");
+  if(r.tenken && !has("1")) need.push("全景");
+  if(r.tenken && tkResult(r).n23 + tkResult(r).n1 > 0 && !n2) need.push("被害部");
+  $("phHint").innerHTML = need.length ? '<span style="color:var(--ng);font-weight:700">未撮影：' + need.join("・") + "</span>" : (ps.length ? ps.length + "枚" : "");
+  const box = $("thumbs"); box.innerHTML = "";
+  ps.forEach(async m => {
+    const d = document.createElement("div");
+    d.innerHTML = '<img alt=""><span>' + esc(m.name.replace(/\.jpg$/, "")) + '</span><button>✕</button>';
+    box.appendChild(d);
+    const b = await idbGet("photos", m.key);
+    if(b) d.querySelector("img").src = URL.createObjectURL(b);
+    d.querySelector("img").onclick = ()=>{ if(b) window.open(URL.createObjectURL(b)); };
+    d.querySelector("button").onclick = async ()=>{ if(!confirm(m.name + " を削除しますか？")) return; await idbDel("photos", m.key); photoMeta = photoMeta.filter(x => x.key !== m.key); savePhotoMeta(); renderPhotos(); };
+  });
+}
+const KIND_TXT = {P: "樹木プレート", "1": "全景・主要部", "2": "被害部", S: "調査状況"};
+let cam = {stream: null, kind: "1", no: "", sp: "", cmts: [], z: 1, track: null, hw: null};
+function photoName(no, kind){
+  if(kind === "P") return no + "_P.jpg";
+  if(kind === "1") return no + "_1.jpg";
+  if(kind === "S"){ const n = photoMeta.filter(m => m.kind === "S").length + 1; return "状況_" + today().replace(/-/g, "") + "_" + n + ".jpg"; }
+  let k = 2; while(photoMeta.some(m => m.name === no + "_" + k + ".jpg")) k++;
+  return no + "_" + k + ".jpg";
+}
+async function openCam(kind){
+  const t = treeById(selId);
+  const no = kind === "S" ? "" : noOf(t);
+  if(kind !== "S" && !no){ toast("先に番号を付けてください"); return; }
+  const r = recOf(selId);
+  cam.kind = kind; cam.no = no; cam.sp = kind === "S" ? "" : (r.sp || (t.past && t.past.sp) || "");
+  cam.cmts = kind === "1" ? ["全景"] : [];
+  if(kind === "P" && photosOf(no).some(m => m.kind === "P") && !confirm("プレートの写真は撮影済みです。撮り直しますか？")) return;
+  if(kind === "1" && photosOf(no).some(m => m.kind === "1") && !confirm("全景の写真は撮影済みです。撮り直しますか？")) return;
+  $("camNo").textContent = no || "調査状況";
+  $("camKind").textContent = "　" + KIND_TXT[kind];
+  $("camKoji").textContent = S.koji || pkg.project.short;
+  renderCamCmts();
+  $("cam").classList.add("show");
+  fitCam();
+  try{
+    cam.stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment", width: {ideal: 1920}, height: {ideal: 1440}}, audio: false});
+    $("camVideo").srcObject = cam.stream; $("camNoCam").style.display = "none";
+    cam.track = cam.stream.getVideoTracks()[0];
+    const caps = cam.track.getCapabilities ? cam.track.getCapabilities() : {};
+    cam.hw = caps.zoom && caps.zoom.max > caps.zoom.min ? caps.zoom : null;
+    applyZoom(1);
+  }catch(e){ $("camNoCam").style.display = "flex"; }
+}
+function boardLines(){
+  const L = [];
+  if(cam.kind === "S") L.push("調査状況");
+  else { L.push(cam.no); if(cam.sp) L.push(cam.sp); if(cam.kind === "P") L.push("樹木プレート"); else if(cam.cmts.length) L.push(cam.cmts.join("・")); }
+  return L;
+}
+function renderCamCmts(){
+  $("camBText").innerHTML = boardLines().map(esc).join("<br>");
+  const list = cam.kind === "P" || cam.kind === "S" ? [] : (lsGet("nagano_cmts", null) || CAM_CMTS);
+  $("camCmts").innerHTML = list.map(c => '<button class="' + (cam.cmts.includes(c) ? "on" : "") + '">' + esc(c) + "</button>").join("");
+  $("camCmts").querySelectorAll("button").forEach(b => b.onclick = ()=>{ const c = b.textContent; cam.cmts = cam.cmts.includes(c) ? cam.cmts.filter(x => x !== c) : cam.cmts.concat(c); renderCamCmts(); });
+}
+$("camEdit").onclick = ()=>{
+  const cur = (lsGet("nagano_cmts", null) || CAM_CMTS).join("、");
+  const v = prompt("黒板に入れる言葉（「、」で区切る）", cur);
+  if(v != null){ lsSet("nagano_cmts", v.split(/[、,]/).map(s => s.trim()).filter(Boolean)); renderCamCmts(); }
+};
+const CAM_AR = 3 / 4;
+function fitCam(){
+  const w = $("camWrap").clientWidth, h = $("camWrap").clientHeight;
+  const fh = Math.min(h, w / CAM_AR), fw = fh * CAM_AR, f = $("camFrame");
+  f.style.width = fw + "px"; f.style.height = fh + "px"; f.style.left = (w - fw) / 2 + "px"; f.style.top = (h - fh) / 2 + "px";
+}
+window.addEventListener("resize", ()=>{ if($("cam").classList.contains("show")) fitCam(); scheduleMarks(); });
+function applyZoom(z){
+  if(cam.hw){ z = Math.min(cam.hw.max, Math.max(cam.hw.min, z)); cam.track.applyConstraints({advanced: [{zoom: z}]}).catch(()=>{}); $("camVideo").style.transform = ""; }
+  else { z = Math.min(3, Math.max(1, z)); $("camVideo").style.transform = z === 1 ? "" : "scale(" + z + ")"; }
+  cam.z = Math.round(z * 10) / 10; $("zVal").textContent = "×" + cam.z.toFixed(1);
+}
+$("zIn").onclick = ()=> applyZoom(cam.z + 0.3);
+$("zOut").onclick = ()=> applyZoom(cam.z - 0.3);
+function closeCam(){ $("cam").classList.remove("show"); if(cam.stream){ cam.stream.getTracks().forEach(t => t.stop()); cam.stream = null; } $("camVideo").srcObject = null; }
+$("camClose").onclick = closeCam;
+function drawBoard(ctx, W, H){
+  const bw = W * 0.46, lines = boardLines(), bx = W * 0.03;
+  const rowH = W * 0.055, lh = W * 0.06, bh = rowH + lh * lines.length + W * 0.02, by = H - bh - H * 0.03;
+  const bd = Math.max(2, W * 0.004);
+  ctx.fillStyle = "#1b6b5f"; ctx.fillRect(bx, by, bw, bh);
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = bd * 2; ctx.strokeRect(bx, by, bw, bh);
+  ctx.lineWidth = bd; ctx.beginPath(); ctx.moveTo(bx, by + rowH); ctx.lineTo(bx + bw, by + rowH); ctx.stroke();
+  ctx.fillStyle = "#fff"; ctx.textBaseline = "middle";
+  const f1 = rowH * 0.42; ctx.font = f1 + "px sans-serif";
+  const lab = "業務名", labW = ctx.measureText(lab).width + f1 * 0.8;
+  ctx.fillText(lab, bx + f1 * 0.4, by + rowH / 2);
+  ctx.beginPath(); ctx.moveTo(bx + labW, by); ctx.lineTo(bx + labW, by + rowH); ctx.stroke();
+  // 業務名：1行に収まらなければ2行に折り返す（小さくなりすぎないように）
+  const koji = S.koji || pkg.project.short, kw = bw - labW - f1 * 0.6, kx = bx + labW + f1 * 0.3;
+  const wrap = f => { ctx.font = f + "px sans-serif"; const L = []; let s = "";
+    for(const ch of koji){ if(ctx.measureText(s + ch).width > kw && s){ L.push(s); s = ch; } else s += ch; } if(s) L.push(s); return L; };
+  let kf = f1, L = wrap(kf);
+  while(kf > 6 && (L.length > 2 || L.length * kf * 1.2 > rowH * 0.95)){ kf -= 0.5; L = wrap(kf); }
+  L.forEach((s, i) => ctx.fillText(s, kx, by + rowH / 2 + (i - (L.length - 1) / 2) * kf * 1.2));
+  ctx.textAlign = "center";
+  lines.forEach((s, i) => {
+    let f = lh * 0.72; ctx.font = "600 " + f + "px sans-serif";
+    while(f > 8 && ctx.measureText(s).width > bw * 0.92){ f -= 1; ctx.font = "600 " + f + "px sans-serif"; }
+    ctx.fillText(s, bx + bw / 2, by + rowH + W * 0.01 + lh * (i + 0.5));
+  });
+  ctx.textAlign = "left";
+}
+let shooting = false;
+$("camShutter").onclick = async ()=>{
+  if(shooting) return; shooting = true;
+  try{
+    const v = $("camVideo"), c = document.createElement("canvas");
+    if(cam.stream && v.videoWidth){
+      const vw = v.videoWidth, vh = v.videoHeight;
+      let cw, ch; if(vw / vh > CAM_AR){ ch = vh; cw = vh * CAM_AR; } else { cw = vw; ch = vw / CAM_AR; }
+      const dz = cam.hw ? 1 : cam.z; cw /= dz; ch /= dz;
+      const Hh = Math.min(1600, Math.round(ch)), Ww = Math.round(Hh * CAM_AR);
+      c.width = Ww; c.height = Hh;
+      c.getContext("2d").drawImage(v, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, Ww, Hh);
+    } else {
+      c.width = 960; c.height = 1280; const x = c.getContext("2d"); x.fillStyle = "#666"; x.fillRect(0, 0, 960, 1280);
+    }
+    drawBoard(c.getContext("2d"), c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.86));
+    const name = photoName(cam.no, cam.kind);
+    const old = photoMeta.find(m => m.name === name);
+    if(old){ await idbDel("photos", old.key); photoMeta = photoMeta.filter(m => m !== old); }
+    const key = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    await idbPut("photos", key, blob);
+    photoMeta.push({key, name, no: cam.no, kind: cam.kind, t: Date.now(), sent: false, cmt: cam.cmts.join("・")});
+    savePhotoMeta();
+    $("camFlash").style.opacity = "0.9"; setTimeout(()=> $("camFlash").style.opacity = "0", 120);
+    toast(name + " を保存しました");
+    if(cam.kind !== "S"){ const r = rec(selId); if(!r.st) r.st = "done"; touch(r); }
+    closeCam(); if(selId) renderPhotos();
+  } finally { shooting = false; }
+};
+$("phP").onclick = ()=> openCam("P");
+$("ph1").onclick = ()=> openCam("1");
+$("ph2").onclick = ()=> openCam("2");
+
+/* ================= ヘッダー ================= */
+const WX = ["晴", "曇", "雨"];
+function renderWx(){
+  const cur = S.wxDate === today() ? S.wx : "";
+  $("wx").innerHTML = WX.map(w => '<button class="hb' + (cur === w ? " on" : "") + '">' + w + "</button>").join("");
+  $("wx").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+    S.wx = b.textContent; S.wxDate = today(); saveS(); renderWx();
+    // 今日入力した樹木で天候が空欄のものにも入れる
+    let n = 0; Object.values(R.trees).forEach(r => { if(r.date === today() && !r.wx){ r.wx = S.wx; n++; } });
+    if(n){ saveR(); toast("今日の " + n + " 本に天候「" + S.wx + "」を入れました"); }
+  });
+}
+$("distSel").onchange = ()=>{ S.dist = $("distSel").value; saveS(); closeSheet(); fitView(); applyView(); updProg(); toast(S.dist + "の図面を表示しました"); };
+function updProg(){
+  if(!pkg){ $("prog").textContent = ""; return; }
+  let done = 0, tot = 0, need = 0, insp = 0, newP = 0;
+  for(const t of allTrees()){
+    const st = stateOf(t), r = recOf(t.id);
+    if(distOf(t) === S.dist){
+      if(!t.out || st) tot++;
+      if(st) done++;
+    }
+    if(st === "need") need++; if(st === "insp") insp++;
+    if(r.plate === "new" || t.added) newP++;
+  }
+  $("prog").innerHTML = S.dist + " 済 <b>" + done + "</b> / " + tot + " 本<br>点検 " + insp + "（残 " + need + "）　新しい札 " + newP;
+}
+$("search").addEventListener("change", ()=>{
+  const q = $("search").value.trim().replace(/[ー－―]/g, "-").toUpperCase(); if(!q || !pkg) return;
+  const ts = allTrees();
+  const hit = ts.find(t => noOf(t).toUpperCase() === q) || ts.find(t => (t.label || "") === q) ||
+              ts.find(t => distOf(t) === S.dist && noOf(t).toUpperCase().endsWith("-" + q)) || ts.find(t => noOf(t).toUpperCase().endsWith("-" + q)) ||
+              ts.find(t => noOf(t).replace(/^0+/, "").endsWith(q.replace(/^0+/, "")));
+  if(hit){ select(hit.id, true); $("search").blur(); $("search").value = ""; }
+  else toast(q + " は見つかりません");
+});
+$("fitBtn").onclick = ()=>{ fitView(); applyView(); };
+$("zinBtn").onclick = ()=>{ const v = viewSize(); zoomAt(v.w / 2, v.h / 2, 1.6); };
+$("zoutBtn").onclick = ()=>{ const v = viewSize(); zoomAt(v.w / 2, v.h / 2, 1 / 1.6); };
+new ResizeObserver(()=> scheduleMarks()).observe(view);
+
+/* ================= 現在地（平面直角座標 第VI系） ================= */
+function ll2xy(lat, lon){
+  const a = 6378137, F = 298.257222101, m0 = 0.9999, n = 1 / (2 * F - 1), rad = Math.PI / 180;
+  const phi = lat * rad, lam = lon * rad, phi0 = 36 * rad, lam0 = 136 * rad;
+  const A = [1 + n**2 / 4 + n**4 / 64, -1.5 * (n - n**3 / 8 - n**5 / 64), 15 / 16 * (n**2 - n**4 / 4), -35 / 48 * (n**3 - 5 / 16 * n**5), 315 / 512 * n**4, -693 / 1280 * n**5];
+  const al = [0, n / 2 - 2 / 3 * n**2 + 5 / 16 * n**3 + 41 / 180 * n**4 - 127 / 288 * n**5, 13 / 48 * n**2 - 3 / 5 * n**3 + 557 / 1440 * n**4 + 281 / 630 * n**5,
+              61 / 240 * n**3 - 103 / 140 * n**4 + 15061 / 26880 * n**5, 49561 / 161280 * n**4 - 179 / 168 * n**5, 34729 / 80640 * n**5];
+  const k = m0 * a / (1 + n), Ab = k * A[0];
+  let S0 = A[0] * phi0; for(let j = 1; j <= 5; j++) S0 += A[j] * Math.sin(2 * j * phi0); S0 *= k;
+  const sn = 2 * Math.sqrt(n) / (1 + n);
+  const t = Math.sinh(Math.atanh(Math.sin(phi)) - sn * Math.atanh(sn * Math.sin(phi))), tb = Math.sqrt(1 + t * t);
+  const lc = Math.cos(lam - lam0), ls = Math.sin(lam - lam0);
+  const xi = Math.atan(t / lc), eta = Math.atanh(ls / tb);
+  let x = xi, y = eta;
+  for(let j = 1; j <= 5; j++){ x += al[j] * Math.sin(2 * j * xi) * Math.cosh(2 * j * eta); y += al[j] * Math.cos(2 * j * xi) * Math.sinh(2 * j * eta); }
+  return {north: Ab * x - S0, east: Ab * y};
+}
+let gps = null, gpsWatch = null;
+/* GPS（平面直角座標 m）→ 図面の座標 m。図面が平面直角座標でなければ、木の所で合わせた点から
+   向き（2点以上・15m以上離れているとき）と位置を求める（縮尺は同じ m なので合わせない） */
+function calOf(d){ return (S.cal && S.cal[d]) || []; }
+function gpsToDwg(e, n, d){
+  const r = regionOf(d);
+  if(r.geo) return {x: e, y: n};
+  const c = calOf(d); if(!c.length) return null;
+  const me = c.reduce((a, q) => a + q.e, 0) / c.length, mn = c.reduce((a, q) => a + q.n, 0) / c.length;
+  const mx = c.reduce((a, q) => a + q.x, 0) / c.length, my = c.reduce((a, q) => a + q.y, 0) / c.length;
+  let th = 0, span = 0;
+  c.forEach(q => { span = Math.max(span, Math.hypot(q.e - me, q.n - mn)); });
+  if(c.length >= 2 && span >= 7.5){
+    let a = 0, b = 0;
+    c.forEach(q => { const ux = q.e - me, uy = q.n - mn, px = q.x - mx, py = q.y - my; a += ux * px + uy * py; b += ux * py - uy * px; });
+    th = Math.atan2(b, a);
+  }
+  const ux = e - me, uy = n - mn;
+  return {x: mx + ux * Math.cos(th) - uy * Math.sin(th), y: my + ux * Math.sin(th) + uy * Math.cos(th)};
+}
+function dwgToPx(x, y, d){ const r = regionOf(d), ppm = pkg.map.ppm; return {x: r.ox + (x - r.x0) * ppm, y: r.oy + (r.y1 - y) * ppm}; }
+function pxToDwg(x, y, d){ const r = regionOf(d), ppm = pkg.map.ppm; return {x: r.x0 + (x - r.ox) / ppm, y: r.y1 - (y - r.oy) / ppm}; }
+function gpsPx(){
+  if(!gps || !pkg) return null;
+  const w = gpsToDwg(gps.east, gps.north, S.dist);
+  return w ? dwgToPx(w.x, w.y, S.dist) : null;
+}
+function renderGps(){
+  const p = gpsPx();
+  if(!p){ $("gps").style.display = $("gpsAcc").style.display = "none"; return; }
+  const m = pkg.map;
+  const q = toScreen(p.x, p.y);
+  $("gps").style.display = ""; $("gps").style.transform = "translate(" + (q.x - 9) + "px," + (q.y - 9) + "px)";
+  const r = Math.max(10, gps.acc * m.ppm * V.s);
+  $("gpsAcc").style.display = ""; $("gpsAcc").style.width = $("gpsAcc").style.height = 2 * r + "px";
+  $("gpsAcc").style.transform = "translate(" + (q.x - r) + "px," + (q.y - r) + "px)";
+}
+$("calLink").onclick = e => {
+  e.preventDefault();
+  if(!gps){ toast("先に［現在地］を押してください"); return; }
+  if(gps.acc > 25 && !confirm("GPS の誤差が約 " + Math.round(gps.acc) + "m あります。それでも合わせますか？（空が開けた所の方が正確です）")) return;
+  const t = treeById(selId), d = distOf(t), pp = posOf(t), w = pxToDwg(pp.x, pp.y, d);
+  S.cal = S.cal || {};
+  S.cal[d] = calOf(d).concat({e: gps.east, n: gps.north, x: w.x, y: w.y, acc: Math.round(gps.acc), no: noOf(t)}).slice(-10);
+  saveS(); renderGps();
+  const n = S.cal[d].length;
+  toast("現在地合わせ " + n + " 点目（" + noOf(t) + "）。" + (n === 1 ? "20m 以上離れた木でもう1点合わせると向きも合います" : "合わせる点が多いほど正確になります"));
+};
+$("calClr").onclick = ()=>{
+  if(!calOf(S.dist).length){ toast(S.dist + "は現在地合わせをしていません"); return; }
+  if(!confirm(S.dist + "の現在地合わせ（" + calOf(S.dist).length + "点）を消しますか？")) return;
+  delete S.cal[S.dist]; saveS(); renderGps(); $("menuM").classList.remove("show"); toast("消しました");
+};
+$("gpsBtn").onclick = ()=>{
+  if(!navigator.geolocation){ toast("位置情報を使えません"); return; }
+  if(gpsWatch != null){ navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; gps = null; $("gpsBtn").classList.remove("on"); renderGps(); return; }
+  $("gpsBtn").classList.add("on");
+  let first = true;
+  gpsWatch = navigator.geolocation.watchPosition(pos => {
+    const c = ll2xy(pos.coords.latitude, pos.coords.longitude);
+    gps = {east: c.east, north: c.north, acc: pos.coords.accuracy};
+    if(first && pkg){
+      first = false;
+      const p = gpsPx();
+      if(p){ centerOn(p, 0.8); toast("現在地（誤差 約" + Math.round(pos.coords.accuracy) + "m）"); }
+      else toast("この地区の図面は GPS の座標と違うので「現在地合わせ」が要ります。番号の分かる木の所で木を選び、［この木の所にいる］を押してください");
+      if(selId) renderSheet();
+    }
+    renderGps();
+  }, err => { toast("現在地を取れません：" + err.message); }, {enableHighAccuracy: true, maximumAge: 5000, timeout: 20000});
+};
+
+/* ================= 一覧 ================= */
+let lFilter = "all";
+const FILTERS = [["all", "すべて"], ["none", "未調査"], ["done", "調査済"], ["need", "要点検（未入力）"], ["insp", "点検済"], ["kin", "緊急対応"], ["gone", "消失・対象外"], ["new", "新木・番号変更"], ["nophoto", "写真不足"]];
+function photoLack(t){
+  const r = recOf(t.id), ps = photosOf(noOf(t));
+  if((r.plate === "new" || t.added || r.tenken) && !ps.some(m => m.kind === "P")) return true;
+  if(r.tenken && !ps.some(m => m.kind === "1")) return true;
+  return false;
+}
+function renderList(){
+  $("lFilters").innerHTML = FILTERS.map(([k, v]) => '<button data-f="' + k + '" class="' + (k === lFilter ? "on" : "") + '">' + v + "</button>").join("");
+  $("lFilters").querySelectorAll("button").forEach(b => b.onclick = ()=>{ lFilter = b.dataset.f; renderList(); });
+  const ts = allTrees().filter(t => {
+    const st = stateOf(t), r = recOf(t.id);
+    switch(lFilter){
+      case "none": return !st; case "done": return st === "done"; case "need": return st === "need"; case "insp": return st === "insp";
+      case "kin": return !!r.kin; case "gone": return st === "gone" || st === "skip";
+      case "new": return t.added || !!R.renamed[t.id]; case "nophoto": return !!st && photoLack(t);
+      default: return true;
+    }
+  }).sort((a, b) => (recOf(b.id).t || 0) - (recOf(a.id).t || 0));
+  let h = "<tr><th>番号</th><th>地区</th><th>状態</th><th>樹種</th><th>樹高</th><th>幹周</th><th>要点検</th><th>点検結果</th><th>処置</th><th>写真</th><th>日付</th></tr>";
+  const ST = {"": "未調査", done: "調査済", need: "要点検", insp: "点検済", gone: "消失・倒木", skip: "対象外"};
+  ts.slice(0, 800).forEach(t => {
+    const r = recOf(t.id), st = stateOf(t), g = girthOf(r.c);
+    const kan = r.kanri ? [["senS", "剪定推薦"], ["sen", "要剪定"], ["basS", "伐採推薦"], ["bas", "要伐採"]].filter(x => r.kanri[x[0]]).map(x => x[1]).join("・") : "";
+    h += '<tr data-id="' + esc(t.id) + '" class="' + (st || "") + '"><td><b>' + esc(noOf(t) || "番号なし") + "</b></td><td>" + esc(distOf(t)) +
+      "</td><td>" + ST[st] + (r.kin ? ' <b style="color:var(--ng)">緊急</b>' : "") + "</td><td>" + esc(r.sp || (t.past && t.past.sp) || "") +
+      '</td><td class="n">' + esc(r.h || "") + '</td><td class="n">' + (g.c != null ? g.c : "") + "</td><td>" + (r.tenken ? "●" : "") +
+      "</td><td>" + (r.tenken && tkDone(r) ? esc(tkResult(r).txt) : "") + "</td><td>" + esc(kan) + "</td><td>" + photosOf(noOf(t)).length + (st && photoLack(t) ? ' <b style="color:var(--ng)">不足</b>' : "") +
+      "</td><td>" + esc(r.date || "") + "</td></tr>";
+  });
+  if(ts.length > 800) h += '<tr><td colspan="11">ほか ' + (ts.length - 800) + ' 本</td></tr>';
+  $("lTbl").innerHTML = h;
+  $("lTbl").querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = ()=>{ $("listM").classList.remove("show"); select(tr.dataset.id, true); });
+}
+$("listBtn").onclick = ()=>{ if(!pkg) return; renderList(); $("listM").classList.add("show"); };
+
+/* ================= 集計 ================= */
+function openSum(){
+  const by = {};
+  pkg.project.districts.forEach(d => by[d] = {done: 0, gone: 0, skip: 0, tenken: 0, insp: 0, kin: 0, plate: 0, add: 0, sen: 0, bas: 0, res: {}});
+  for(const t of allTrees()){
+    const r = recOf(t.id), st = stateOf(t); if(!st) continue;
+    const dn = distOf(t);
+    const d = by[dn] || (by[dn] = {done: 0, gone: 0, skip: 0, tenken: 0, insp: 0, kin: 0, plate: 0, add: 0, sen: 0, bas: 0, res: {}});
+    if(st === "gone") d.gone++; else if(st === "skip") d.skip++; else d.done++;
+    if(r.tenken) d.tenken++; if(st === "insp"){ d.insp++; const x = tkResult(r).txt; d.res[x] = (d.res[x] || 0) + 1; }
+    if(r.kin) d.kin++; if(r.plate === "new" || t.added) d.plate++; if(t.added) d.add++;
+    if(r.kanri && (r.kanri.sen || r.kanri.senS)) d.sen++; if(r.kanri && (r.kanri.bas || r.kanri.basS)) d.bas++;
+  }
+  let tot = {done: 0, tenken: 0, insp: 0, plate: 0};
+  let h = "";
+  Object.entries(by).forEach(([name, d]) => {
+    tot.done += d.done; tot.tenken += d.tenken; tot.insp += d.insp; tot.plate += d.plate;
+    h += '<div class="card"><h3>' + esc(name) + "</h3>" +
+      '<div class="big">毎木調査 ' + d.done + " 本</div>" +
+      '<p class="note">消失・倒木 ' + d.gone + "　対象外 " + d.skip + "　新木 " + d.add + "　新しい札 " + d.plate + "<br>" +
+      "要樹木点検 " + d.tenken + "（点検済 " + d.insp + "）　緊急対応 " + d.kin + "　剪定 " + d.sen + "　伐採 " + d.bas + "<br>" +
+      Object.entries(d.res).map(([k, v]) => esc(k) + " " + v).join("　") + "</p></div>";
+  });
+  h = '<div class="card"><h3>全体（設計数量との比較）</h3>' +
+      '<div class="big">毎木 ' + tot.done + ' 本　／　点検 ' + tot.insp + " 本（要点検 " + tot.tenken + "）</div>" +
+      '<p class="note">設計：毎木調査 3.87ha（510本/haで約1,974本）・樹木点検 217本（57本/ha）・樹木番号札 130枚/ha（約503枚）<br>' +
+      "新しい札 " + tot.plate + " 枚。樹木点検の本数が変わる場合は設計変更の対象です（特記仕様書 第10条）。</p></div>" + h;
+  $("sumBody").innerHTML = h;
+  $("sumM").classList.add("show");
+}
+$("sumBtn").onclick = ()=>{ if(pkg) openSum(); };
+
+/* ================= メニュー・書き出し ================= */
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = ()=> b.closest(".modal").classList.remove("show"));
+$("menuBtn").onclick = ()=>{
+  $("setInsp").value = S.insp || ""; $("setKoji").value = S.koji || (pkg ? pkg.project.short : ""); $("setNext").value = S.nextNo || 1;
+  const unsent = photoMeta.filter(m => !m.sent).length;
+  $("bkInfo").innerHTML = "写真 " + photoMeta.length + " 枚（未送信 " + unsent + " 枚）。" + (S.lastBk ? "前回の書き出し：" + esc(S.lastBk) : "まだ書き出していません") +
+    "<br>書き出したファイルを AirDrop・OneDrive などで事務所PCへ送り、システムの［iPadの結果を取り込む］で読み込みます。";
+  if(opt.range == null) opt.range = true;
+  $("optTags").innerHTML = '<button class="' + (opt.tags ? "on" : "") + '" data-o="tags">番号を表示</button>' +
+    '<button class="' + (opt.range ? "on" : "") + '" data-o="range">調査範囲を表示</button>';
+  $("optTags").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+    opt[b.dataset.o] = !opt[b.dataset.o]; lsSet("nagano_opt", opt); b.classList.toggle("on");
+    $("rng").style.display = opt.range === false ? "none" : ""; scheduleMarks();
+  });
+  $("calInfo").innerHTML = pkg ? "現在地合わせ：" + regions().filter(r => r.district).map(r => esc(r.district) + " " + (r.geo ? "不要" : calOf(r.district).length + "点")).join("　") +
+    "<br>GPS の点が図面に出ない・ずれるときは、番号の分かる木の所で木を選び、［この木の所にいる］を押します（2点以上・20m以上離すと向きも合います）。" : "";
+  $("verInfo").textContent = "画面 v" + APP_VER + (pkg ? "　図面データ " + pkg.created + "（樹木 " + pkg.trees.length + " 本）" : "");
+  $("menuM").classList.add("show");
+};
+$("setInsp").onchange = ()=>{ S.insp = $("setInsp").value.trim(); saveS(); };
+$("setKoji").onchange = ()=>{ S.koji = $("setKoji").value.trim(); saveS(); };
+$("setNext").onchange = ()=>{ S.nextNo = Math.max(1, parseInt($("setNext").value) || 1); saveS(); };
+$("impBtn").onclick = ()=> $("impFile").click();
+$("impFile").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if(f) importPkg(f); };
+async function share(blob, name){
+  const file = new File([blob], name, {type: blob.type});
+  if(navigator.canShare && navigator.canShare({files: [file]})){ try{ await navigator.share({files: [file], title: name}); return true; }catch(e){ return false; } }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  return true;
+}
+function stampName(){ const d = new Date(); return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + "_" + pad2(d.getHours()) + pad2(d.getMinutes()); }
+$("bkBtn").onclick = async ()=>{
+  const out = {type: "nagano-res", version: 1, exported: new Date().toISOString(), pkg: pkg ? pkg.id : "", settings: S, res: R,
+               photos: photoMeta.map(m => ({name: m.name, no: m.no, kind: m.kind, t: m.t, cmt: m.cmt || ""}))};
+  const blob = new Blob([JSON.stringify(out)], {type: "application/json"});
+  if(await share(blob, "長野公園_調査結果_" + stampName() + ".json")){ S.lastBk = new Date().toLocaleString("ja-JP"); saveS(); toast("書き出しました"); }
+};
+/* 無圧縮ZIP */
+const CRC_T = (()=>{ const t = new Uint32Array(256); for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c; } return t; })();
+const crc32 = d => { let c = 0xFFFFFFFF; for(let i = 0; i < d.length; i++) c = CRC_T[(c ^ d[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+async function makeZip(files){
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  for(const f of files){
+    const data = new Uint8Array(await f.blob.arrayBuffer()), nb = enc.encode(f.name), crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+    lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, nb.length, true);
+    parts.push(lh.buffer, nb, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+    ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, nb.length, true); ch.setUint32(42, off, true);
+    central.push(ch.buffer, nb);
+    off += 30 + nb.length + data.length;
+  }
+  const cs = central.reduce((s, b) => s + b.byteLength, 0), end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, cs, true); end.setUint32(16, off, true);
+  return new Blob([...parts, ...central, end.buffer], {type: "application/zip"});
+}
+async function exportPhotos(all){
+  const list = photoMeta.filter(m => all || !m.sent).sort((a, b) => a.name < b.name ? -1 : 1);
+  if(!list.length){ toast("書き出す写真はありません"); return; }
+  const CH = 60, n = Math.ceil(list.length / CH), st = stampName();
+  for(let i = 0; i < n; i++){
+    busy("写真をまとめています… " + (i + 1) + "/" + n);
+    const part = list.slice(i * CH, (i + 1) * CH), files = [];
+    for(const m of part){ const b = await idbGet("photos", m.key); if(b) files.push({name: m.name, blob: b}); }
+    const zip = await makeZip(files);
+    busy(false);
+    const ok = await share(zip, "長野公園_写真_" + st + (n > 1 ? "_" + (i + 1) : "") + ".zip");
+    if(ok){ part.forEach(m => m.sent = true); savePhotoMeta(); }
+    else { toast("中止しました"); return; }
+  }
+  toast(list.length + " 枚を書き出しました");
+}
+$("zipBtn").onclick = ()=> exportPhotos(false);
+$("zipAllBtn").onclick = ()=> exportPhotos(true);
+$("rsBtn").onclick = ()=> $("rsFile").click();
+$("rsFile").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if(!f) return;
+  try{
+    const j = JSON.parse(await f.text());
+    if(j.type !== "nagano-res") throw new Error("調査結果のファイルではありません");
+    if(!confirm("このファイルの内容で、iPadの調査結果を置き換えますか？（写真はそのまま）")) return;
+    R = j.res; saveR(); reindex(); renderAll(); toast("読み戻しました");
+  }catch(err){ alert("読み込めませんでした：" + err.message); }
+};
+$("wipeBtn").onclick = async ()=>{
+  if(!confirm("入力した調査結果と写真をすべて消します（図面データは残ります）。\n本番の調査を始める前の、練習の後片付け用です。")) return;
+  if(!confirm("本当に消しますか？（元に戻せません。本番のデータなら先に「調査結果を書き出す」をしてください）")) return;
+  R = {trees: {}, added: [], moved: {}, renamed: {}, t: 0}; saveR();
+  await idb("photos", "readwrite", st => st.clear()); photoMeta = []; savePhotoMeta();
+  S.nextNo = (pkg && pkg.project.next_no) || 1; saveS();
+  reindex(); closeSheet(); renderAll(); $("menuM").classList.remove("show"); toast("消しました");
+};
+$("updBtn").onclick = async ()=>{
+  if(!confirm("アプリを最新版に更新します（入力した結果・写真・図面は消えません）")) return;
+  try{ const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith("nagano-")).map(k => caches.delete(k)));
+       const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister())); }catch(e){}
+  location.reload();
+};
+
+function busy(msg){ if(msg === false){ $("busy").style.display = "none"; return; } $("busyMsg").textContent = msg; $("busy").style.display = "flex"; }
+let toastT = 0;
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(()=> t.classList.remove("show"), 2600); }
+function renderAll(){ renderWx(); updProg(); scheduleMarks(); if(selId) renderSheet(); }
+
+(async ()=>{
+  if("serviceWorker" in navigator){ try{ await navigator.serviceWorker.register("sw.js"); }catch(e){} }
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+  await loadPhotoMeta();
+  renderWx();
+  await openPkg();
+  // 確認用：?pkg=ファイルのURL で図面データを読み込む（事務所PCでの動作確認に使う）
+  const qp = new URLSearchParams(location.search).get("pkg");
+  if(qp && !pkg){ try{ const b = await (await fetch(qp)).blob(); await importPkg(new File([b], "pkg.json")); }catch(e){ toast("読めません：" + e.message); } }
+})();
+</script>
+</body>
+</html>
