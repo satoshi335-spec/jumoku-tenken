@@ -66,6 +66,18 @@ header select{font-size:15px;padding:7px 6px;border-radius:8px;border:none;backg
 .spok button.on{background:var(--g);color:#fff}
 .spok span{font-size:12px;color:var(--tx2)}
 .tagx{color:var(--warn);font-weight:700}
+.phase{display:flex;gap:2px;background:rgba(255,255,255,.18);border-radius:9px;padding:2px}
+.phase button{border:none;background:transparent;color:#fff;font-size:14px;padding:7px 10px;border-radius:7px;font-weight:700;min-height:36px}
+.phase button.on{background:#fff;color:var(--g)}
+body.ph-t header{background:var(--pur)}
+body.ph-t .phase button.on{color:var(--pur)}
+body.ph-t .mk.dim{opacity:.22}
+body.ph-t #mmBox{display:none}
+body.ph-t.mmOpen #mmBox{display:block}
+#mmTgl{display:none;margin-top:12px;font-size:13px;color:var(--acc);text-decoration:underline}
+body.ph-t #mmTgl{display:block}
+#tkMsg{margin:8px 0 0}
+#tkMsg:empty{display:none}
 .mk.sel{border-width:4px;border-color:#FF2D55!important;box-shadow:0 0 0 5px rgba(255,45,85,.3)}
 .tag{position:absolute;left:0;top:0;font-size:11px;font-weight:700;padding:0 3px;border-radius:4px;background:rgba(255,255,255,.88);color:#223;white-space:nowrap}
 .tag.n{color:var(--acc)}
@@ -201,6 +213,7 @@ tr.need td{background:var(--pur-bg)}
 <body>
 <header>
   <span class="t">長野公園</span>
+  <div class="phase" id="phase"><button data-v="m">毎木調査</button><button data-v="t">樹木点検</button></div>
   <select id="distSel" aria-label="地区"></select>
   <div id="wx"></div>
   <input id="search" inputmode="numeric" placeholder="番号検索" autocomplete="off">
@@ -237,6 +250,8 @@ tr.need td{background:var(--pur-bg)}
     </div>
     <div class="info" id="sInfo"></div>
 
+    <a href="#" id="mmTgl">毎木調査の入力を見る・直す</a>
+    <div id="mmBox">
     <div class="seg st" id="stSeg">
       <button data-v="done">調査済</button><button data-v="gone">消失・倒木</button><button data-v="skip">対象外</button>
     </div>
@@ -288,6 +303,8 @@ tr.need td{background:var(--pur-bg)}
     <div class="lbl">原因・欠陥等の内容・処置等</div>
     <div class="chips" id="genChips"></div>
     <input class="inp" id="gennin" placeholder="例）根元法面の流亡あり" style="margin-top:5px">
+    </div>
+    <p class="note" id="tkMsg"></p>
 
 
     <div id="tkBox" class="tk" style="display:none">
@@ -299,6 +316,7 @@ tr.need td{background:var(--pur-bg)}
       <div class="tkres" id="tkRes" style="margin-top:6px"></div>
     </div>
 
+    <div id="phBox">
     <div class="lbl">写真 <span class="r" id="phHint"></span></div>
     <div class="photos">
       <button class="pb" id="phP">📷 プレート</button>
@@ -306,6 +324,7 @@ tr.need td{background:var(--pur-bg)}
       <button class="pb" id="ph2">📷 被害部</button>
     </div>
     <div class="thumbs" id="thumbs"></div>
+    </div>
 
     <div class="lbl">メモ</div>
     <input class="inp" id="memo" placeholder="自由記入（台帳の備考に入ります）">
@@ -410,7 +429,7 @@ tr.need td{background:var(--pur-bg)}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 4;
+const APP_VER = 5;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -683,7 +702,7 @@ function renderMarks(){
     if(q.x < -30 || q.y < -30 || q.x > vs.w + 30 || q.y > vs.h + 30) continue;
     const st = stateOf(t), r = recOf(t.id);
     const cls = "mk " + (st || (t.gone ? "pg" : t.src === "circle" ? "circ" : t.src === "label" ? "lbl" : "")) +
-                (t.added || R.renamed[t.id] ? " new" : "") + (r.kin ? " kin" : "") + (t.out && !st ? " out" : "") + (t.id === selId ? " sel" : "");
+                (t.added || R.renamed[t.id] ? " new" : "") + (r.kin ? " kin" : "") + (t.out && !st ? " out" : "") + (S.phase === "t" && !r.tenken ? " dim" : "") + (t.id === selId ? " sel" : "");
     const dd = t.id === selId ? d + 8 : d;
     h += '<div class="' + cls + '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
     if(showTag){
@@ -955,6 +974,11 @@ function renderSheet(){
     : (t.added ? "新しく追加した樹木です。" : t.src === "circle" ? "図面に番号がありません。札が付いていれば［違う番号が付いている］で札の番号を、無ければ［無い → 新しい札］。" : "過去の台帳に記録がありません。");
   if(t.marks) info += "<br>前回の図面：" + esc(t.marks.join("・"));
   if(t.gone) info += '<br><b style="color:var(--ng)">前回の図面では伐採済み・消失（×）</b>　木が無ければ［消失・倒木］';
+  if(S.phase === "t" && r.st){
+    const g = girthOf(r.c);
+    info += '<br><b style="color:var(--pur)">毎木 ' + esc(r.date || "") + "</b>　" + esc(r.sp || (p && p.sp) || "") + "　H " + esc(r.h || "—") + "m　C " + (g.c != null ? g.c : "—") + "cm" +
+      (r.kareNote ? "　枯れ・折れ：" + esc(r.kareNote) : "") + (r.shiNote ? "　支障：" + esc(r.shiNote) : "") + (r.gennin ? "　" + esc(r.gennin) : "");
+  }
   $("sInfo").innerHTML = info;
   segSet("stSeg", r.st || "");
   // ① プレート
@@ -1087,13 +1111,13 @@ function undoNew(t, r){
 function autoTenken(r){
   if(r.tenken || r.tkOff) return;
   r.tenken = true;
-  toast("枯れ・折れ等ありのため「要樹木点検」にしました（違えば外してください）");
+  toast("枯れ・折れ等ありのため「要樹木点検」（点検の候補）にしました。違えば外してください");
 }
 $("shiNote").addEventListener("input", ()=>{ const r = rec(selId); r.shiNote = $("shiNote").value; touch(r); });
 $("kareNote").addEventListener("input", ()=>{ const r = rec(selId); r.kareNote = $("kareNote").value; touch(r); });
 $("gennin").addEventListener("input", ()=>{ const r = rec(selId); r.gennin = $("gennin").value; touch(r); });
 $("memo").addEventListener("input", ()=>{ const r = rec(selId); r.memo = $("memo").value; touch(r); });
-$("tkTg").onclick = ()=>{ const r = rec(selId); r.tenken = !r.tenken; if(!r.tenken) r.tkOff = true; if(!r.st) r.st = "done"; touch(r); renderSheet(); if(r.tenken) setTimeout(()=> $("tkBox").scrollIntoView({behavior: "smooth", block: "nearest"}), 50); };
+$("tkTg").onclick = ()=>{ const r = rec(selId); r.tenken = !r.tenken; if(!r.tenken) r.tkOff = true; if(!r.st) r.st = "done"; touch(r); renderSheet(); if(r.tenken && S.phase === "t") setTimeout(()=> $("tkBox").scrollIntoView({behavior: "smooth", block: "nearest"}), 50); };
 $("kinTg").onclick = ()=>{ const r = rec(selId); r.kin = !r.kin; if(r.kin) r.tenken = true; if(!r.st) r.st = "done"; touch(r); renderSheet(); if(r.kin) toast("緊急対応：写真を撮って、監督職員へ速やかに報告してください"); };
 $("kanri").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   const r = rec(selId); r.kanri = r.kanri || {}; r.kanri[b.dataset.v] = !r.kanri[b.dataset.v]; if(!r.st) r.st = "done"; touch(r); renderSheet();
@@ -1109,8 +1133,12 @@ function tkResult(r){
 }
 function renderTenken(){
   const r = recOf(selId);
-  $("tkBox").style.display = r.tenken ? "" : "none";
-  if(!r.tenken) return;
+  const ph = S.phase === "t";
+  $("tkMsg").innerHTML = !ph && r.tenken ? "要点検（樹木点検の候補）です。樹木点検は監督職員に報告したあと、上の［樹木点検］に切り替えて入力します。" +
+      (r.kin ? "" : "写真は樹木点検のときに撮ります。") :
+    ph && !r.tenken ? "この木は要点検ではありません。点検する場合は［毎木調査の入力を見る・直す］→［要樹木点検］。" : "";
+  $("tkBox").style.display = r.tenken && ph ? "" : "none";
+  if(!r.tenken || !ph) return;
   const items = new Set((r.tk && r.tk.items) || []);
   let h = "", g0 = "";
   const GN = {"①": "①維持管理上の問題", "②": "②活力点検", "③": "③樹木の異常"};
@@ -1142,11 +1170,13 @@ function goNearest(){
   const p0 = posOf(t0);
   let best = null, bd = Infinity;
   for(const t of allTrees()){
-    if(t.id === selId || stateOf(t)) continue;
+    if(t.id === selId) continue;
+    if(S.phase === "t"){ const rr = recOf(t.id); if(!rr.tenken || tkDone(rr)) continue; }
+    else if(stateOf(t)) continue;
     const p = posOf(t), d = Math.hypot(p.x - p0.x, p.y - p0.y) * (t.out ? 3 : 1);   // 範囲の外の木は後回し
     if(d < bd){ bd = d; best = t; }
   }
-  if(!best){ toast("未調査の樹木はありません"); return; }
+  if(!best){ toast(S.phase === "t" ? "未点検の要点検の木はありません" : "未調査の樹木はありません"); return; }
   navHist.push(selId);
   select(best.id, true);
 }
@@ -1197,9 +1227,12 @@ function renderPhotos(){
   $("ph2").classList.toggle("done", n2 > 0); $("ph2").textContent = "📷 被害部" + (n2 ? "（" + n2 + "枚）" : "");
   const need = [];
   // 新しい札を付けた木と、点検表を作る木（R7 の点検表は「樹木プレート」の写真が入る）はプレートの写真が要る
-  if((r.plate === "new" || t.added || r.tenken) && !has("P")) need.push("プレート");
-  if(r.tenken && !has("1")) need.push("全景");
-  if(r.tenken && tkResult(r).n23 + tkResult(r).n1 > 0 && !n2) need.push("被害部");
+  if(r.kin && !has("1") && !n2) need.push("緊急対応（全景か被害部）");
+  if(S.phase === "t" && r.tenken){
+    if(!has("P")) need.push("プレート");
+    if(!has("1")) need.push("全景");
+    if(tkResult(r).n23 + tkResult(r).n1 > 0 && !n2) need.push("被害部");
+  }
   $("phHint").innerHTML = need.length ? '<span style="color:var(--ng);font-weight:700">未撮影：' + need.join("・") + "</span>" : (ps.length ? ps.length + "枚" : "");
   // 見本の画像は写真が変わったときだけ作り直す（入力のたびに作り直すとメモリがたまって落ちる）
   const tk = selId + "|" + ps.map(m => m.key + (m.gone ? "g" : "")).join(",");
@@ -1348,6 +1381,28 @@ $("phP").onclick = ()=> openCam("P");
 $("ph1").onclick = ()=> openCam("1");
 $("ph2").onclick = ()=> openCam("2");
 
+/* ================= 工程（毎木調査 → 要点検を監督職員に報告 → 樹木点検） =================
+   毎木調査：写真は緊急対応の木だけ。枯れ・折れ等から「要点検」（樹木点検の候補）を選ぶ
+   樹木点検：要点検の木だけを回り、点検項目と写真（プレート・全景・被害部）を入れる */
+function applyPhase(){
+  const t = S.phase === "t";
+  document.body.classList.toggle("ph-t", t);
+  if(!t) document.body.classList.remove("mmOpen");
+  $("phase").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === (t ? "t" : "m")));
+  // 樹木点検では「点検 → 写真 → 毎木の入力（畳む）」の順に並べる
+  if(t){ $("phBox").after($("mmTgl")); $("mmTgl").after($("mmBox")); $("tkBox").before($("tkMsg")); }
+  else { $("tkBox").before($("mmTgl")); $("tkBox").before($("mmBox")); $("tkBox").before($("tkMsg")); }
+  $("nextTree").textContent = t ? "近くの未点検へ ▶" : "近くの未調査へ ▶";
+  renderAll();
+}
+$("phase").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+  const v = b.dataset.v === "t" ? "t" : "m";
+  if((S.phase || "m") === v) return;
+  S.phase = v; saveS(); applyPhase();
+  toast(v === "t" ? "樹木点検：要点検の木だけを回ります（ほかの木は薄く表示）" : "毎木調査に戻しました");
+});
+$("mmTgl").onclick = e => { e.preventDefault(); document.body.classList.toggle("mmOpen"); };
+
 /* ================= ヘッダー ================= */
 const WX = ["晴", "曇", "雨"];
 function renderWx(){
@@ -1373,7 +1428,8 @@ function updProg(){
     if(st === "need") need++; if(st === "insp") insp++;
     if(r.plate === "new" || t.added) newP++;
   }
-  $("prog").innerHTML = S.dist + " 済 <b>" + done + "</b> / " + tot + " 本<br>点検 " + insp + "（残 " + need + "）　新しい札 " + newP;
+  $("prog").innerHTML = S.phase === "t" ? "樹木点検 済 <b>" + insp + "</b> / 要点検 " + (insp + need) + " 本<br>（2地区の合計）"
+    : S.dist + " 済 <b>" + done + "</b> / " + tot + " 本<br>要点検 " + (insp + need) + "　新しい札 " + newP;
 }
 $("search").addEventListener("change", ()=>{
   const q = $("search").value.trim().replace(/[ー－―]/g, "-").toUpperCase(); if(!q || !pkg) return;
@@ -1482,9 +1538,12 @@ $("gpsBtn").onclick = ()=>{
 let lFilter = "all";
 const FILTERS = [["all", "すべて"], ["none", "未調査"], ["done", "調査済"], ["need", "要点検（未入力）"], ["insp", "点検済"], ["kin", "緊急対応"], ["gone", "消失・対象外"], ["new", "新木・番号変更"], ["nophoto", "写真不足"]];
 function photoLack(t){
-  const r = recOf(t.id), ps = photosOf(noOf(t));
-  if((r.plate === "new" || t.added || r.tenken) && !ps.some(m => m.kind === "P")) return true;
-  if(r.tenken && !ps.some(m => m.kind === "1")) return true;
+  const r = recOf(t.id), ps = photosOf(noOf(t)), has = k => ps.some(m => m.kind === k);
+  if(r.kin && !has("1") && !has("2")) return true;                        // 緊急対応：報告の写真
+  if(r.tenken && tkDone(r)){                                                // 樹木点検：点検表の写真
+    if(!has("P") || !has("1")) return true;
+    if(tkResult(r).n1 + tkResult(r).n23 > 0 && !has("2")) return true;
+  }
   return false;
 }
 function renderList(){
@@ -1668,6 +1727,7 @@ function renderAll(){ renderWx(); updProg(); scheduleMarks(); if(selId) renderSh
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   await loadRes();
   await loadPhotoMeta();
+  applyPhase();
   renderWx();
   await openPkg();
   // 確認用：?pkg=ファイルのURL で図面データを読み込む（事務所PCでの動作確認に使う）
