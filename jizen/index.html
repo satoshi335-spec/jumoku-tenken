@@ -313,7 +313,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 5;   // このファイルを直したら1つ増やす
+const APP_VER = 6;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -637,7 +637,10 @@ function vpos(e){ const r = view.getBoundingClientRect(); return {x: e.clientX -
 view.addEventListener("pointerdown", e => {
   if(e.target.closest("#tools,#nopos,#pinBar,#nodraw,#legend")) return;
   if(!pkg || dwKey.startsWith("nodraw|")) return;
-  view.setPointerCapture(e.pointerId);
+  // 最初の指が触れたときは、前の操作で離した通知が届かず残った指を消す
+  // （残っていると1本指でも2本指と見なされ、移動が拡大縮小になってしまう）
+  if(e.isPrimary) ptrs.clear();
+  try{ view.setPointerCapture(e.pointerId); }catch(_){}
   ptrs.set(e.pointerId, vpos(e));
   if(ptrs.size === 1){
     const p = vpos(e);
@@ -692,6 +695,16 @@ function ptrEnd(e){
 }
 view.addEventListener("pointerup", ptrEnd);
 view.addEventListener("pointercancel", ptrEnd);
+view.addEventListener("lostpointercapture", ptrEnd);
+// 画面から指が全部離れたら、残っている指の記録を消す（iPadで離した通知が抜けることがあるため）
+// （指を離した通常の処理が先に済むよう、少し待ってから）
+let touchCount = 0;
+["touchstart", "touchend", "touchcancel"].forEach(type => document.addEventListener(type, e => {
+  touchCount = e.touches.length;
+  if(type !== "touchstart" && touchCount === 0){
+    setTimeout(() => { if(touchCount === 0 && ptrs.size){ ptrs.clear(); gest = null; clearTimeout(lpTimer); } }, 120);
+  }
+}, {capture: true, passive: true}));
 view.addEventListener("wheel", e => {
   if(!pkg || dwKey.startsWith("nodraw|")) return;
   e.preventDefault();
