@@ -92,6 +92,22 @@ body.ph-t #mmTgl{display:block}
 #legend i:first-child{margin-left:0}
 #hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:var(--acc);color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;display:none;gap:10px;align-items:center;z-index:5}
 #hint button{background:#fff;color:var(--acc);border:none;border-radius:7px;padding:5px 10px;font-size:13px}
+#nudge{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:rgba(255,255,255,.97);border:2px solid var(--acc);
+  border-radius:14px;padding:8px 10px;display:none;z-index:6;box-shadow:0 4px 16px rgba(0,0,0,.18);touch-action:none}
+#nudge.show{display:block}
+#nudge .nt{font-size:13px;font-weight:700;color:var(--acc);text-align:center;margin-bottom:4px;white-space:nowrap}
+#nudge .nb{display:flex;gap:10px;align-items:center}
+#nudge .ar{display:grid;grid-template-columns:repeat(3,50px);grid-template-rows:repeat(3,44px);gap:4px}
+#nudge .ar button{border:1px solid var(--line);border-radius:10px;background:#fff;font-size:22px;color:var(--tx)}
+#nudge .ar button:active{background:var(--acc-bg)}
+#nudge .ar .c{font-size:11px;color:var(--tx2);background:#F3F3EE}
+#nudge .side{display:flex;flex-direction:column;gap:5px}
+#nudge .stp{display:flex;gap:3px}
+#nudge .stp button{font-size:13px;padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:#fff}
+#nudge .stp button.on{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:700}
+#nudge .side>button{min-height:40px;border-radius:9px;font-size:14px;font-weight:700;border:1px solid var(--line);background:#fff}
+#nudge .side>button.ok{background:var(--acc);border-color:var(--acc);color:#fff}
+#nudge .off{font-size:12px;color:var(--tx2);text-align:center;margin-top:4px;white-space:nowrap}
 #empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--tx2);font-size:15px;line-height:1.9}
 
 #sheet{background:var(--card);border-top:1px solid var(--line);max-height:55vh;overflow:auto;display:none;padding:8px 12px calc(env(safe-area-inset-bottom) + 12px);-webkit-overflow-scrolling:touch}
@@ -237,6 +253,22 @@ tr.need td{background:var(--pur-bg)}
       <button class="tb" id="zoutBtn">－</button>
     </div>
     <div id="hint"><span id="hintMsg"></span><button id="hintCancel">やめる</button></div>
+    <div id="nudge">
+      <div class="nt" id="nTitle"></div>
+      <div class="nb">
+        <div class="ar">
+          <span></span><button data-d="0,-1">▲</button><span></span>
+          <button data-d="-1,0">◀</button><button class="c" id="nOrig">図面の<br>位置</button><button data-d="1,0">▶</button>
+          <span></span><button data-d="0,1">▼</button><span></span>
+        </div>
+        <div class="side">
+          <div class="stp" id="nStep"><button data-s="0.5">0.5m</button><button data-s="1">1m</button><button data-s="2">2m</button></div>
+          <button class="ok" id="nOk">決定</button>
+          <button id="nCancel">やめる</button>
+        </div>
+      </div>
+      <div class="off" id="nOff"></div>
+    </div>
     <div id="empty"></div>
   </div>
 
@@ -335,7 +367,7 @@ tr.need td{background:var(--pur-bg)}
     </div>
     <div class="links">
       <a href="#" id="renoLink">番号を変える</a>
-      <a href="#" id="moveLink">位置を直す</a>
+      <a href="#" id="moveLink">位置を直す（微調整）</a>
       <a href="#" id="calLink" style="display:none">この木の所にいる（現在地合わせ）</a>
       <a href="#" id="undoLink">未調査に戻す</a>
       <a href="#" id="delLink" class="del" style="display:none">この新木を削除</a>
@@ -429,7 +461,7 @@ tr.need td{background:var(--pur-bg)}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 5;
+const APP_VER = 6;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -737,7 +769,7 @@ function vpos(e){ const r = view.getBoundingClientRect(); return {x: e.clientX -
    1本指で動かしても拡大・縮小になり、タップも効かなくなる → 新しく触れ始めたときと、全部の指が離れたときに記録を消す */
 function resetPtrs(){ ptrs.clear(); gest = null; clearTimeout(lpTimer); }
 view.addEventListener("pointerdown", e => {
-  if(e.target.closest("#tools,#hint,#legend")) return;
+  if(e.target.closest("#tools,#hint,#legend,#nudge")) return;
   if(!pkg) return;
   if(e.isPrimary) resetPtrs();                  // 1本目の指（前の指は全部離れている）
   try{ view.setPointerCapture(e.pointerId); }catch(err){}
@@ -745,6 +777,13 @@ view.addEventListener("pointerdown", e => {
   ptrs.set(e.pointerId, vpos(e));
   if(ptrs.size === 1){
     const p = vpos(e);
+    if(mode === "move" && selId){
+      const q = toScreen(posOf(treeById(selId)).x, posOf(treeById(selId)).y);
+      if(Math.hypot(q.x - p.x, q.y - p.y) < Math.max(28, markSize())){
+        gest = {mode: "drag", lx: p.x, ly: p.y, moved: true, multi: false};
+        return;
+      }
+    }
     gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: false, multi: false};
     clearTimeout(lpTimer);
     lpTimer = setTimeout(()=>{ if(gest && !gest.moved && !gest.multi && ptrs.size === 1){ gest.long = true; longPress(gest.sx, gest.sy); } }, 650);
@@ -757,6 +796,12 @@ view.addEventListener("pointerdown", e => {
 view.addEventListener("pointermove", e => {
   if(!ptrs.has(e.pointerId) || !gest) return;
   ptrs.set(e.pointerId, vpos(e));
+  if(gest.mode === "drag"){
+    const p = vpos(e), t = treeById(selId), q = posOf(t);
+    setPos(t, {x: q.x + (p.x - gest.lx) / V.s, y: q.y + (p.y - gest.ly) / V.s}, true);
+    gest.lx = p.x; gest.ly = p.y;
+    return;
+  }
   if(gest.mode === "pan" && ptrs.size === 1){
     const p = vpos(e);
     if(!gest.moved && Math.hypot(p.x - gest.sx, p.y - gest.sy) > 8){ gest.moved = true; clearTimeout(lpTimer); }
@@ -781,6 +826,7 @@ function ptrEnd(e){
   }
   if(ptrs.size) return;
   const g = gest; gest = null;
+  if(g.mode === "drag"){ nudgeInfo(); return; }
   if(g.moved || g.multi || g.long || e.type === "pointercancel") return;
   const now = Date.now();
   if(now - lastTap.t < 300 && Math.hypot(g.sx - lastTap.x, g.sy - lastTap.y) < 30){ lastTap.t = 0; zoomAt(g.sx, g.sy, 2); return; }
@@ -811,7 +857,7 @@ function nearestTree(sx, sy, lim){
 }
 function tapAt(sx, sy){
   if(mode === "add"){ setMode(null); const p = toImage(sx, sy); openNoDlg({kind: "add", x: Math.round(p.x), y: Math.round(p.y)}); return; }
-  if(mode === "move"){ const p = toImage(sx, sy); R.moved[selId] = {x: Math.round(p.x), y: Math.round(p.y)}; const a = R.added.find(x => x.id === selId); if(a){ a.x = R.moved[selId].x; a.y = R.moved[selId].y; delete R.moved[selId]; reindex(); } saveR(); setMode(null); scheduleMarks(); toast("位置を直しました"); return; }
+  if(mode === "move"){ setPos(treeById(selId), toImage(sx, sy)); return; }
   const t = nearestTree(sx, sy, Math.max(26, markSize() * 1.1));
   if(t) select(t.id, false);
 }
@@ -823,6 +869,7 @@ function longPress(sx, sy){
   openNoDlg({kind: "add", x: Math.round(p.x), y: Math.round(p.y)});
 }
 function setMode(m, msg){
+  if(mode === "move" && m !== "move") endNudge(false);
   mode = m;
   $("addBtn").classList.toggle("on", m === "add");
   if(m){ $("hintMsg").textContent = msg; $("hint").style.display = "flex"; }
@@ -919,6 +966,91 @@ function renumber(t, no, kind){
   renderSheet(); scheduleMarks(); updProg(); toast("番号を " + no + " にしました");
 }
 
+/* ================= 位置の微調整 =================
+   現地で樹木の位置が図面と少しずれているとき：
+   ・矢印で 0.5m／1m／2m ずつ動かす（押し続けると続けて動く）
+   ・印を指で動かす　・地図をタップした所へ移す
+   ［決定］で保存、［やめる］で元に戻す、［図面の位置］で図面どおりに戻す */
+let nudge = null;
+function setPos(t, p, live){
+  const q = {x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10};
+  const a = R.added.find(x => x.id === t.id);
+  if(a){ a.x = q.x; a.y = q.y; reindex(); }
+  else if(Math.hypot(q.x - t.x, q.y - t.y) < 0.05) delete R.moved[t.id];
+  else R.moved[t.id] = q;
+  scheduleMarks();
+  if(!live) nudgeInfo();
+}
+function nudgeInfo(){
+  const t = treeById(selId); if(!t || !nudge) return;
+  const p = posOf(t), ppm = pkg.map.ppm, o = nudge.orig;
+  const dx = (p.x - o.x) / ppm, dy = (o.y - p.y) / ppm, d = Math.hypot(dx, dy);
+  const f = v => (v >= 0 ? "" : "－") + Math.abs(v).toFixed(1);
+  $("nOff").textContent = d < 0.05 ? (t.added ? "置いた位置のまま" : "図面の位置のまま") :
+    (t.added ? "置いた位置から " : "図面の位置から ") + d.toFixed(1) + "m（右 " + f(dx) + "m・上 " + f(dy) + "m）";
+}
+function startNudge(){
+  const t = treeById(selId); if(!t) return;
+  const a = R.added.find(x => x.id === t.id);
+  nudge = {id: t.id, start: {...posOf(t)}, orig: a ? (a.x0 != null ? {x: a.x0, y: a.y0} : {x: a.x, y: a.y}) : {x: t.x, y: t.y}};
+  if(a && a.x0 == null){ a.x0 = a.x; a.y0 = a.y; }
+  setMode("move", "");
+  $("hint").style.display = "none";
+  $("nTitle").textContent = (noOf(t) || "番号なし") + " の位置を直す";
+  $("nStep").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.s === (S.nStep || 0.5)));
+  $("nOrig").innerHTML = t.added ? "置いた<br>位置" : "図面の<br>位置";
+  $("nudge").classList.add("show");
+  centerOn(posOf(t), 2.2);      // 0.5m が見分けられる大きさまで拡大
+  nudgeVisible(true);
+  nudgeInfo();
+}
+/* 木の印が微調整の板に隠れないように、板より上に見せる */
+function nudgeVisible(force){
+  const t = treeById(selId); if(!t) return;
+  const vs = viewSize(), ph = $("nudge").offsetHeight + 24, q = toScreen(posOf(t).x, posOf(t).y);
+  const top = 50, bottom = vs.h - ph;
+  if(force || q.y > bottom - 20 || q.y < top || q.x < 40 || q.x > vs.w - 40){
+    V.tx += vs.w / 2 - q.x;
+    V.ty += Math.max(top + 20, (top + bottom) / 2) - q.y;
+    applyView();
+  }
+}
+function endNudge(ok){
+  if(!nudge) return;
+  const t = treeById(nudge.id);
+  if(!ok && t) setPos(t, nudge.start, true);
+  if(ok && t){
+    const p = posOf(t), moved = Math.hypot(p.x - nudge.start.x, p.y - nudge.start.y) > 0.05;
+    if(moved){ const r = rec(t.id); r.posT = Date.now(); if(!r.st) r.st = "done"; stamp(r); }
+    saveR(); toast(moved ? "位置を直しました（" + $("nOff").textContent + "）" : "位置はそのままです");
+  }
+  nudge = null;
+  $("nudge").classList.remove("show");
+  scheduleMarks(); if(selId) renderSheet();
+}
+let nudgeRep = 0;
+$("nudge").querySelectorAll(".ar button[data-d]").forEach(b => {
+  const step = ()=>{
+    const t = treeById(selId); if(!t) return;
+    const [dx, dy] = b.dataset.d.split(",").map(Number), m = (S.nStep || 0.5) * pkg.map.ppm, p = posOf(t);
+    setPos(t, {x: p.x + dx * m, y: p.y + dy * m});
+    nudgeVisible(false);
+  };
+  b.addEventListener("pointerdown", e => {
+    e.preventDefault(); step();
+    clearInterval(nudgeRep); let n = 0;
+    nudgeRep = setInterval(()=>{ if(++n > 3) step(); }, 120);   // 押し続けると続けて動く
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => b.addEventListener(ev, ()=> clearInterval(nudgeRep)));
+});
+$("nStep").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+  S.nStep = +b.dataset.s; saveS();
+  $("nStep").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+});
+$("nOrig").onclick = ()=>{ const t = treeById(selId); if(t && nudge) setPos(t, nudge.orig); };
+$("nOk").onclick = ()=>{ mode = null; $("addBtn").classList.remove("on"); endNudge(true); };
+$("nCancel").onclick = ()=>{ mode = null; $("addBtn").classList.remove("on"); endNudge(false); };
+
 /* ================= 入力パネル ================= */
 let wxWarned = false;
 function stamp(r){
@@ -932,6 +1064,7 @@ function stamp(r){
 }
 function select(id, center){
   const t = treeById(id); if(!t) return;
+  if(nudge && nudge.id !== id){ mode = null; endNudge(true); }
   setMode(null);
   selId = id;
   const d = distOf(t);
@@ -966,6 +1099,7 @@ function renderSheet(){
     (t.label ? "　図面の表記「" + esc(t.label) + "」" : "") +
     (t.out ? '　<span class="tagx">調査範囲の外</span>' : "") +
     (dupNo ? '　<span class="tagx">図面に同じ番号が2か所</span>' : "") +
+    (!t.added && R.moved[t.id] ? '　<span class="tagx">位置を直した（図面から ' + (Math.hypot(R.moved[t.id].x - t.x, R.moved[t.id].y - t.y) / pkg.map.ppm).toFixed(1) + 'm）</span>' : "") +
     (r.date ? "　" + esc(r.date + " " + (r.wx || "")) : "");
   const p = t.past;
   let info = p ? "<b>前回 " + esc(p.year || "") + "</b>　" + esc(p.sp || "—") + "　H " + esc(p.h || "—") + "m　C " + esc(p.c || "—") + "cm" +
@@ -1183,7 +1317,7 @@ function goNearest(){
 $("nextTree").onclick = goNearest;
 $("prevTree").onclick = ()=>{ const id = navHist.pop(); if(id) select(id, true); else toast("前の樹木はありません"); };
 $("renoLink").onclick = e => { e.preventDefault(); const t = treeById(selId); openNoDlg({kind: t.src === "circle" && !R.renamed[t.id] ? "assign" : "reno", id: selId}); };
-$("moveLink").onclick = e => { e.preventDefault(); setMode("move", noOf(treeById(selId)) + " の正しい位置を図面上でタップしてください"); };
+$("moveLink").onclick = e => { e.preventDefault(); startNudge(); };
 $("undoLink").onclick = e => { e.preventDefault(); if(!confirm("この樹木の入力を消して未調査に戻しますか？（写真は残ります）")) return; delete R.trees[selId]; saveR(); renderSheet(); scheduleMarks(); updProg(); };
 $("delLink").onclick = e => { e.preventDefault(); if(!confirm("この新木を削除しますか？")) return; R.added = R.added.filter(a => a.id !== selId); delete R.trees[selId]; reindex(); saveR(); closeSheet(); updProg(); };
 
