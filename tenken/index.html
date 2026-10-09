@@ -159,7 +159,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v13</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v14</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -499,16 +499,17 @@ function bump(key, v){
   if(!v) return;
   const a = recents[key]; const i = a.indexOf(v);
   if(i > -1) a.splice(i,1);
-  a.unshift(v); if(a.length > 10) a.pop();
+  a.unshift(v); if(a.length > (key === "route" ? 40 : 10)) a.pop();   // 路線（ブロック）は案件の全路線を残す
   store("gj_recents", recents);
 }
 function renderSug(key){
   const box = $("sug-"+key); box.innerHTML = "";
   const cur = $(key).value;
-  recents[key].filter(v => v !== cur).slice(0,4).forEach(v=>{
+  // 路線名は案件の路線を全部出す（他の項目は最近使った4つ）
+  recents[key].filter(v => v !== cur).slice(0, key === "route" ? 30 : 4).forEach(v=>{
     const b = document.createElement("button");
     b.type = "button"; b.className = "chip";
-    b.textContent = v.length > 20 ? v.slice(0,20)+"…" : v;
+    b.textContent = v.length > 24 ? v.slice(0,24)+"…" : v;
     b.addEventListener("pointerdown", e=>{
       e.preventDefault();
       $(key).value = v; bump(key,v); box.classList.remove("show");
@@ -1990,23 +1991,35 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
   });
 })();
 </script>
+<script src="zumen.js"></script>
 <script>
 SysProject.attachBar("tenken", {
   apply: function(p){
     SysProject.setField("inspector", p.inspector, "change");
     SysProject.setField("office", p.office, "change");
     SysProject.setField("koji", p.koji, "change");
-    // 案件の路線を路線名の候補に加える（事務所PCで台帳を取り込むと入ってくる）
+    // 路線名の候補は「この案件の路線」だけにする（前に開いた別の案件の路線が混ざらないように）
     try{
-      var rs = (typeof SysProject.routeNames === "function")
-        ? SysProject.routeNames(p)
-        : ((p.routes || []).map(function(r){ return typeof r === "string" ? r : (r && r.name) || ""; })
-                           .filter(Boolean));
-      if(rs.length && typeof recents !== "undefined" && recents.route){
-        rs.forEach(function(n){
-          if(recents.route.indexOf(n) < 0) recents.route.push(n);
-        });
+      // 外観診断だけを行う路線（gaikanOnly）は樹木点検の路線にしない
+      var rs = (p.routes || []).filter(function(r){ return !(r && r.gaikanOnly); })
+                 .map(function(r){ return typeof r === "string" ? r : (r && r.name) || ""; })
+                 .filter(Boolean);
+      if(rs.length && typeof recents !== "undefined"){
+        recents.route = rs.slice();
         store("gj_recents", recents);
+        // 路線名の欄が別の案件の路線のままなら、この案件で最後に使った路線に戻す（無ければ空にして選んでもらう）
+        var lastP = load("gj_last_p", {});
+        var cur = $("route").value.trim();
+        if(rs.indexOf(cur) < 0){
+          var back = (lastP[p.id] && rs.indexOf(lastP[p.id]) > -1) ? lastP[p.id] : "";
+          $("route").value = back;
+          routeChanged();
+          if(!back){ $("setPanel").open = true; toast("この案件の路線名を選んでください（路線名の欄をタップすると候補が出ます）"); }
+        }
+        $("route").addEventListener("change", function(){
+          var v = $("route").value.trim();
+          if(rs.indexOf(v) > -1){ var lp = load("gj_last_p", {}); lp[p.id] = v; store("gj_last_p", lp); }
+        });
       }
     }catch(e){ console.warn("路線候補の反映に失敗:", e); }
   }
