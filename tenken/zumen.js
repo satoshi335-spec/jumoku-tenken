@@ -5,7 +5,7 @@
    index.html の関数（listState, showListItem, routeKey, routeRecords, judgeOf …）をそのまま使う */
 (function(){
 "use strict";
-const ZVER = 1;
+const ZVER = 2;
 
 /* ================= 保存（IndexedDB） ================= */
 let zdbP = null;
@@ -65,6 +65,13 @@ body.zOn #zCard{display:block}
 #zChoose button{display:block;width:100%;text-align:left;font-size:14px;padding:9px 12px;border:none;background:none;border-radius:7px;font-family:inherit}
 #zChoose button:active{background:#E6F1FB}
 #zShowBtn{display:none;margin:0 0 10px}
+.zmk.moved::after{content:"";position:absolute;right:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:#185FA5;border:1px solid #fff}
+#zFixBar{display:none;position:absolute;left:6px;right:6px;top:6px;z-index:7;background:#185FA5;color:#fff;border-radius:9px;padding:8px 10px;font-size:13px;align-items:center;gap:8px;flex-wrap:wrap}
+#zFixBar b{font-size:14px}
+#zFixBar button{background:#fff;color:#185FA5;border:none;border-radius:7px;padding:6px 10px;font-size:13px;font-weight:600;font-family:inherit}
+body.zFixing #zFixBar{display:flex}
+body.zFixing #zView{outline:3px solid #185FA5;cursor:crosshair}
+#zFixBtn.on{background:#185FA5;color:#fff;border-color:#185FA5}
 body.zHas:not(.zOn) #zShowBtn{display:block}
 /* iPad 横向き：図面を左、入力を右に並べる */
 @media (min-width:1000px) and (orientation:landscape){
@@ -90,10 +97,11 @@ card.innerHTML =
     '<button type="button" class="miniBtn" id="zNext">▶</button>' +
     '<button type="button" class="miniBtn" id="zFit">全体</button>' +
     '<button type="button" class="miniBtn" id="zRot">↻</button>' +
+    '<button type="button" class="miniBtn" id="zFixBtn">位置を直す</button>' +
     '<button type="button" class="miniBtn" id="zHide">隠す</button>' +
   '</div>' +
   '<div id="zView"><div id="zStage"><img id="zImg" alt=""></div><div id="zMarks"></div>' +
-  '<div id="zLegend"></div><div id="zEmpty"></div><div id="zChoose"></div></div>';
+  '<div id="zLegend"></div><div id="zEmpty"></div><div id="zChoose"></div><div id="zFixBar"></div></div>';
 const showBtn = document.createElement("button");
 showBtn.type = "button"; showBtn.id = "zShowBtn"; showBtn.className = "miniBtn pri";
 showBtn.textContent = "🗺 図面を表示する";
@@ -137,7 +145,22 @@ function buildIndex(){
     idxOf.set(keyOf(it.zumen, b, h), i);
   });
 }
-function posOnDrawing(z){ return R ? R.pos.filter(p => nz(p.z) === nz(z)) : []; }
+/* 現場で直した位置（路線ごと・樹木ごと）。{路線キー: {"図面|桝|補助": {z,x,y,m,h}}} */
+let FIX = load("gj_zfix", {});
+function fixesFor(){ return FIX[rKey] || {}; }
+/* 図面上の位置の一覧（現場で直した位置があればそちらを使う。図面に無かった樹木も、置けば出る） */
+function allPos(){
+  if(!R) return [];
+  const fx = fixesFor(), seen = new Set();
+  const out = R.pos.map(p => {
+    const k = keyOf(p.z, p.m, p.h); seen.add(k);
+    const f = fx[k];
+    return f ? {z: f.z, m: p.m, h: p.h, x: f.x, y: f.y, k, moved: true} : Object.assign({k}, p);
+  });
+  Object.keys(fx).forEach(k => { if(!seen.has(k)){ const f = fx[k]; out.push({z: f.z, m: f.m, h: f.h, x: f.x, y: f.y, k, moved: true}); } });
+  return out;
+}
+function posOnDrawing(z){ return allPos().filter(p => nz(p.z) === nz(z)); }
 function curItem(){ const st = listState(); return st && st.items[st.idx]; }
 
 function statusOf(i, doneMap){
@@ -218,6 +241,10 @@ function toScreen(x, y){
   const dx = x - V.w / 2, dy = y - V.h / 2, a = V.rot * Math.PI / 180;
   return {x: V.tx + V.s * (dx * Math.cos(a) - dy * Math.sin(a)), y: V.ty + V.s * (dx * Math.sin(a) + dy * Math.cos(a))};
 }
+function toImage(sx, sy){
+  const px = (sx - V.tx) / V.s, py = (sy - V.ty) / V.s, a = -V.rot * Math.PI / 180;
+  return {x: px * Math.cos(a) - py * Math.sin(a) + V.w / 2, y: px * Math.sin(a) + py * Math.cos(a) + V.h / 2};
+}
 function zoomAt(sx, sy, f){
   const ns = Math.max(0.03, Math.min(4, V.s * f)), k = ns / V.s;
   V.tx = sx - (sx - V.tx) * k; V.ty = sy - (sy - V.ty) * k; V.s = ns;
@@ -250,7 +277,7 @@ function renderMarks(){
   let html = "";
   const seen = new Map();   // 同じ位置に複数の樹木（1つの桝に数本）→ 少しずらして並べる
   posOnDrawing(dz).forEach(p => {
-    const i = idxOf.get(keyOf(p.z, p.m, p.h));
+    const i = idxOf.get(p.k);
     if(i == null) return;
     const s = statusOf(i, done);
     cnt[s]++;
@@ -261,7 +288,7 @@ function renderMarks(){
     if(q.x < -40 || q.y < -40 || q.x > vs.w + 40 || q.y > vs.h + 40) return;
     const isCur = i === cur;
     const dd = isCur ? d + 8 : d;
-    html += '<div class="zmk ' + s + (isCur ? " cur" : "") + '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
+    html += '<div class="zmk ' + s + (isCur ? " cur" : "") + (p.moved ? " moved" : "") + '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
     if(tags || isCur){
       const it = st.items[i];
       const lbl = treeLabel(it, false);
@@ -294,7 +321,7 @@ function treesNear(sx, sy){
   const d = markSize(), lim = Math.max(22, d * 0.9);
   const out = [], seen = new Map();
   posOnDrawing(dz).forEach(p => {
-    const i = idxOf.get(keyOf(p.z, p.m, p.h)); if(i == null) return;
+    const i = idxOf.get(p.k); if(i == null) return;
     const k = Math.round(p.x) + "," + Math.round(p.y);
     const n = seen.get(k) || 0; seen.set(k, n + 1);
     const q = toScreen(p.x, p.y);
@@ -305,6 +332,7 @@ function treesNear(sx, sy){
 }
 function tapAt(sx, sy){
   hideChoose();
+  if(fixing){ placeFix(sx, sy); return; }
   const near = treesNear(sx, sy);
   if(!near.length) return;
   const best = near[0].dist;
@@ -329,6 +357,41 @@ function tapAt(sx, sy){
 }
 function hideChoose(){ $z("zChoose").style.display = "none"; }
 
+/* ================= 位置を直す ================= */
+let fixing = false;
+function curKey(){
+  const it = curItem(); if(!it) return null;
+  const b = it.base != null ? it.base : splitHojo(it.no).base;
+  const h = it.base != null ? (it.hojo || "") : splitHojo(it.no).hojo;
+  return {it, k: keyOf(it.zumen, b, h), m: b, h};
+}
+function setFixing(on){
+  const c = curKey();
+  if(on && !c){ toast("先に樹木を選んでください"); on = false; }
+  fixing = on;
+  document.body.classList.toggle("zFixing", on);
+  $z("zFixBtn").classList.toggle("on", on);
+  if(!on){ $z("zFixBar").innerHTML = ""; return; }
+  const moved = !!fixesFor()[c.k];
+  $z("zFixBar").innerHTML = '<span><b>' + esc(treeLabel(c.it, false)) + '</b> の正しい位置をタップしてください（拡大してから押すと正確です）</span>' +
+    '<span style="flex:1"></span>' + (moved ? '<button type="button" id="zFixUndo">元の位置に戻す</button>' : '') +
+    '<button type="button" id="zFixCancel">やめる</button>';
+  const u = $z("zFixUndo");
+  if(u) u.onclick = ev => { ev.stopPropagation(); const f = FIX[rKey] || {}; delete f[c.k]; FIX[rKey] = f; store("gj_zfix", FIX); setFixing(false); schedule(); toast("元の位置に戻しました"); };
+  $z("zFixCancel").onclick = ev => { ev.stopPropagation(); setFixing(false); };
+}
+function placeFix(sx, sy){
+  const c = curKey(); if(!c){ setFixing(false); return; }
+  const ip = toImage(sx, sy);
+  if(ip.x < 0 || ip.y < 0 || ip.x > V.w || ip.y > V.h){ toast("図面の中をタップしてください"); return; }
+  const f = FIX[rKey] || {};
+  f[c.k] = {z: dz, x: Math.round(ip.x * 10) / 10, y: Math.round(ip.y * 10) / 10, m: c.m, h: c.h, t: Date.now()};
+  FIX[rKey] = f; store("gj_zfix", FIX);
+  setFixing(false); schedule();
+  toast(treeLabel(c.it, false) + " の位置を直しました（青い点の印）");
+}
+$z("zFixBar").addEventListener("pointerdown", e => e.stopPropagation());
+
 /* リストのその樹木を入力欄に出す */
 function pick(i){
   if(getMode() !== "list"){ modes[routeKey()] = "list"; store("gj_modes", modes); updateModeUI(); }
@@ -341,7 +404,7 @@ async function sync(){
   if(!R) return;
   const it = curItem(); if(!it) { schedule(); return; }
   const b = it.base != null ? it.base : splitHojo(it.no).base;
-  const p = R.pos.find(x => keyOf(x.z, x.m, x.h) === keyOf(it.zumen, b, it.hojo || ""));
+  const p = allPos().find(x => x.k === keyOf(it.zumen, b, it.hojo || ""));
   if(!p){ schedule(); return; }
   if(nz(p.z) !== nz(dz)) await showDrawing(p.z, false);
   const q = toScreen(p.x, p.y), vs = vsize(), m = 50;
@@ -424,6 +487,7 @@ $z("zPrev").onclick = ()=> stepDrawing(-1);
 $z("zNext").onclick = ()=> stepDrawing(1);
 $z("zFit").onclick = ()=>{ fitView(); applyView(); };
 $z("zRot").onclick = ()=>{ V.rot = (V.rot + 90) % 360; fitView(); applyView(); };
+$z("zFixBtn").onclick = ()=> setFixing(!fixing);
 $z("zHide").onclick = ()=>{ opt.hide = true; store("gj_zopt", opt); document.body.classList.remove("zOn"); };
 showBtn.onclick = ()=>{ opt.hide = false; store("gj_zopt", opt); document.body.classList.add("zOn"); layoutTop(); setTimeout(()=>{ fitView(); applyView(); sync(); }, 50); };
 
@@ -491,7 +555,7 @@ async function importPack(f){
 
 /* ================= 既存の処理につなぐ ================= */
 const _show = window.showListItem;
-window.showListItem = function(i){ _show(i); sync(); };
+window.showListItem = function(i){ _show(i); if(fixing) setFixing(false); sync(); };
 const _save = window.saveAndMove;
 window.saveAndMove = function(m){ _save(m); schedule(); };
 const _route = window.routeChanged;
