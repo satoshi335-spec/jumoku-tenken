@@ -135,7 +135,7 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
 <body>
 <header>
   <div class="hdTop">
-    <h1>外観診断 <span style="font-size:11px;opacity:.7;font-weight:400">v3</span></h1>
+    <h1>外観診断 <span style="font-size:11px;opacity:.7;font-weight:400">v4</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -610,13 +610,13 @@ function bump(key, v){
   if(!v) return;
   const a = recents[key]; const i = a.indexOf(v);
   if(i > -1) a.splice(i,1);
-  a.unshift(v); if(a.length > 10) a.pop();
+  a.unshift(v); if(a.length > (key === "block" ? 40 : 10)) a.pop();   // 路線（ブロック）は案件の全路線を残す
   store("gk_recents", recents);
 }
 function renderSug(key){
   const box = $("sug-" + key); box.innerHTML = "";
   const cur = $(key).value;
-  recents[key].filter(v => v !== cur).slice(0,4).forEach(v=>{
+  recents[key].filter(v => v !== cur).slice(0, key === "block" ? 30 : 4).forEach(v=>{
     const b = document.createElement("button");
     b.type = "button"; b.className = "chip";
     b.textContent = v.length > 20 ? v.slice(0,20) + "…" : v;
@@ -1626,6 +1626,15 @@ SysProject.attachBar("gaikan", {
   apply: function(p){
     SysProject.setField("inspector", p.inspector, "change");
     SysProject.setField("koji", p.koji, "change");
+    // ブロック名の候補は「この案件の路線」にする（統合ハブの外観診断リストは路線ごとのファイル）
+    try{
+      var rs = (p.routes || []).map(function(r){ return typeof r === "string" ? r : (r && r.name) || ""; }).filter(Boolean);
+      if(rs.length){
+        var own = recents.block.filter(function(b){ return rs.indexOf(b) > -1; });
+        recents.block = own.concat(rs.filter(function(b){ return own.indexOf(b) < 0; }));
+        store("gk_recents", recents);
+      }
+    }catch(e){ console.warn("ブロック候補の反映に失敗:", e); }
   }
 });
 </script>
