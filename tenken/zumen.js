@@ -5,7 +5,7 @@
    index.html の関数（listState, showListItem, routeKey, routeRecords, judgeOf …）をそのまま使う */
 (function(){
 "use strict";
-const ZVER = 2;
+const ZVER = 3;
 
 /* ================= 保存（IndexedDB） ================= */
 let zdbP = null;
@@ -44,8 +44,8 @@ css.textContent = `
 #zCard{padding:8px;display:none}
 body.zOn #zCard{display:block}
 .zBar{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
-.zBar select{flex:1;min-width:120px;font-size:15px;padding:7px 8px}
-.zBar .miniBtn{padding:8px 11px}
+.zBar select{flex:1;min-width:96px;font-size:15px;padding:7px 8px}
+.zBar .miniBtn{padding:8px 9px}
 #zView{position:relative;overflow:hidden;touch-action:none;background:#E9E8E2;border-radius:10px;height:42vh;min-height:260px}
 #zStage{position:absolute;left:0;top:0;transform-origin:0 0}
 #zImg{display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}
@@ -56,6 +56,13 @@ body.zOn #zCard{display:block}
 .zmk.ng{border-color:#C62828;background:rgba(198,40,40,.55)}
 .zmk.none{border-color:#555;background:rgba(80,80,80,.45)}
 .zmk.cur{border-color:#185FA5;border-width:4px;box-shadow:0 0 0 4px rgba(24,95,165,.35)}
+.zmk.unsure{border-style:dashed}
+.zmk.sel{border-color:#185FA5;border-width:4px;animation:zBlink .9s ease-in-out infinite alternate}
+@keyframes zBlink{from{box-shadow:0 0 0 2px rgba(24,95,165,.25)}to{box-shadow:0 0 0 9px rgba(24,95,165,.55)}}
+.zmk.added::before{content:"+";position:absolute;left:-7px;top:-9px;font-size:13px;font-weight:700;color:#3B6D11}
+.zFlash{animation:zFl 1.2s ease-out}
+@keyframes zFl{from{box-shadow:0 0 0 4px rgba(24,95,165,.7)}to{box-shadow:0 0 0 0 rgba(24,95,165,0)}}
+.zmk.newpt{border-color:#3B6D11;border-style:dashed;background:rgba(59,109,17,.25)}
 .ztag{position:absolute;left:0;top:0;font-size:11px;font-weight:600;color:#7a2a00;background:rgba(255,255,255,.78);padding:0 3px;border-radius:3px;white-space:nowrap}
 #zLegend{position:absolute;left:6px;bottom:6px;background:rgba(255,255,255,.9);border-radius:8px;padding:4px 8px;font-size:11px;line-height:1.6;pointer-events:none}
 #zLegend i{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid;vertical-align:-1px;margin:0 3px 0 8px}
@@ -67,12 +74,24 @@ body.zOn #zCard{display:block}
 #zShowBtn{display:none;margin:0 0 10px}
 .zmk.moved::after{content:"";position:absolute;right:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:#185FA5;border:1px solid #fff}
 #zFixBar{display:none;position:absolute;left:6px;right:6px;top:6px;z-index:7;background:#185FA5;color:#fff;border-radius:9px;padding:8px 10px;font-size:13px;align-items:center;gap:8px;flex-wrap:wrap}
+body.zAdding #zFixBar{display:flex;background:#3B6D11}
+body.zAdding #zView{outline:3px solid #3B6D11;cursor:crosshair}
+#zFixBar input{font-size:15px;padding:6px 7px;border:none;border-radius:6px;width:76px;font-family:inherit}
+#zFixBar input#zAddS{width:120px}
+#zFixBar label{display:flex;align-items:center;gap:4px;white-space:nowrap}
+#zAddBtn.on{background:#3B6D11;color:#fff;border-color:#3B6D11}
+#zInpBtn.on{background:#5F5E5A;color:#fff;border-color:#5F5E5A}
 #zFixBar b{font-size:14px}
 #zFixBar button{background:#fff;color:#185FA5;border:none;border-radius:7px;padding:6px 10px;font-size:13px;font-weight:600;font-family:inherit}
 body.zFixing #zFixBar{display:flex}
 body.zFixing #zView{outline:3px solid #185FA5;cursor:crosshair}
 #zFixBtn.on{background:#185FA5;color:#fff;border-color:#185FA5}
 body.zHas:not(.zOn) #zShowBtn{display:block}
+/* 入力を隠す：図面を大きく */
+body.zOn.zNoInp #view-input > *:not(#zCard){display:none !important}
+body.zOn.zNoInp #view-input{grid-template-columns:minmax(0,1fr) !important}
+body.zOn.zNoInp #zCard{position:sticky !important;top:var(--zTop,120px) !important}
+body.zOn.zNoInp #zView{height:calc(100vh - var(--zTop,120px) - 74px) !important}
 /* iPad 横向き：図面を左、入力を右に並べる */
 @media (min-width:1000px) and (orientation:landscape){
   body.zOn #view-input{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);column-gap:14px;align-items:start}
@@ -98,7 +117,9 @@ card.innerHTML =
     '<button type="button" class="miniBtn" id="zFit">全体</button>' +
     '<button type="button" class="miniBtn" id="zRot">↻</button>' +
     '<button type="button" class="miniBtn" id="zFixBtn">位置を直す</button>' +
-    '<button type="button" class="miniBtn" id="zHide">隠す</button>' +
+    '<button type="button" class="miniBtn" id="zAddBtn">＋樹木</button>' +
+    '<button type="button" class="miniBtn" id="zInpBtn">入力を隠す</button>' +
+    '<button type="button" class="miniBtn" id="zHide">図面を隠す</button>' +
   '</div>' +
   '<div id="zView"><div id="zStage"><img id="zImg" alt=""></div><div id="zMarks"></div>' +
   '<div id="zLegend"></div><div id="zEmpty"></div><div id="zChoose"></div><div id="zFixBar"></div></div>';
@@ -130,7 +151,7 @@ let rKey = "";
 let dz = "";           // 表示中の図面番号
 let imgUrl = "";
 let idxOf = new Map(); // "図面|桝|補助" → リストの何番目か
-const opt = Object.assign({hide: false}, load("gj_zopt", {}));
+const opt = Object.assign({hide: false, noInp: false}, load("gj_zopt", {}));
 
 function nz(z){ z = String(z == null ? "" : z).trim(); return /^\d+$/.test(z) ? String(parseInt(z, 10)) : z; }
 function keyOf(z, m, h){ return nz(z) + "|" + String(m || "").trim() + "|" + String(h || "").trim(); }
@@ -153,12 +174,20 @@ function allPos(){
   if(!R) return [];
   const fx = fixesFor(), seen = new Set();
   const out = R.pos.map(p => {
-    const k = keyOf(p.z, p.m, p.h); seen.add(k);
+    const k = keyOf(p.kz || p.z, p.m, p.h); seen.add(k);   // kz … 台帳の図面番号（隣の図面に描かれた樹木）
     const f = fx[k];
     return f ? {z: f.z, m: p.m, h: p.h, x: f.x, y: f.y, k, moved: true} : Object.assign({k}, p);
   });
-  Object.keys(fx).forEach(k => { if(!seen.has(k)){ const f = fx[k]; out.push({z: f.z, m: f.m, h: f.h, x: f.x, y: f.y, k, moved: true}); } });
+  Object.keys(fx).forEach(k => { if(!seen.has(k)){ const f = fx[k]; out.push({z: f.z, m: f.m, h: f.h, x: f.x, y: f.y, k, moved: !f.add, added: !!f.add}); } });
   return out;
+}
+/* 現場で追加した樹木（図面・リストに無かった樹木）。点検データを取り込み直しても残すため別に持つ
+   {路線キー: {"図面|桝|補助": {item: リストの1行, after: "直前の樹木のキー"}}} */
+let ADD = load("gj_zadd", {});
+function itemKey(it){
+  const b = it.base != null ? it.base : splitHojo(it.no).base;
+  const h = it.base != null ? (it.hojo || "") : splitHojo(it.no).hojo;
+  return {k: keyOf(it.zumen, b, h), m: b, h};
 }
 function posOnDrawing(z){ return allPos().filter(p => nz(p.z) === nz(z)); }
 function curItem(){ const st = listState(); return st && st.items[st.idx]; }
@@ -178,6 +207,7 @@ function statusOf(i, doneMap){
 /* ================= 路線の図面を読む ================= */
 async function loadRoute(){
   const k = routeKey();
+  if(k !== rKey){ if(fixing) setFixing(false); if(addMode) setAdding(false); }
   rKey = k;
   let d = null;
   try{ d = await zget("routes", k); }catch(e){ d = null; }
@@ -205,13 +235,21 @@ function fillSel(){
   });
   sel.value = dz;
 }
+let showTok = 0, pendingZ = "";
 async function showDrawing(z, fit){
   if(!R) return;
   const d = R.drawings.find(x => nz(x.zumen) === nz(z));
   if(!d) return;
-  dz = d.zumen;
-  $z("zSel").value = dz;
+  // 続けて切り替えたとき、後から届いた古い図面の画像で上書きしない（画像と印の図面が食い違うとタップが効かなくなる）
+  const tok = ++showTok;
+  pendingZ = d.zumen;
+  $z("zSel").value = d.zumen;
+  hideChoose();
   const blob = await zget("imgs", rKey + "|" + d.zumen).catch(()=>null);
+  if(tok !== showTok) return;
+  pendingZ = "";
+  if(nz(dz) !== nz(d.zumen)){ fixSel = null; addPt = null; updateBar(); }
+  dz = d.zumen;
   if(imgUrl) URL.revokeObjectURL(imgUrl);
   imgUrl = blob ? URL.createObjectURL(blob) : "";
   const img = $z("zImg");
@@ -281,30 +319,38 @@ function renderMarks(){
     if(i == null) return;
     const s = statusOf(i, done);
     cnt[s]++;
+    if(p.u && !p.moved) cnt.u = (cnt.u || 0) + 1;
     const k = Math.round(p.x) + "," + Math.round(p.y);
     const n = seen.get(k) || 0; seen.set(k, n + 1);
     let q = toScreen(p.x, p.y);
     q = {x: q.x + n * (d * 0.75), y: q.y};
     if(q.x < -40 || q.y < -40 || q.x > vs.w + 40 || q.y > vs.h + 40) return;
-    const isCur = i === cur;
-    const dd = isCur ? d + 8 : d;
-    html += '<div class="zmk ' + s + (isCur ? " cur" : "") + (p.moved ? " moved" : "") + '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
-    if(tags || isCur){
+    const isCur = i === cur && !fixing && !addMode, isSel = !!(fixSel && fixSel.k === p.k);
+    const dd = (isCur || isSel) ? d + 8 : d;
+    html += '<div class="zmk ' + s + (isCur ? " cur" : "") + (isSel ? " sel" : "") + (p.moved ? " moved" : "") +
+            (p.added ? " added" : "") + (p.u && !p.moved ? " unsure" : "") +
+            '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
+    if(tags || isCur || isSel){
       const it = st.items[i];
       const lbl = treeLabel(it, false);
       html += '<div class="ztag" style="transform:translate(' + (q.x + dd / 2) + 'px,' + (q.y - dd / 2 - 8) + 'px)">' + esc(lbl) + '</div>';
     }
   });
+  if(addMode && addPt){
+    const q = toScreen(addPt.x, addPt.y), dd = d + 6;
+    html += '<div class="zmk newpt" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
+  }
   box.innerHTML = html;
   $z("zLegend").innerHTML =
     '<i style="border-color:#E07B00"></i>未点検 ' + cnt[""] +
     '<i style="border-color:#3B6D11;background:rgba(59,109,17,.45)"></i>良好 ' + cnt.ok +
     '<i style="border-color:#B07A00;background:rgba(240,190,40,.65)"></i>維持管理 ' + cnt.warn +
     '<i style="border-color:#C62828;background:rgba(198,40,40,.55)"></i>要外観 ' + cnt.ng +
-    (cnt.none ? '<i style="border-color:#555;background:rgba(80,80,80,.45)"></i>空桝等 ' + cnt.none : "");
+    (cnt.none ? '<i style="border-color:#555;background:rgba(80,80,80,.45)"></i>空桝等 ' + cnt.none : "") +
+    (cnt.u ? '<i style="border-color:#E07B00;border-style:dashed"></i>位置未確定 ' + cnt.u : "");
 }
 
-/* 印・一覧に出す番号。「左27#2」（同じ桝の2本目）は「左27（2本目）」と書く */
+/* 印・一覧に出す番号。「左27#2」（同じ桝の2本目）は「左27（2本目）」と書く。many … 同じ桝の樹木が並ぶ一覧 */
 function treeLabel(it, many){
   const b = String(it.base != null ? it.base : it.no);
   const m = b.match(/^(.*)#(\d+)$/);
@@ -326,77 +372,226 @@ function treesNear(sx, sy){
     const n = seen.get(k) || 0; seen.set(k, n + 1);
     const q = toScreen(p.x, p.y);
     const dist = Math.hypot(q.x + n * (d * 0.75) - sx, q.y - sy);
-    if(dist <= lim + n * d * 0.75) out.push({i, dist, k});
+    if(dist <= lim + n * d * 0.75) out.push({i, dist, k, key: p.k});
   });
   return out.sort((a, b) => a.dist - b.dist);
 }
-function tapAt(sx, sy){
-  hideChoose();
-  if(fixing){ placeFix(sx, sy); return; }
+/* 近くの樹木を1本に決める（数本あれば一覧から選ぶ）→ done(リストの何番目か) */
+function chooseNear(sx, sy, done){
   const near = treesNear(sx, sy);
-  if(!near.length) return;
+  if(!near.length) return false;
   const best = near[0].dist;
   // 同じ桝の樹木（同じ位置に並べた印）はまとめて選べるようにする
   const group = near.filter(x => x.k === near[0].k || x.dist <= best + 12);
-  if(group.length === 1){ pick(group[0].i); return; }
-  const st = listState(), done = new Map(routeRecords().map(r => [r.no, r]));
+  if(group.length === 1){ done(group[0].i); return true; }
+  const st = listState(), recs = new Map(routeRecords().map(r => [r.no, r]));
+  const baseOf = it => String(it.base != null ? it.base : it.no).replace(/#\d+$/, "");
+  const bases = {};
+  group.forEach(x => { const b = baseOf(st.items[x.i]); bases[b] = (bases[b] || 0) + 1; });
   const ch = $z("zChoose");
   ch.innerHTML = group.slice(0, 12).map(x => {
     const it = st.items[x.i];
-    const s = statusOf(x.i, done);
+    const s = statusOf(x.i, recs);
     const lab = {"": "未点検", ok: "良好", warn: "維持管理", ng: "要外観診断", none: "空桝等"}[s];
-    return '<button data-i="' + x.i + '"><b>' + esc(treeLabel(it, group.length > 1)) + '</b>　' +
-           esc(it.sp || "") + '　<small style="color:#6b6a64">' + lab + '</small></button>';
+    return '<button data-i="' + x.i + '"><b>' + esc(treeLabel(it, bases[baseOf(it)] > 1)) + '</b>　' +
+           esc(it.sp || "") + '　<small style="color:#6b6a64;white-space:nowrap">' + lab + '</small></button>';
   }).join("");
-  const vs = vsize();
+  const vs = vsize(), w = Math.min(280, vs.w - 12);
   ch.style.display = "block";
-  ch.style.left = Math.min(sx + 8, vs.w - 230) + "px";
+  ch.style.width = w + "px";
+  ch.style.left = Math.max(6, Math.min(sx + 8, vs.w - w - 6)) + "px";
   ch.style.top = Math.max(6, Math.min(sy - 20, vs.h - 200)) + "px";
-  ch.style.width = "220px";
-  ch.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); hideChoose(); pick(+b.dataset.i); });
+  ch.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); hideChoose(); done(+b.dataset.i); });
+  return true;
+}
+function tapAt(sx, sy){
+  hideChoose();
+  if(addMode){ placeAdd(sx, sy); return; }
+  if(fixing){
+    if(fixSel){ placeFix(sx, sy); return; }
+    if(!chooseNear(sx, sy, i => selectFix(i))) toast("動かす樹木の印をタップしてください");
+    return;
+  }
+  chooseNear(sx, sy, i => pick(i));
 }
 function hideChoose(){ $z("zChoose").style.display = "none"; }
 
-/* ================= 位置を直す ================= */
-let fixing = false;
-function curKey(){
-  const it = curItem(); if(!it) return null;
-  const b = it.base != null ? it.base : splitHojo(it.no).base;
-  const h = it.base != null ? (it.hojo || "") : splitHojo(it.no).hojo;
-  return {it, k: keyOf(it.zumen, b, h), m: b, h};
-}
+/* ================= 位置を直す（続けて何本でも直せる。直すたびにiPadに保存） ================= */
+let fixing = false, fixSel = null;
+let addMode = false, addPt = null;
 function setFixing(on){
-  const c = curKey();
-  if(on && !c){ toast("先に樹木を選んでください"); on = false; }
-  fixing = on;
+  if(on && addMode) setAdding(false);
+  fixing = on; fixSel = null;
   document.body.classList.toggle("zFixing", on);
   $z("zFixBtn").classList.toggle("on", on);
-  if(!on){ $z("zFixBar").innerHTML = ""; return; }
-  const moved = !!fixesFor()[c.k];
-  $z("zFixBar").innerHTML = '<span><b>' + esc(treeLabel(c.it, false)) + '</b> の正しい位置をタップしてください（拡大してから押すと正確です）</span>' +
-    '<span style="flex:1"></span>' + (moved ? '<button type="button" id="zFixUndo">元の位置に戻す</button>' : '') +
-    '<button type="button" id="zFixCancel">やめる</button>';
-  const u = $z("zFixUndo");
-  if(u) u.onclick = ev => { ev.stopPropagation(); const f = FIX[rKey] || {}; delete f[c.k]; FIX[rKey] = f; store("gj_zfix", FIX); setFixing(false); schedule(); toast("元の位置に戻しました"); };
-  $z("zFixCancel").onclick = ev => { ev.stopPropagation(); setFixing(false); };
+  if(on){
+    // 入力中の樹木がこの図面にあれば、その樹木から直せるようにしておく
+    const st = listState(), it = curItem();
+    if(it && st){ const c = itemKey(it); if(posOnDrawing(dz).some(p => p.k === c.k)) selectFix(st.idx); }
+  }
+  updateBar(); schedule();
+}
+function selectFix(i){
+  const st = listState(); if(!st) return;
+  const it = st.items[i]; if(!it) return;
+  fixSel = Object.assign({it, i}, itemKey(it));
+  updateBar(); schedule();
+}
+function updateBar(){
+  const bar = $z("zFixBar");
+  document.body.classList.toggle("zAdding", addMode);
+  if(addMode){
+    if(!addPt){
+      bar.innerHTML = '<span><b>樹木を追加</b>：図面・リストに無い樹木の位置をタップしてください</span><span style="flex:1"></span>' +
+                      '<button type="button" data-a="addEnd">やめる</button>';
+    } else {
+      bar.innerHTML = '<label>桝No.<input id="zAddM" value="' + esc(addPt.m) + '"></label>' +
+        '<label>樹木No.<input id="zAddH" value="' + esc(addPt.h) + '" placeholder="なし"></label>' +
+        '<label>樹種<input id="zAddS" list="zSpList" value="' + esc(addPt.sp) + '"></label>' +
+        '<datalist id="zSpList">' + spList().map(v => '<option value="' + esc(v) + '">').join("") + '</datalist>' +
+        '<span style="flex:1"></span><button type="button" data-a="addOk">追加する</button><button type="button" data-a="addEnd">やめる</button>';
+    }
+  } else if(fixing){
+    if(!fixSel){
+      bar.innerHTML = '<span><b>位置を直す</b>：動かす樹木の印をタップ → 正しい位置をタップ（続けて直せます）</span><span style="flex:1"></span>' +
+                      '<button type="button" data-a="fixEnd">終わる</button>';
+    } else {
+      const f = fixesFor()[fixSel.k];
+      bar.innerHTML = '<span><b>' + esc(treeLabel(fixSel.it, false)) + '</b> の正しい位置をタップ（拡大すると正確です）</span><span style="flex:1"></span>' +
+        (f && f.add ? '<button type="button" data-a="addDel">追加を取り消す</button>'
+                    : (f ? '<button type="button" data-a="fixUndo">元の位置に戻す</button>' : '')) +
+        '<button type="button" data-a="fixOther">別の樹木</button><button type="button" data-a="fixEnd">終わる</button>';
+    }
+  } else bar.innerHTML = "";
+  bar.querySelectorAll("button[data-a]").forEach(b => b.onclick = ev => { ev.stopPropagation(); barAction(b.dataset.a); });
+}
+function barAction(a){
+  if(a === "fixEnd") setFixing(false);
+  else if(a === "fixOther"){ fixSel = null; updateBar(); schedule(); }
+  else if(a === "fixUndo"){
+    const f = FIX[rKey] || {}; delete f[fixSel.k]; FIX[rKey] = f; store("gj_zfix", FIX);
+    toast(treeLabel(fixSel.it, false) + " を元の位置に戻しました");
+    fixSel = null; updateBar(); schedule();
+  }
+  else if(a === "addDel") removeAdded(fixSel);
+  else if(a === "addEnd") setAdding(false);
+  else if(a === "addOk") commitAdd();
 }
 function placeFix(sx, sy){
-  const c = curKey(); if(!c){ setFixing(false); return; }
+  if(!fixSel) return;
   const ip = toImage(sx, sy);
   if(ip.x < 0 || ip.y < 0 || ip.x > V.w || ip.y > V.h){ toast("図面の中をタップしてください"); return; }
-  const f = FIX[rKey] || {};
-  f[c.k] = {z: dz, x: Math.round(ip.x * 10) / 10, y: Math.round(ip.y * 10) / 10, m: c.m, h: c.h, t: Date.now()};
+  const f = FIX[rKey] || {}, old = f[fixSel.k] || {};
+  f[fixSel.k] = Object.assign({}, old, {z: dz, x: Math.round(ip.x * 10) / 10, y: Math.round(ip.y * 10) / 10, m: fixSel.m, h: fixSel.h, t: Date.now()});
   FIX[rKey] = f; store("gj_zfix", FIX);
-  setFixing(false); schedule();
-  toast(treeLabel(c.it, false) + " の位置を直しました（青い点の印）");
+  toast(treeLabel(fixSel.it, false) + " の位置を保存しました");
+  fixSel = null; updateBar(); schedule();
 }
 $z("zFixBar").addEventListener("pointerdown", e => e.stopPropagation());
+
+/* ================= 樹木を追加（図面・数量表に無い樹木） ================= */
+function setAdding(on){
+  if(on && fixing){ fixing = false; fixSel = null; document.body.classList.remove("zFixing"); $z("zFixBtn").classList.remove("on"); }
+  addMode = on; addPt = null;
+  $z("zAddBtn").classList.toggle("on", on);
+  updateBar(); schedule();
+}
+function spList(){
+  const st = listState(), s = new Set();
+  if(st) st.items.forEach(it => { if(it.sp && !isNoTree(it.sp)) s.add(it.sp); });
+  return [...s];
+}
+function placeAdd(sx, sy){
+  const ip = toImage(sx, sy);
+  if(ip.x < 0 || ip.y < 0 || ip.x > V.w || ip.y > V.h){ toast("図面の中をタップしてください"); return; }
+  // いちばん近い樹木の桝番号・樹種を初めの値にする（樹木No.は、その桝の次の番号）
+  const st = listState();
+  let near = null, nd = 1e9;
+  posOnDrawing(dz).forEach(p => {
+    const d = Math.hypot(p.x - ip.x, p.y - ip.y);
+    if(d < nd && idxOf.has(p.k)){ nd = d; near = p; }
+  });
+  let m = "", h = "", sp = "", ni = -1;
+  if(near && st){
+    ni = idxOf.get(near.k);
+    const it = st.items[ni];
+    m = String(it.base != null ? it.base : splitHojo(it.no).base).replace(/#\d+$/, "");
+    sp = it.sp || "";
+    const hs = st.items.filter(x => String(x.base != null ? x.base : "").replace(/#\d+$/, "") === m && x.hojo).map(x => x.hojo);
+    h = hs.length ? (nextHojo(hs[hs.length - 1]) || "") : "1";
+  }
+  addPt = {x: Math.round(ip.x * 10) / 10, y: Math.round(ip.y * 10) / 10, m, h, sp, near: near ? near.k : "", ni};
+  updateBar(); schedule();
+}
+function commitAdd(){
+  const st = listState();
+  if(!st || !addPt){ setAdding(false); return; }
+  const m = $z("zAddM").value.trim(), h = $z("zAddH").value.trim(), sp = $z("zAddS").value.trim();
+  if(!m){ toast("桝No.を入れてください"); return; }
+  const near = addPt.ni >= 0 ? st.items[addPt.ni] : null;
+  const zumen = near ? near.zumen : dz;
+  const k = keyOf(zumen, m, h);
+  if(idxOf.has(k)){ toast(m + (h ? "-" + h : "") + " はもうリストにあります。樹木No.を変えてください"); return; }
+  const it = {no: "", base: m, hojo: h, sp, zumen, city: near ? near.city : "", town: near ? near.town : "",
+              bikou: "現場で追加", girth: "", added: true, solo: false};
+  it.no = composeNo(zumen, m, h, st.zumenKey);
+  if(st.items.some(x => x.no === it.no)){ toast(it.no + " はもうリストにあります。樹木No.を変えてください"); return; }
+  const at = addPt.ni >= 0 ? addPt.ni + 1 : st.items.length;
+  // 同じ桝に樹木が増えたので、元の樹木を「枝番付きで保存されたら済」とみなさない
+  st.items.forEach(x => { if(String(x.base != null ? x.base : x.no).replace(/#\d+$/, "") === m) x.solo = false; });
+  st.items.splice(at, 0, it);
+  if(st.idx >= at) st.idx++;
+  store("gj_imports", imports);
+  const f = FIX[rKey] || {};
+  f[k] = {z: dz, x: addPt.x, y: addPt.y, m, h, t: Date.now(), add: 1};
+  FIX[rKey] = f; store("gj_zfix", FIX);
+  const a = ADD[rKey] || {};
+  a[k] = {item: it, after: addPt.near};
+  ADD[rKey] = a; store("gj_zadd", ADD);
+  buildIndex();
+  setAdding(false);
+  fillSel();
+  pick(at);
+  toast(treeLabel(it, false) + " を追加しました。続けて点検を入力できます");
+}
+function removeAdded(sel){
+  const st = listState(); if(!st || !sel) return;
+  const it = st.items[sel.i];
+  const saved = routeRecords().some(r => r.no === (it && it.no));
+  if(!confirm(treeLabel(sel.it, false) + " の追加を取り消しますか？" + (saved ? "\n（入力した点検結果は消えません）" : ""))) return;
+  if(it && it.added){
+    st.items.splice(sel.i, 1);
+    if(st.idx > sel.i) st.idx--;
+    if(st.idx >= st.items.length) st.idx = st.items.length - 1;
+    store("gj_imports", imports);
+  }
+  const f = FIX[rKey] || {}; delete f[sel.k]; store("gj_zfix", FIX);
+  const a = ADD[rKey] || {}; delete a[sel.k]; store("gj_zadd", ADD);
+  fixSel = null; buildIndex(); updateBar(); schedule(); fillSel();
+  toast("追加を取り消しました");
+}
 
 /* リストのその樹木を入力欄に出す */
 function pick(i){
   if(getMode() !== "list"){ modes[routeKey()] = "list"; store("gj_modes", modes); updateModeUI(); }
   if(insertMode){ insertMode = false; $("insertBanner").style.display = "none"; }
   showListItem(i);
+  const st = listState(), it = st && st.items[i];
+  if(document.body.classList.contains("zNoInp")){
+    if(it) toast(treeLabel(it, false) + "（" + (it.sp || "") + "）を選びました。［入力を表示］で入力できます");
+  } else revealInput();
+}
+/* 入力欄の樹木番号が画面に見えるようにする（入力欄を下までスクロールしていた場合など） */
+function revealInput(){
+  const el = document.getElementById("listInfo") && document.getElementById("listInfo").classList.contains("show")
+           ? document.getElementById("listInfo") : document.getElementById("tno");
+  if(!el) return;
+  const r = el.getBoundingClientRect();
+  const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zTop")) || 120;
+  const wide = window.matchMedia("(min-width:1000px) and (orientation:landscape)").matches;
+  const minY = wide ? top + 8 : $z("zCard").getBoundingClientRect().bottom + 8;
+  if(r.top < minY || r.bottom > window.innerHeight - 20) window.scrollBy({top: r.top - minY - 70, behavior: "smooth"});
+  el.classList.remove("zFlash"); void el.offsetWidth; el.classList.add("zFlash");
 }
 
 /* 入力中の樹木が見えるように（別の図面なら切り替える） */
@@ -479,7 +674,7 @@ view.addEventListener("wheel", e => { e.preventDefault(); const p = vpos(e); zoo
 $z("zSel").onchange = ()=> showDrawing($z("zSel").value, true);
 function stepDrawing(k){
   if(!R) return;
-  const i = R.drawings.findIndex(x => nz(x.zumen) === nz(dz));
+  const i = R.drawings.findIndex(x => nz(x.zumen) === nz(pendingZ || dz));
   const j = Math.max(0, Math.min(R.drawings.length - 1, i + k));
   if(j !== i) showDrawing(R.drawings[j].zumen, true);
 }
@@ -488,6 +683,22 @@ $z("zNext").onclick = ()=> stepDrawing(1);
 $z("zFit").onclick = ()=>{ fitView(); applyView(); };
 $z("zRot").onclick = ()=>{ V.rot = (V.rot + 90) % 360; fitView(); applyView(); };
 $z("zFixBtn").onclick = ()=> setFixing(!fixing);
+$z("zAddBtn").onclick = ()=>{
+  if(!listState()){ toast("先に点検データを取り込んでください"); return; }
+  setAdding(!addMode);
+};
+/* 右（縦向きは下）の入力を隠して図面を大きく見る */
+function applyInp(){
+  document.body.classList.toggle("zNoInp", !!opt.noInp);
+  $z("zInpBtn").textContent = opt.noInp ? "入力を表示" : "入力を隠す";
+  $z("zInpBtn").classList.toggle("on", !!opt.noInp);
+}
+$z("zInpBtn").onclick = ()=>{
+  opt.noInp = !opt.noInp; store("gj_zopt", opt); applyInp();
+  layoutTop();
+  setTimeout(()=>{ fitView(); applyView(); sync(); if(!opt.noInp) revealInput(); }, 60);
+};
+applyInp();
 $z("zHide").onclick = ()=>{ opt.hide = true; store("gj_zopt", opt); document.body.classList.remove("zOn"); };
 showBtn.onclick = ()=>{ opt.hide = false; store("gj_zopt", opt); document.body.classList.add("zOn"); layoutTop(); setTimeout(()=>{ fitView(); applyView(); sync(); }, 50); };
 
@@ -498,8 +709,13 @@ function layoutTop(){
   const h = (hd ? hd.getBoundingClientRect().height : 90) + (bar ? bar.getBoundingClientRect().height : 0);
   document.documentElement.style.setProperty("--zTop", Math.round(h) + "px");
 }
-let rsT = 0;
-window.addEventListener("resize", ()=>{ clearTimeout(rsT); rsT = setTimeout(()=>{ layoutTop(); fitView(); applyView(); }, 150); });
+let rsT = 0, lastW = window.innerWidth;
+// iPad では文字入力のキーボードやスクロールでも resize が来る。幅が変わったとき（回転）だけ全体表示に戻す
+window.addEventListener("resize", ()=>{ clearTimeout(rsT); rsT = setTimeout(()=>{
+  layoutTop();
+  if(Math.abs(window.innerWidth - lastW) > 40){ lastW = window.innerWidth; fitView(); }
+  applyView();
+}, 150); });
 
 /* ================= 取込 ================= */
 $z("zImpBtn").onclick = ()=> $z("zImpFile").click();
@@ -529,10 +745,22 @@ async function importPack(f){
               sp: o.sp || "", zumen: o.zumen || "", city: o.city || "", town: o.town || "",
               bikou: o.bikou || "", girth: o.girth || ""};
     });
+    // 現場で追加した樹木は、取り込み直しても残す（リストに同じ番号が入っていれば、そちらを使う）
+    const adds = ADD[key] || {};
+    Object.keys(adds).forEach(k => {
+      const a = adds[k], it0 = a.item;
+      if(items.some(x => keyOf(x.zumen, x.base, x.hojo) === k)){ delete adds[k]; return; }
+      const j = items.findIndex(x => keyOf(x.zumen, x.base, x.hojo) === a.after);
+      const it = {no: "", base: it0.base, hojo: it0.hojo, sp: it0.sp, zumen: it0.zumen, city: it0.city, town: it0.town,
+                  bikou: it0.bikou || "現場で追加", girth: "", added: true};
+      if(j >= 0) items.splice(j + 1, 0, it); else items.push(it);
+    });
+    store("gj_zadd", ADD);
     const zk = detectZumenKey(items);
     const cnt = {};
     items.forEach(it => { const b = it.base || it.no; cnt[b] = (cnt[b] || 0) + 1; });
-    items.forEach(it => { it.no = composeNo(it.zumen, it.base, it.hojo, zk); it.solo = !it.hojo && cnt[it.base || it.no] === 1; });
+    const addBase = new Set(items.filter(x => x.added).map(x => x.base));
+    items.forEach(it => { it.no = composeNo(it.zumen, it.base, it.hojo, zk); it.solo = !it.added && !addBase.has(it.base) && !it.hojo && cnt[it.base || it.no] === 1; });
     imports[key] = {items, idx: 0, zumenKey: zk};
     modes[key] = "list";
     // 図面
