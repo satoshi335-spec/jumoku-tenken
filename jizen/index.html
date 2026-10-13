@@ -328,7 +328,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 10;   // このファイルを直したら1つ増やす
+const APP_VER = 11;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -500,6 +500,26 @@ async function openPkg(id){
   $("spList").innerHTML = [...new Set(pkg.trees.map(t => t.sp).filter(Boolean))].map(s => '<option value="' + esc(s) + '">').join("");
   $("empty").style.display = "none";
   await showDrawing(dwKey, true);
+  if(res.renum !== 1){   // 以前の版で追加した樹木の番号を、種別ごとの連番に付け直す（1回だけ）
+    const n = renumberAdded();
+    res.renum = 1; saveRes();
+    if(n){ fillDwSel(); scheduleMarks(); toast("追加した樹木 " + n + " 本の番号を、種別ごとの連番（新植1・番号不明1…）に付け直しました"); }
+  }
+}
+/* 自動で付けた番号（新植3・その他2 など）の追加樹木を、路線ごと・種別ごとに図面の並び順で 1 から付け直す。
+   自分で入力した番号（L130 など）はそのまま */
+function renumberAdded(){
+  const re = /^(新植|実生|番号不明|その他)\d*$/;
+  let n = 0;
+  pkg.routes.forEach(rt => {
+    const cnt = {};
+    allTrees().filter(t => t.added && t.route === rt.name && re.test(String(t.no || ""))).sort(byRouteOrder).forEach(t => {
+      const a = res.added.find(x => x.id === t.id), k = a.kind || "番号不明";
+      cnt[k] = (cnt[k] || 0) + 1;
+      if(a.no !== k + cnt[k]){ a.no = k + cnt[k]; n++; }
+    });
+  });
+  return n;
 }
 function showEmpty(){
   pkg = null;
@@ -1353,6 +1373,8 @@ $("rsFile").addEventListener("change", async e => {
     });
     (d.res.added || []).forEach(a => { if(!res.added.some(x => x.id === a.id)){ res.added.push(a); n++; } });
     Object.assign(res.pins, d.res.pins || {});
+    res.added.forEach(a => { if(a.kind === "その他") a.kind = "番号不明"; });
+    if(d.res.renum !== 1) renumberAdded();    // 古い版のバックアップは番号を付け直す
     saveRes(); fillDwSel(); updProgress(); scheduleMarks();
     toast(n + " 件を読み込みました（新しい方を採用）");
   }catch(err){ alert("読み込めませんでした\n" + err.message); }
