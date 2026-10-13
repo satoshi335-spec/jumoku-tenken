@@ -328,7 +328,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 12;   // このファイルを直したら1つ増やす
+const APP_VER = 13;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -500,11 +500,9 @@ async function openPkg(id){
   $("spList").innerHTML = [...new Set(pkg.trees.map(t => t.sp).filter(Boolean))].map(s => '<option value="' + esc(s) + '">').join("");
   $("empty").style.display = "none";
   await showDrawing(dwKey, true);
-  if(res.renum !== 1){   // 以前の版で追加した樹木の番号を、種別ごとの連番に付け直す（1回だけ）
-    const n = renumberAdded();
-    res.renum = 1; saveRes();
-    if(n){ fillDwSel(); scheduleMarks(); toast("追加した樹木 " + n + " 本の番号を、種別ごとの連番（新植1・数量表に無い1…）に付け直しました"); }
-  }
+  // 追加した樹木の番号を、種別ごとに図面の並び順の連番にそろえる（以前の版で付いた番号も直す）
+  const n = renumberAdded();
+  if(n){ saveRes(); fillDwSel(); scheduleMarks(); toast("追加した樹木 " + n + " 本の番号を、図面の並び順の連番（新植1・数量表に無い1…）に付け直しました"); }
 }
 /* 種別「その他」「番号不明」は「数量表に無い」に改めた。自動の番号（番号不明2）も同じ番号のまま名前を合わせる */
 function migrateKinds(){
@@ -515,6 +513,7 @@ function migrateKinds(){
   });
 }
 /* 自動で付けた番号（新植3・その他2 など）の追加樹木を、路線ごと・種別ごとに図面の並び順で 1 から付け直す。
+   追加・種別の変更・移動・削除のたびに呼ぶので、途中に追加すると後ろの番号が1つずつずれる。
    自分で入力した番号（L130 など）はそのまま */
 function renumberAdded(){
   const re = /^(新植|実生|数量表に無い|番号不明|その他)\d*$/;
@@ -870,6 +869,7 @@ function placeHere(id){
     const a = res.added.find(x => x.id === id);
     a.drawing = c.drawing; a.zumen = c.zumen; a.x = c.x; a.y = c.y;
     a.order = insertOrder(a, null);
+    renumberAdded();
   } else {
     const own = pkg.trees.find(x => x.id === id).drawing;
     res.pins[id] = {x: c.x, y: c.y};
@@ -879,7 +879,7 @@ function placeHere(id){
   $("addDlg").classList.remove("show");
   fillDwSel(); updProgress();
   select(id, false);
-  toast(t.no + "（図面" + zShort(t.zumen) + "）をこの位置に置きました");
+  toast(treeById(id).no + "（図面" + zShort(t.zumen) + "）をこの位置に置きました");
 }
 /* 台帳外として追加した樹木を、台帳の樹木（図面で見つからなかった樹木）に置き換える */
 function replaceAdded(addId, id){
@@ -896,6 +896,7 @@ function replaceAdded(addId, id){
   r.t = Date.now();
   res.trees[id] = r;
   res.added = res.added.filter(x => x.id !== a.id); delete res.trees[a.id];
+  renumberAdded();
   saveRes();
   $("addDlg").classList.remove("show");
   fillDwSel(); updProgress();
@@ -924,9 +925,11 @@ $("addOk").onclick = ()=>{
     const a = res.added.find(x => x.id === c.editId);
     a.no = no; a.kind = c.kind;
     const r = rec(a.id); r.sp2 = sp; r.t = Date.now();
+    renumberAdded();
     saveRes();
     $("addDlg").classList.remove("show");
     renderSheet(); scheduleMarks(); if(dwKey.startsWith("nodraw|")) renderNoDraw(dwKey);
+    if(a.no !== no) toast("図面の並び順で「" + a.no + "」になりました");
     return;
   }
   const a = {id: "add-" + Date.now().toString(36), route: c.route, zumen: c.zumen, drawing: c.drawing,
@@ -934,12 +937,13 @@ $("addOk").onclick = ()=>{
   a.order = insertOrder(a, c.prevId);
   res.added.push(a);
   const r = rec(a.id); r.st = "ok"; r.sp2 = sp; r.t = Date.now();
+  renumberAdded();
   saveRes();
   $("addDlg").classList.remove("show");
   fillDwSel(); updProgress();
   if(dwKey.startsWith("nodraw|")) renderNoDraw(dwKey);
   select(a.id, false);
-  toast(c.kind + "の樹木を追加しました。幹周を入力してください");
+  toast("「" + a.no + "」を追加しました。幹周を入力してください");
 };
 $("addBtn").onclick = ()=>{
   if(!pkg || !dwKey) return;
@@ -1143,6 +1147,7 @@ $("delAdd").onclick = e => {
   if(!confirm("この追加樹木を削除しますか？")) return;
   if(!confirm("本当に削除しますか？（元に戻せません）")) return;
   res.added = res.added.filter(a => a.id !== selId); delete res.trees[selId];
+  renumberAdded();
   saveRes(); closeSheet(); fillDwSel(); toast("削除しました");
 };
 
@@ -1382,7 +1387,7 @@ $("rsFile").addEventListener("change", async e => {
     (d.res.added || []).forEach(a => { if(!res.added.some(x => x.id === a.id)){ res.added.push(a); n++; } });
     Object.assign(res.pins, d.res.pins || {});
     migrateKinds();
-    if(d.res.renum !== 1) renumberAdded();    // 古い版のバックアップは番号を付け直す
+    renumberAdded();
     saveRes(); fillDwSel(); updProgress(); scheduleMarks();
     toast(n + " 件を読み込みました（新しい方を採用）");
   }catch(err){ alert("読み込めませんでした\n" + err.message); }
@@ -1562,7 +1567,9 @@ function buildWorkbook(){
     R.rows.push([{v: rt.name + "　事前調査結果", s: 6}]);
     R.rows.push(["赤＝伐採済・空桝　灰＝桝無し　黄＝幹周区分が変わる　薄橙＝未調査　青＝台帳外の追加樹木"]);
     R.rows.push(heads.map(H));
-    const ts = routeTrees(rt.name).sort((a, b) => (a.added ? 1 : 0) - (b.added ? 1 : 0) || (a.zumen < b.zumen ? -1 : a.zumen > b.zumen ? 1 : 0) || (a.order - b.order));
+    // 台帳の樹木は図面の並び順、追加した樹木はその後ろに種別ごと・番号順（＝図面の並び順）
+    const ki = t => { const i = ADD_KINDS.indexOf(t.kind); return i < 0 ? 9 : i; };
+    const ts = routeTrees(rt.name).sort((a, b) => (a.added ? 1 : 0) - (b.added ? 1 : 0) || (a.added && b.added ? ki(a) - ki(b) : 0) || byRouteOrder(a, b));
     ts.forEach((t, i) => {
       const r = recOf(t.id), g = girthOf(r.g), chg = clsChanged(t, r), ac = afterCls(t, r), lc = t.added ? "" : ledgerCls(t);
       const s = t.added ? 9 : r.st === "gone" ? 3 : r.st === "nomasu" ? 4 : !r.st ? 7 : 2;
