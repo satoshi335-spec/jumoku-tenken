@@ -259,12 +259,12 @@ td.chg{background:#FFF3A0!important;font-weight:600}
     <h3 id="addTitle">台帳に無い樹木を追加</h3>
     <p class="note" id="addWhere" style="margin:0 0 4px"></p>
     <div id="addPickBox">
-      <label class="lbl" style="margin-top:6px">図面で見つからない樹木・追加済みの樹木を、この位置に置く</label>
+      <label class="lbl" style="margin-top:6px" id="addPickLbl"></label>
       <div class="pick" id="addPick"></div>
-      <label class="lbl" style="margin-top:14px;font-weight:600;color:var(--tx)">または、台帳に無い樹木として新しく追加する</label>
+      <label class="lbl" style="margin-top:14px;font-weight:600;color:var(--tx)" id="addOrLbl"></label>
     </div>
     <label class="lbl">種別</label>
-    <div class="kinds" id="addKinds"><button data-k="新植">新植</button><button data-k="実生">実生</button><button data-k="その他">その他</button></div>
+    <div class="kinds" id="addKinds"><button data-k="新植">新植</button><button data-k="実生">実生</button><button data-k="番号不明">番号不明</button></div>
     <label class="lbl">樹種</label>
     <input class="inp" id="addSp" list="spList" placeholder="例）クスノキ（分からなければ空欄）">
     <label class="lbl">樹木番号（そのままで構いません）</label>
@@ -328,7 +328,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 8;   // このファイルを直したら1つ増やす
+const APP_VER = 9;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -487,6 +487,7 @@ async function openPkg(id){
   pkg = p;
   res = lsGet(resKey(), null) || {trees: {}, added: [], pins: {}};
   res.added = res.added || []; res.pins = res.pins || {};
+  res.added.forEach(a => { if(a.kind === "その他") a.kind = "番号不明"; });   // 種別「その他」は「番号不明」に改めた
   lsSet("jizen_cur", pkg.id);
   const last = lsGet("jizen_last_" + pkg.id, {});
   route = pkg.routes.some(r => r.name === last.route) ? last.route : pkg.routes[0].name;
@@ -759,7 +760,7 @@ function longPress(sx, sy){
 }
 
 /* ---- 台帳に無い樹木（新植・実生など）の追加 ---- */
-const ADD_KINDS = ["新植", "実生", "その他"];
+const ADD_KINDS = ["新植", "実生", "番号不明"];
 let addMode = false, addCtx = null;
 function setAddMode(on){
   addMode = on;
@@ -782,7 +783,7 @@ function openAddDlg(ctx, editId){
   addCtx = Object.assign({editId: editId || null}, ctx);
   addCtx.prevId = selId;          // 追加する直前に開いていた樹木（「次の樹木」の並びをここにつなぐ）
   const a = editId ? res.added.find(x => x.id === editId) : null;
-  const kind = a ? (a.kind || "その他") : lsGet("jizen_addkind", "新植");
+  const kind = a ? (a.kind || "番号不明") : String(lsGet("jizen_addkind", "新植")).replace("その他", "番号不明");
   addCtx.kind = kind;
   addCtx.auto = a ? null : autoNo(kind, ctx.route);
   $("addOk").textContent = a ? "変更する" : "追加する";
@@ -805,8 +806,17 @@ function pickCands(c){
 }
 function renderPick(){
   const c = addCtx;
-  const ts = (c.editId || !c.drawing) ? [] : pickCands(c);
+  let ts = [];
+  if(c.editId){
+    // 追加した樹木を、図面で見つからない台帳の樹木に置き換える（番号が同じ樹木を先頭に）
+    const a = res.added.find(x => x.id === c.editId);
+    ts = pickCands(Object.assign({}, c, {drawing: a.drawing, zumen: a.zumen})).filter(t => !t.added)
+      .sort((p, q) => (q.no === a.no ? 1 : 0) - (p.no === a.no ? 1 : 0));
+  } else if(c.drawing) ts = pickCands(c);
   $("addPickBox").style.display = ts.length ? "" : "none";
+  $("addPickLbl").textContent = c.editId ? "図面で見つからない台帳の樹木だった場合は、選ぶと置き換えます（入力した幹周・現況・メモは引き継ぎます）"
+                                         : "図面で見つからない樹木・追加済みの樹木を、この位置に置く";
+  $("addOrLbl").textContent = c.editId ? "台帳に無い樹木のまま、種別・番号・樹種を変える" : "または、台帳に無い樹木として新しく追加する";
   $("addTitle").textContent = c.editId ? "追加した樹木の変更" : ts.length ? "この位置に樹木を置く" : "台帳に無い樹木を追加";
   $("addPick").innerHTML = ts.map(t => {
     const r = recOf(t.id), g = girthOf(r.g);
@@ -816,7 +826,7 @@ function renderPick(){
       '<br><small>' + esc(t.added ? "台帳外（" + (t.kind || "追加") + "）" + (r.sp2 ? " " + r.sp2 : "") : (t.sp || "") + (t.c ? " C" + t.c : "")) +
       (g.c != null ? " 実測" + g.c : "") + '<br>' + esc(where) + '</small></button>';
   }).join("");
-  $("addPick").querySelectorAll("button").forEach(b => b.onclick = ()=> placeHere(b.dataset.id));
+  $("addPick").querySelectorAll("button").forEach(b => b.onclick = ()=> c.editId ? replaceAdded(c.editId, b.dataset.id) : placeHere(b.dataset.id));
 }
 function placeHere(id){
   const c = addCtx, t = treeById(id); if(!t) return;
@@ -835,13 +845,35 @@ function placeHere(id){
   select(id, false);
   toast(t.no + "（図面" + zShort(t.zumen) + "）をこの位置に置きました");
 }
+/* 台帳外として追加した樹木を、台帳の樹木（図面で見つからなかった樹木）に置き換える */
+function replaceAdded(addId, id){
+  const a = res.added.find(x => x.id === addId), t = treeById(id); if(!a || !t) return;
+  const old = res.trees[id];
+  if(old && old.st && !confirm(t.no + " には入力済みの調査結果（" + ST_LABEL[old.st] + (old.g ? " " + old.g : "") + "）があります。\n追加した樹木の内容で上書きしますか？")) return;
+  if(a.drawing && a.x != null){
+    const own = pkg.trees.find(x => x.id === id).drawing;
+    res.pins[id] = {x: a.x, y: a.y};
+    if(a.drawing !== own) res.pins[id].dw = a.drawing;
+  }
+  const r = Object.assign({st: "", g: "", sp2: "", memo: "", t: 0}, res.trees[a.id] || {});
+  if(r.sp2 && r.sp2 === t.sp) r.sp2 = "";     // 台帳と同じ樹種なら「現地の樹種」は空にする
+  r.t = Date.now();
+  res.trees[id] = r;
+  res.added = res.added.filter(x => x.id !== a.id); delete res.trees[a.id];
+  saveRes();
+  $("addDlg").classList.remove("show");
+  fillDwSel(); updProgress();
+  if(dwKey.startsWith("nodraw|")) renderNoDraw(dwKey);
+  select(id, false);
+  toast(a.no + " を台帳の " + t.no + "（図面" + zShort(t.zumen) + "）に置き換えました");
+}
 function renderKinds(){
   $("addKinds").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.k === addCtx.kind));
 }
 $("addKinds").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   addCtx.kind = b.dataset.k;
   // 番号を自動のまま使っているときは、種別に合わせて付け直す（新植3 → 実生3）
-  const m = $("addNo").value.match(/^(新植|実生|その他)(\d+)$/);
+  const m = $("addNo").value.match(/^(新植|実生|番号不明|その他)(\d+)$/);
   if(m) $("addNo").value = addCtx.kind + m[2];
   if(addCtx.auto) addCtx.auto = addCtx.kind + (m ? m[2] : "");
   renderKinds();
@@ -1150,7 +1182,7 @@ function tally(r0){
   ts.forEach(t => {
     const r = recOf(t.id);
     if(t.added){
-      if(r.st === "ok"){ o.add++; const k = t.kind || "その他"; o.addKind[k] = (o.addKind[k] || 0) + 1; const a = afterCls(t, r); o.after[a || "x"]++; }
+      if(r.st === "ok"){ o.add++; const k = t.kind || "番号不明"; o.addKind[k] = (o.addKind[k] || 0) + 1; const a = afterCls(t, r); o.after[a || "x"]++; }
       return;
     }
     o.n++;
@@ -1586,7 +1618,8 @@ async function drawSheet(cv, dw){
   ts.forEach(t => {
     const p = posOf(t); if(!p) return;
     marks.push({x: p.x - R, y: p.y - R, w: R * 2, h: R * 2, id: t.id});
-    const r = recOf(t.id), chg = clsChanged(t, r), gg = girthOf(r.g);
+    const r = recOf(t.id), gg = girthOf(r.g);
+    const chg = gg.c != null && gg.c >= 60 && r.st !== "gone" && r.st !== "nomasu";   // 黄色＝実測の幹回りが60cm以上
     g.save();
     if(chg){ g.beginPath(); g.arc(p.x, p.y, R + 7 * k, 0, Math.PI * 2); g.fillStyle = "rgba(255,212,0,.55)"; g.fill(); }
     g.beginPath(); g.arc(p.x, p.y, R, 0, Math.PI * 2);
@@ -1610,15 +1643,16 @@ async function drawSheet(cv, dw){
   });
   // 見出し（左上）の大きさを先に決めて、札がその下に隠れないようにする
   const c = {"": 0, ok: 0, gone: 0, nomasu: 0};
-  let nChg = 0;
+  let nChg = 0, nGe = 0;
   ts.filter(t => !t.added).forEach(t => { const r = recOf(t.id); c[r.st || ""]++; if(clsChanged(t, r)) nChg++; });
+  ts.forEach(t => { const r = recOf(t.id), gg = girthOf(r.g); if(gg.c != null && gg.c >= 60 && r.st !== "gone" && r.st !== "nomasu") nGe++; });
   const nAdd = ts.filter(t => t.added).length;
   const nopos = ts.filter(t => !posOf(t));
   const L = [
     {t: "事前調査結果　" + dw.route + "　図面 " + dw.zumen, b: true, s: 1.5},
     {t: (dw.rev ? "台帳図面 " + dw.rev + " 修正版　" : "") + "出力 " + fmtT(Date.now())},
     {t: "対象 " + (ts.length - nAdd) + "本　現存 " + c.ok + "　伐採済・空桝 " + c.gone + "　桝無し " + c.nomasu +
-        "　未調査 " + c[""] + "　区分変更 " + nChg + (nAdd ? "　台帳外の追加 " + nAdd : "")},
+        "　未調査 " + c[""] + "　区分変更 " + nChg + "　幹回り60cm以上 " + nGe + (nAdd ? "　台帳外の追加 " + nAdd : "")},
     {legend: true},
   ];
   if(nopos.length) L.push({t: "図面上の位置不明: " + nopos.map(t => dispNo(t) + "（" + ST_LABEL[recOf(t.id).st] + (girthOf(recOf(t.id).g).c != null ? " " + girthOf(recOf(t.id).g).c : "") + "）").join("、")});
@@ -1627,8 +1661,8 @@ async function drawSheet(cv, dw){
   L.forEach(l => { if(!l.legend){ g.font = (l.b ? "bold " : "") + Math.round(F * (l.s || 1)) + FONT; bw = Math.max(bw, g.measureText(l.t).width); } });
   // 凡例の行の長さも測って枠に収める
   g.font = Math.round(F * 0.9) + FONT;
-  const LEG = ["樹木番号｜実測幹周cm", "伐採済・空桝", "桝無し", "未調査", "最新図面で撤去（未調査）", "60cm区分が変わる"];
-  const legW = LEG.reduce((a, t) => a + R * 2 + 8 * k + g.measureText(t).width + 28 * k, 0);
+  const LEG = ["樹木番号｜実測幹周cm", "伐採済・空桝", "桝無し", "未調査", "最新図面で撤去（未調査）", "幹回り60cm以上", "(株)は株立ち"];
+  const legW = LEG.reduce((a, t, i) => a + (i < 6 ? R * 2 + 8 * k : 0) + g.measureText(t).width + 28 * k, 0);
   bw = Math.min(Math.max(bw, legW), dw.w - 80 * k);
   const bh = L.reduce((a, l) => a + lh * (l.s || 1), 0) + pad * 2;
   const bx = 40 * k, by = 40 * k;
@@ -1699,9 +1733,13 @@ async function drawSheet(cv, dw){
     const hh = lh * (l.s || 1);
     if(l.legend){
       let x = bx + pad;
-      const items = [["ok", LEG[0]], ["gone", LEG[1]], ["nomasu", LEG[2]], ["", LEG[3]], ["flag", LEG[4]], ["chg", LEG[5]]];
+      const items = [["ok", LEG[0]], ["gone", LEG[1]], ["nomasu", LEG[2]], ["", LEG[3]], ["flag", LEG[4]], ["chg", LEG[5]], ["kabu", LEG[6]]];
       g.font = Math.round(F * 0.9) + FONT;
       items.forEach(([st, label]) => {
+        if(st === "kabu"){   // 印は無く文字だけ
+          g.fillStyle = "#222"; g.fillText(label, x, y + hh / 2 + 1);
+          x += g.measureText(label).width + 28 * k; return;
+        }
         const cx = x + R, cy = y + hh / 2;
         if(st === "chg"){ g.beginPath(); g.arc(cx, cy, R + 5 * k, 0, Math.PI * 2); g.fillStyle = "rgba(255,212,0,.6)"; g.fill(); }
         g.beginPath(); g.arc(cx, cy, R * 0.8, 0, Math.PI * 2);
