@@ -63,6 +63,11 @@ header select{font-size:15px;padding:7px 6px;border-radius:8px;border:none;backg
 .kinds{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
 .kinds button{min-height:48px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:16px;font-weight:600;color:var(--tx)}
 .kinds button.on{background:var(--g);border-color:var(--g);color:#fff}
+.pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:6px;max-height:34dvh;overflow:auto;padding:2px}
+.pick button{text-align:left;padding:7px 9px;border-radius:10px;border:2px dashed var(--warn);background:#fff;font-size:13px;line-height:1.45;color:var(--tx)}
+.pick button.add{border-color:var(--acc)}
+.pick button b{font-size:15px}
+.pick button small{color:var(--tx2);font-size:11px}
 .tlist button.addNd{border-style:dashed;border-color:var(--g);color:var(--g);font-weight:600;text-align:center}
 #legend{position:absolute;left:8px;top:8px;background:rgba(255,255,255,.93);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font-size:12px;line-height:1.7}
 #legend i{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid;margin:0 3px -1px 6px}
@@ -99,6 +104,8 @@ body.selOpen #sheet{display:block}
 .seg button.on[data-st=gone]{background:var(--ng);border-color:var(--ng);color:#fff}
 .seg button.on[data-st=nomasu]{background:#333;border-color:#333;color:#fff}
 .gRow{display:flex;align-items:center;gap:8px;margin-top:10px}
+.gb{min-height:50px;min-width:58px;max-width:110px;border-radius:10px;border:1px solid var(--line);background:#F3F3EE;font-size:14px;color:var(--tx);line-height:1.2;padding:2px 6px;overflow:hidden}
+.gb small{display:block;font-size:11px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #gDisp{flex:1;font-size:26px;font-weight:700;padding:6px 10px;border:2px solid var(--line);border-radius:10px;min-height:50px;background:#fff;display:flex;align-items:baseline;gap:6px}
 #gDisp.act{border-color:var(--acc)}
 #gDisp small{font-size:14px;color:var(--tx2);font-weight:400}
@@ -113,7 +120,7 @@ body.selOpen #sheet{display:block}
 .pad button:active{background:#E6E5DF}
 .pad button.fn{font-size:15px;background:#F3F3EE}
 .pad button.nx{grid-column:span 2;background:var(--g);color:#fff;font-size:16px;font-weight:600;border:none}
-body.noTree .pad button:not(.nx),body.noTree #gDisp{opacity:.35;pointer-events:none}
+body.noTree .pad button:not(.nx),body.noTree #gDisp,body.noTree .gb{opacity:.35;pointer-events:none}
 label.lbl{display:block;font-size:12px;color:var(--tx2);margin:12px 0 4px}
 .inp{width:100%;font-size:16px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--tx);font-family:inherit}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
@@ -214,6 +221,8 @@ td.chg{background:#FFF3A0!important;font-weight:600}
     </div>
     <div class="gRow">
       <div id="gDisp"></div>
+      <button class="gb" id="gCopy">コピー</button>
+      <button class="gb" id="gPaste">貼付</button>
     </div>
     <div id="gNote"></div>
     <div id="clsRow"></div>
@@ -223,7 +232,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
       <button>1</button><button>2</button><button>3</button><button class="fn" data-k="clr">消去</button>
       <button>0</button><button>.</button><button class="nx" data-k="next">次の樹木 ▶</button>
     </div>
-    <p class="note" style="margin-top:4px">株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7で自動計算）</p>
+    <p class="note" style="margin-top:4px">株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7で自動計算）。［コピー］した幹周は、ほかの樹木で［貼付］を押すと同じ値（株立ちの内訳も）が入ります</p>
 
     <label class="lbl" id="sp2Lbl">現地の樹種（台帳と違うときだけ）</label>
     <input class="inp" id="sp2" list="spList" placeholder="例）新植でサクラになっている">
@@ -238,6 +247,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
     <div class="links">
       <a href="#" id="pinLink">図面上の位置を直す</a>
       <a href="#" id="undoLink">未調査に戻す</a>
+      <a href="#" id="unpinLink" style="display:none">指定した位置を取り消す</a>
       <a href="#" id="delAdd" class="del" style="display:none">この追加樹木を削除</a>
     </div>
   </div>
@@ -248,6 +258,11 @@ td.chg{background:#FFF3A0!important;font-weight:600}
   <div class="dlgBox">
     <h3 id="addTitle">台帳に無い樹木を追加</h3>
     <p class="note" id="addWhere" style="margin:0 0 4px"></p>
+    <div id="addPickBox">
+      <label class="lbl" style="margin-top:6px">図面で見つからない樹木・追加済みの樹木を、この位置に置く</label>
+      <div class="pick" id="addPick"></div>
+      <label class="lbl" style="margin-top:14px;font-weight:600;color:var(--tx)">または、台帳に無い樹木として新しく追加する</label>
+    </div>
     <label class="lbl">種別</label>
     <div class="kinds" id="addKinds"><button data-k="新植">新植</button><button data-k="実生">実生</button><button data-k="その他">その他</button></div>
     <label class="lbl">樹種</label>
@@ -313,7 +328,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 6;   // このファイルを直したら1つ増やす
+const APP_VER = 8;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -363,7 +378,7 @@ function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return tr
 
 /* ================= 状態 ================= */
 let pkg = null;           // 取り込んだ台帳と図面の情報（画像は別保存）
-let res = null;           // 調査結果 {trees:{id:rec}, added:[...], pins:{id:{x,y}}}
+let res = null;           // 調査結果 {trees:{id:rec}, added:[...], pins:{id:{x,y,dw?}}}（dw＝台帳と別の図面に置いたとき、その図面）
 let route = "";           // 表示中の路線
 let dwKey = "";           // 表示中の図面（drawing id か "nodraw|路線|図面番号"）
 let selId = null;         // 選択中の樹木
@@ -376,11 +391,18 @@ function saveRes(){ res.saved = Date.now(); lsSet(resKey(), res); }
 function rec(id){ return res.trees[id] || (res.trees[id] = {st: "", g: "", sp2: "", memo: "", t: 0}); }
 function recOf(id){ return res.trees[id] || {st: "", g: "", sp2: "", memo: "", t: 0}; }
 
-/* 台帳の樹木＋現地で追加した樹木 */
+/* 台帳の樹木＋現地で追加した樹木。
+   台帳の図面で見つからず別の図面に置いた樹木は、drawing をその図面に読み替える（moved=true） */
 function allTrees(){
-  return pkg.trees.concat((res.added || []).map(a => Object.assign({added: true, sp: "", c: "", cls: "", h: "", bikou: "", masu: "", row: ""}, a)));
+  const pins = res.pins || {};
+  return pkg.trees.map(t => (pins[t.id] && pins[t.id].dw && pins[t.id].dw !== t.drawing)
+      ? Object.assign({}, t, {drawing: pins[t.id].dw, moved: true, ledgerDrawing: t.drawing}) : t)
+    .concat((res.added || []).map(a => Object.assign({added: true, sp: "", c: "", cls: "", h: "", bikou: "", masu: "", row: ""}, a)));
 }
-function treeById(id){ return pkg.trees.find(t => t.id === id) || allTrees().find(t => t.id === id); }
+function treeById(id){ return allTrees().find(t => t.id === id); }
+/* 図面に書く樹木番号。別の図面から持ってきた樹木は、元の図面番号を付けて区別する（例 049-L12） */
+function dispNo(t){ return t.moved ? zShort(t.zumen) + "-" + t.no : String(t.no || ""); }
+function dwZumen(key){ const d = pkg.drawings.find(x => x.id === key); return d ? d.zumen : ""; }
 function posOf(t){
   const p = res.pins && res.pins[t.id];
   if(p) return p;
@@ -595,7 +617,7 @@ function renderMarks(){
     if(showTag){
       const g = girthOf(r.g);
       let txt = "";
-      if(t.added || (res.pins && res.pins[t.id])) txt = t.no;
+      if(t.added || (res.pins && res.pins[t.id])) txt = dispNo(t);
       if(g.c != null) txt += (txt ? " " : "") + g.c;
       if(txt) html += '<div class="tag' + (chg ? " chg" : "") + '" style="transform:translate(' + (q.x + dd / 2 + 1) + 'px,' + (q.y - dd / 2 - 6) + 'px)">' + esc(txt) + '</div>';
     }
@@ -625,7 +647,7 @@ function renderNoPos(){
   const ts = treesOnKey(dwKey).filter(t => !posOf(t));
   if(!ts.length){ box.innerHTML = ""; return; }
   box.innerHTML = "<b>図面で見つからない樹木</b>" + ts.map(t =>
-    '<button data-id="' + esc(t.id) + '" class="' + (recOf(t.id).st ? "done" : "") + '">' + esc(t.no) + '</button>').join("");
+    '<button data-id="' + esc(t.id) + '" class="' + (recOf(t.id).st ? "done" : "") + '">' + esc(dispNo(t)) + '</button>').join("");
   box.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); select(b.dataset.id, false); });
 }
 
@@ -763,13 +785,55 @@ function openAddDlg(ctx, editId){
   const kind = a ? (a.kind || "その他") : lsGet("jizen_addkind", "新植");
   addCtx.kind = kind;
   addCtx.auto = a ? null : autoNo(kind, ctx.route);
-  $("addTitle").textContent = a ? "追加した樹木の変更" : "台帳に無い樹木を追加";
   $("addOk").textContent = a ? "変更する" : "追加する";
   $("addWhere").textContent = ctx.route + "　図面 " + zShort(ctx.zumen) + (ctx.drawing ? "" : "（図面なし）");
   $("addNo").value = a ? a.no : addCtx.auto;
   $("addSp").value = a ? (recOf(a.id).sp2 || "") : "";
   renderKinds();
+  renderPick();
   $("addDlg").classList.add("show");
+}
+/* この位置に置ける樹木：台帳の図面で位置が分からない樹木（別の図面にあった場合など）と、台帳外で追加した樹木。
+   今の図面に近い図面番号の樹木から並べる */
+function pickCands(c){
+  const zs = drawingsOf(c.route).map(d => d.zumen), zi = z => { const i = zs.indexOf(z); return i < 0 ? 999 : i; };
+  const here = zi(c.zumen);
+  return routeTrees(c.route).filter(t => t.added ? !(t.drawing === c.drawing && t.x != null) : !posOf(t) || t.moved)
+    .filter(t => !(t.moved && t.drawing === c.drawing))
+    .sort((a, b) => (a.added ? 1 : 0) - (b.added ? 1 : 0) || Math.abs(zi(a.zumen) - here) - Math.abs(zi(b.zumen) - here) ||
+                    (a.zumen < b.zumen ? -1 : a.zumen > b.zumen ? 1 : 0) || effOrder(a) - effOrder(b));
+}
+function renderPick(){
+  const c = addCtx;
+  const ts = (c.editId || !c.drawing) ? [] : pickCands(c);
+  $("addPickBox").style.display = ts.length ? "" : "none";
+  $("addTitle").textContent = c.editId ? "追加した樹木の変更" : ts.length ? "この位置に樹木を置く" : "台帳に無い樹木を追加";
+  $("addPick").innerHTML = ts.map(t => {
+    const r = recOf(t.id), g = girthOf(r.g);
+    const where = t.added ? (t.drawing ? (t.x != null ? "図面" + zShort(dwZumen(t.drawing)) + "に配置済" : "位置なし") : "図面なしで追加")
+                          : t.moved ? "図面" + zShort(dwZumen(t.drawing)) + "に配置済" : (t.drawing ? "図面で不明" : "図面PDFなし");
+    return '<button data-id="' + esc(t.id) + '" class="' + (t.added ? "add" : "") + '"><b>' + esc(t.no) + '</b>　' + esc(zShort(t.zumen)) +
+      '<br><small>' + esc(t.added ? "台帳外（" + (t.kind || "追加") + "）" + (r.sp2 ? " " + r.sp2 : "") : (t.sp || "") + (t.c ? " C" + t.c : "")) +
+      (g.c != null ? " 実測" + g.c : "") + '<br>' + esc(where) + '</small></button>';
+  }).join("");
+  $("addPick").querySelectorAll("button").forEach(b => b.onclick = ()=> placeHere(b.dataset.id));
+}
+function placeHere(id){
+  const c = addCtx, t = treeById(id); if(!t) return;
+  if(t.added){
+    const a = res.added.find(x => x.id === id);
+    a.drawing = c.drawing; a.zumen = c.zumen; a.x = c.x; a.y = c.y;
+    a.order = insertOrder(a, null);
+  } else {
+    const own = pkg.trees.find(x => x.id === id).drawing;
+    res.pins[id] = {x: c.x, y: c.y};
+    if(c.drawing !== own) res.pins[id].dw = c.drawing;
+  }
+  saveRes();
+  $("addDlg").classList.remove("show");
+  fillDwSel(); updProgress();
+  select(id, false);
+  toast(t.no + "（図面" + zShort(t.zumen) + "）をこの位置に置きました");
 }
 function renderKinds(){
   $("addKinds").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.k === addCtx.kind));
@@ -828,7 +892,10 @@ function placePin(sx, sy){
   const t = treeById(pinFor);
   const p = toImage(sx, sy);
   if(t.added){ t.x = Math.round(p.x); t.y = Math.round(p.y); const a = res.added.find(x => x.id === t.id); a.x = t.x; a.y = t.y; }
-  else res.pins[t.id] = {x: Math.round(p.x), y: Math.round(p.y)};
+  else {
+    res.pins[t.id] = {x: Math.round(p.x), y: Math.round(p.y)};
+    if(t.moved) res.pins[t.id].dw = t.drawing;     // 別の図面に置いた樹木は、その図面のまま位置だけ直す
+  }
   saveRes();
   const id = pinFor; endPin();
   select(id, false);
@@ -858,6 +925,7 @@ function renderSheet(){
   const r = recOf(t.id);
   $("sNo").textContent = t.no;
   $("sSub").innerHTML = esc(t.route) + "　図面 " + esc(zShort(t.zumen)) + (t.masu ? "　桝 " + esc(t.masu) : "") +
+                        (t.moved ? '　<b style="color:var(--acc)">位置は図面 ' + esc(zShort(dwZumen(t.drawing))) + '</b>' : "") +
                         (t.added ? '　<b style="color:var(--acc)">台帳外（' + esc(t.kind || "追加") + '）</b>' : "");
   $("sp2Lbl").textContent = t.added ? "樹種" : "現地の樹種（台帳と違うときだけ）";
   if(t.added){
@@ -882,6 +950,7 @@ function renderSheet(){
   $("pinLink").style.display = t.drawing ? "" : "none";
   $("delAdd").style.display = t.added ? "" : "none";
   $("undoLink").style.display = t.added ? "none" : "";
+  $("unpinLink").style.display = !t.added && res.pins[t.id] ? "" : "none";
 }
 function renderGirth(){
   const t = treeById(selId); const r = recOf(selId);
@@ -890,6 +959,8 @@ function renderGirth(){
   $("gDisp").innerHTML = (g.kabu ? raw + '<small>→ ' + g.c + ' cm</small>' : raw + (r.g ? "<small>cm</small>" : ""));
   $("gDisp").classList.toggle("act", !!r.g);
   $("gNote").textContent = g.note;
+  const clip = lsGet("jizen_gclip", "");
+  $("gPaste").innerHTML = "貼付" + (clip ? "<small>" + esc(clip.replace(/\+/g, "＋")) + "</small>" : "");
   const lc = t.added ? "" : ledgerCls(t);
   if(r.st === "gone" || r.st === "nomasu"){
     $("clsRow").innerHTML = '<span class="cls chg">' + ST_LABEL[r.st] + '</span>　集計の本数から除きます';
@@ -945,6 +1016,28 @@ $("pad").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   touch(r); renderGirth();
   $("seg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.st === r.st));
 });
+/* 幹周のコピー・貼り付け（株立ちの内訳ごと）。iPadのクリップボードにも幹周の数字を入れる */
+$("gCopy").onclick = ()=>{
+  const r = recOf(selId), g = girthOf(r.g);
+  if(g.c == null){ toast("コピーする幹周が入っていません"); return; }
+  lsSet("jizen_gclip", r.g.replace(/\+$/, ""));
+  try{ navigator.clipboard && navigator.clipboard.writeText(String(g.c)).catch(()=>{}); }catch(_){}
+  renderGirth();
+  toast("幹周 " + (g.kabu ? r.g.replace(/\+/g, "＋") + "（→" + g.c + "cm）" : g.c + "cm") + " をコピーしました");
+};
+$("gPaste").onclick = async ()=>{
+  let v = lsGet("jizen_gclip", "");
+  if(!v){
+    try{ const s = navigator.clipboard ? await navigator.clipboard.readText() : ""; const m = String(s).match(/\d+(\.\d+)?/); if(m) v = m[0]; }catch(_){}
+  }
+  if(!v || girthOf(v).c == null){ toast("先にほかの樹木で［コピー］を押してください"); return; }
+  const r = rec(selId);
+  if(r.st === "gone" || r.st === "nomasu") return;
+  r.g = v;
+  if(!r.st) r.st = "ok";
+  touch(r); renderGirth();
+  $("seg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.st === r.st));
+};
 $("sp2").addEventListener("input", ()=>{ const r = rec(selId); r.sp2 = $("sp2").value.trim(); touch(r); });
 $("memo").addEventListener("input", ()=>{ const r = rec(selId); r.memo = $("memo").value; touch(r); renderChips(); });
 
@@ -965,6 +1058,16 @@ $("undoLink").onclick = e => {
   e.preventDefault();
   if(!confirm("この樹木の入力を消して未調査に戻しますか？")) return;
   delete res.trees[selId]; saveRes(); scheduleMarks(); fillDwSel(); updProgress(); renderSheet();
+};
+$("unpinLink").onclick = e => {
+  e.preventDefault();
+  const t = treeById(selId); if(!t || !res.pins[t.id]) return;
+  if(!confirm(t.no + " に指定した図面上の位置を取り消しますか？" + (t.moved ? "\n（台帳の図面 " + zShort(t.zumen) + " の「図面で見つからない樹木」に戻ります）" : ""))) return;
+  delete res.pins[t.id]; saveRes();
+  const key = t.ledgerDrawing !== undefined ? t.ledgerDrawing : t.drawing;
+  closeSheet(); fillDwSel(); scheduleMarks();
+  if(key && key !== dwKey) showDrawing(key, true);
+  toast(t.no + " の位置を取り消しました");
 };
 $("delAdd").onclick = e => {
   e.preventDefault();
@@ -1026,7 +1129,7 @@ function renderList(){
   let h = "<tr><th>図面</th><th>桝</th><th>樹木No</th><th>樹種</th><th>台帳C</th><th>現況</th><th>実測C</th><th>区分</th><th>メモ</th></tr>";
   ts.forEach(t => {
     const r = recOf(t.id), g = girthOf(r.g), chg = clsChanged(t, r), ac = afterCls(t, r);
-    h += '<tr data-id="' + esc(t.id) + '" class="' + (r.st || "none") + '"><td>' + esc(zShort(t.zumen)) + "</td><td>" + esc(t.masu) +
+    h += '<tr data-id="' + esc(t.id) + '" class="' + (r.st || "none") + '"><td>' + esc(zShort(t.zumen)) + (t.moved ? "→" + esc(zShort(dwZumen(t.drawing))) : "") + "</td><td>" + esc(t.masu) +
          "</td><td><b>" + esc(t.no) + "</b>" + (t.added ? "（" + esc(t.kind || "追加") + "）" : "") + (t.flag ? ' <span style="color:var(--ng)">図面で撤去</span>' : "") + "</td><td>" + esc(t.added ? (r.sp2 || "") : r.sp2 ? r.sp2 + "（台帳 " + (t.sp || "—") + "）" : t.sp) +
          '</td><td class="n">' + esc(t.c) + "</td><td>" + ST_LABEL[r.st] + '</td><td class="n">' + (g.c != null ? g.c : "") +
          '</td><td class="' + (chg ? "chg" : "") + '">' + (ac ? CLS_TXT[ac] : (ac === null ? "—" : "")) + "</td><td>" + esc(r.memo) + "</td></tr>";
@@ -1397,7 +1500,8 @@ function buildWorkbook(){
         c(t.added ? "追加（" + (t.kind || "台帳外") + "）" : ST_LABEL[r.st]), cn(g.c != null ? g.c : ""), c(g.note),
         chg ? {v: ac ? CLS_TXT[ac] : "", s: 5} : c(ac ? CLS_TXT[ac] : (ac === null ? "—" : "")),
         chg ? {v: "変更", s: 5} : c(""), c(r.sp2), c(r.memo), c(t.bikou),
-        c(t.flag === "red" ? "赤い○（撤去）" : t.flag === "nolabel" ? "記号・番号なし" : ""), c(fmtT(r.t)), cn(t.row)]);
+        c([t.flag === "red" ? "赤い○（撤去）" : t.flag === "nolabel" ? "記号・番号なし" : "", t.moved ? "位置は図面 " + zShort(dwZumen(t.drawing)) : ""].filter(Boolean).join("　")),
+        c(fmtT(r.t)), cn(t.row)]);
     });
     R.filter = "A3:" + XL.col(heads.length - 1) + (R.rows.length);
     sheets.push(R);
@@ -1502,7 +1606,7 @@ async function drawSheet(cv, dw){
     else if(gg.c != null) val = gg.c + (gg.kabu ? "(株)" : "");
     else if(t.flag && !r.st) val = "図面撤去";
     if(r.sp2) val += " " + r.sp2;
-    tags.push({id: t.id, px: p.x, py: p.y, no: String(t.no || ""), val: val.trim(), chg, st: r.st});
+    tags.push({id: t.id, px: p.x, py: p.y, no: dispNo(t), val: val.trim(), chg, st: r.st});
   });
   // 見出し（左上）の大きさを先に決めて、札がその下に隠れないようにする
   const c = {"": 0, ok: 0, gone: 0, nomasu: 0};
@@ -1517,7 +1621,7 @@ async function drawSheet(cv, dw){
         "　未調査 " + c[""] + "　区分変更 " + nChg + (nAdd ? "　台帳外の追加 " + nAdd : "")},
     {legend: true},
   ];
-  if(nopos.length) L.push({t: "図面上の位置不明: " + nopos.map(t => t.no + "（" + ST_LABEL[recOf(t.id).st] + (girthOf(recOf(t.id).g).c != null ? " " + girthOf(recOf(t.id).g).c : "") + "）").join("、")});
+  if(nopos.length) L.push({t: "図面上の位置不明: " + nopos.map(t => dispNo(t) + "（" + ST_LABEL[recOf(t.id).st] + (girthOf(recOf(t.id).g).c != null ? " " + girthOf(recOf(t.id).g).c : "") + "）").join("、")});
   const F = Math.round(30 * k), pad = 18 * k, lh = F * 1.55;
   let bw = 0;
   L.forEach(l => { if(!l.legend){ g.font = (l.b ? "bold " : "") + Math.round(F * (l.s || 1)) + FONT; bw = Math.max(bw, g.measureText(l.t).width); } });
