@@ -232,7 +232,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
       <button>1</button><button>2</button><button>3</button><button class="fn" data-k="clr">消去</button>
       <button>0</button><button>.</button><button class="nx" data-k="next">次の樹木 ▶</button>
     </div>
-    <p class="note" style="margin-top:4px">株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7で自動計算）。［コピー］した幹周は、ほかの樹木で［貼付］を押すと同じ値（株立ちの内訳も）が入ります</p>
+    <p class="note" style="margin-top:4px">株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7、小数点以下切り捨てで自動計算）。［コピー］した幹周は、ほかの樹木で［貼付］を押すと同じ値（株立ちの内訳も）が入ります</p>
 
     <label class="lbl" id="sp2Lbl">現地の樹種（台帳と違うときだけ）</label>
     <input class="inp" id="sp2" list="spList" placeholder="例）新植でサクラになっている">
@@ -328,7 +328,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 9;   // このファイルを直したら1つ増やす
+const APP_VER = 10;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -415,8 +415,10 @@ function girthOf(g){
   const parts = String(g || "").split("+").map(s => parseFloat(s)).filter(v => v > 0);
   if(!parts.length) return {c: null, note: "", kabu: false};
   if(parts.length === 1) return {c: parts[0], note: "", kabu: false};
-  const c = Math.round(parts.reduce((a, b) => a + b, 0) * 0.7 * 10) / 10;
-  return {c, kabu: true, note: "株立ち" + parts.length + "本立ち　幹周り＝(" + parts.join("＋") + ")×0.7＝" + c + "cm"};
+  const sum = parts.reduce((a, b) => a + b, 0);
+  const raw = Math.round(sum * 7) / 10;          // 合計×0.7（70×0.7＝48.999… の誤差を避けて計算）
+  const c = Math.floor(raw);                      // 小数点以下は切り捨て
+  return {c, kabu: true, note: "株立ち" + parts.length + "本立ち　幹周り＝(" + parts.join("＋") + ")×0.7＝" + raw + (raw !== c ? "→" + c : "") + "cm（小数点以下切り捨て）"};
 }
 function ledgerCls(t){
   if(t.cls === "lt" || t.cls === "ge") return t.cls;
@@ -778,7 +780,13 @@ function openAddAt(sx, sy){
   const p = toImage(sx, sy);
   openAddDlg({route, zumen: d.zumen, drawing: dwKey, x: Math.round(p.x), y: Math.round(p.y)});
 }
-function autoNo(kind, r){ return kind + ((res.added || []).filter(a => a.route === r).length + 1); }
+/* 自動の樹木番号：種別ごとに 新植1, 新植2 … ／ 番号不明1, 番号不明2 …（路線ごと、使われている番号の次） */
+function autoNo(kind, r, exceptId){
+  const re = new RegExp("^" + kind + "(\\d+)$");
+  const max = (res.added || []).filter(a => a.route === r && a.id !== exceptId)
+    .reduce((m, a) => { const x = String(a.no || "").match(re); return x ? Math.max(m, +x[1]) : m; }, 0);
+  return kind + (max + 1);
+}
 function openAddDlg(ctx, editId){
   addCtx = Object.assign({editId: editId || null}, ctx);
   addCtx.prevId = selId;          // 追加する直前に開いていた樹木（「次の樹木」の並びをここにつなぐ）
@@ -872,10 +880,11 @@ function renderKinds(){
 }
 $("addKinds").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   addCtx.kind = b.dataset.k;
-  // 番号を自動のまま使っているときは、種別に合わせて付け直す（新植3 → 実生3）
+  // 番号を自動のまま使っているときは、その種別の次の番号に付け直す（新植2 → 番号不明1）
   const m = $("addNo").value.match(/^(新植|実生|番号不明|その他)(\d+)$/);
-  if(m) $("addNo").value = addCtx.kind + m[2];
-  if(addCtx.auto) addCtx.auto = addCtx.kind + (m ? m[2] : "");
+  const nx = autoNo(addCtx.kind, addCtx.route, addCtx.editId);
+  if(m || !$("addNo").value.trim()) $("addNo").value = nx;
+  if(addCtx.auto) addCtx.auto = nx;
   renderKinds();
 });
 $("addCancel").onclick = ()=> $("addDlg").classList.remove("show");
@@ -1508,7 +1517,7 @@ function buildWorkbook(){
   S.merges.push("A" + r1 + ":A" + (r1 + 2));
   S.rows.push([]);
   S.rows.push(["※事前調査後＝台帳の樹木から伐採済・空桝と桝無しを除き、台帳外の追加樹木を加えた本数。"]);
-  S.rows.push(["※幹周は実測値で区分し、未調査・幹周未測定の樹木は台帳の区分のまま数えています。株立ちは各幹周の合計×0.7。"]);
+  S.rows.push(["※幹周は実測値で区分し、未調査・幹周未測定の樹木は台帳の区分のまま数えています。株立ちは各幹周の合計×0.7（小数点以下切り捨て）。"]);
   S.rows.push([]);
   S.rows.push([H("対象路線"), H("対象本数"), H("調査済"), H("未調査"), H("現存"), H("伐採済・空桝 ／ 桝無し ／ 追加 ／ 区分変更 ／ 幹周未測定")]);
   pkg.routes.forEach(rt => {
