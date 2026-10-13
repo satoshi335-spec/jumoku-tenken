@@ -264,7 +264,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
       <label class="lbl" style="margin-top:14px;font-weight:600;color:var(--tx)" id="addOrLbl"></label>
     </div>
     <label class="lbl">種別</label>
-    <div class="kinds" id="addKinds"><button data-k="新植">新植</button><button data-k="実生">実生</button><button data-k="番号不明">番号不明</button></div>
+    <div class="kinds" id="addKinds"><button data-k="新植">新植</button><button data-k="実生">実生</button><button data-k="数量表に無い">数量表に無い</button></div>
     <label class="lbl">樹種</label>
     <input class="inp" id="addSp" list="spList" placeholder="例）クスノキ（分からなければ空欄）">
     <label class="lbl">樹木番号（そのままで構いません）</label>
@@ -328,7 +328,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 11;   // このファイルを直したら1つ増やす
+const APP_VER = 12;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -489,7 +489,7 @@ async function openPkg(id){
   pkg = p;
   res = lsGet(resKey(), null) || {trees: {}, added: [], pins: {}};
   res.added = res.added || []; res.pins = res.pins || {};
-  res.added.forEach(a => { if(a.kind === "その他") a.kind = "番号不明"; });   // 種別「その他」は「番号不明」に改めた
+  migrateKinds();
   lsSet("jizen_cur", pkg.id);
   const last = lsGet("jizen_last_" + pkg.id, {});
   route = pkg.routes.some(r => r.name === last.route) ? last.route : pkg.routes[0].name;
@@ -503,18 +503,26 @@ async function openPkg(id){
   if(res.renum !== 1){   // 以前の版で追加した樹木の番号を、種別ごとの連番に付け直す（1回だけ）
     const n = renumberAdded();
     res.renum = 1; saveRes();
-    if(n){ fillDwSel(); scheduleMarks(); toast("追加した樹木 " + n + " 本の番号を、種別ごとの連番（新植1・番号不明1…）に付け直しました"); }
+    if(n){ fillDwSel(); scheduleMarks(); toast("追加した樹木 " + n + " 本の番号を、種別ごとの連番（新植1・数量表に無い1…）に付け直しました"); }
   }
+}
+/* 種別「その他」「番号不明」は「数量表に無い」に改めた。自動の番号（番号不明2）も同じ番号のまま名前を合わせる */
+function migrateKinds(){
+  res.added.forEach(a => {
+    if(a.kind === "その他" || a.kind === "番号不明") a.kind = "数量表に無い";
+    const m = String(a.no || "").match(/^(その他|番号不明)(\d+)$/);
+    if(m) a.no = "数量表に無い" + m[2];
+  });
 }
 /* 自動で付けた番号（新植3・その他2 など）の追加樹木を、路線ごと・種別ごとに図面の並び順で 1 から付け直す。
    自分で入力した番号（L130 など）はそのまま */
 function renumberAdded(){
-  const re = /^(新植|実生|番号不明|その他)\d*$/;
+  const re = /^(新植|実生|数量表に無い|番号不明|その他)\d*$/;
   let n = 0;
   pkg.routes.forEach(rt => {
     const cnt = {};
     allTrees().filter(t => t.added && t.route === rt.name && re.test(String(t.no || ""))).sort(byRouteOrder).forEach(t => {
-      const a = res.added.find(x => x.id === t.id), k = a.kind || "番号不明";
+      const a = res.added.find(x => x.id === t.id), k = a.kind || "数量表に無い";
       cnt[k] = (cnt[k] || 0) + 1;
       if(a.no !== k + cnt[k]){ a.no = k + cnt[k]; n++; }
     });
@@ -782,7 +790,7 @@ function longPress(sx, sy){
 }
 
 /* ---- 台帳に無い樹木（新植・実生など）の追加 ---- */
-const ADD_KINDS = ["新植", "実生", "番号不明"];
+const ADD_KINDS = ["新植", "実生", "数量表に無い"];
 let addMode = false, addCtx = null;
 function setAddMode(on){
   addMode = on;
@@ -800,7 +808,7 @@ function openAddAt(sx, sy){
   const p = toImage(sx, sy);
   openAddDlg({route, zumen: d.zumen, drawing: dwKey, x: Math.round(p.x), y: Math.round(p.y)});
 }
-/* 自動の樹木番号：種別ごとに 新植1, 新植2 … ／ 番号不明1, 番号不明2 …（路線ごと、使われている番号の次） */
+/* 自動の樹木番号：種別ごとに 新植1, 新植2 … ／ 数量表に無い1, 数量表に無い2 …（路線ごと、使われている番号の次） */
 function autoNo(kind, r, exceptId){
   const re = new RegExp("^" + kind + "(\\d+)$");
   const max = (res.added || []).filter(a => a.route === r && a.id !== exceptId)
@@ -811,7 +819,7 @@ function openAddDlg(ctx, editId){
   addCtx = Object.assign({editId: editId || null}, ctx);
   addCtx.prevId = selId;          // 追加する直前に開いていた樹木（「次の樹木」の並びをここにつなぐ）
   const a = editId ? res.added.find(x => x.id === editId) : null;
-  const kind = a ? (a.kind || "番号不明") : String(lsGet("jizen_addkind", "新植")).replace("その他", "番号不明");
+  const kind = a ? (a.kind || "数量表に無い") : String(lsGet("jizen_addkind", "新植")).replace(/^(その他|番号不明)$/, "数量表に無い");
   addCtx.kind = kind;
   addCtx.auto = a ? null : autoNo(kind, ctx.route);
   $("addOk").textContent = a ? "変更する" : "追加する";
@@ -900,8 +908,8 @@ function renderKinds(){
 }
 $("addKinds").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   addCtx.kind = b.dataset.k;
-  // 番号を自動のまま使っているときは、その種別の次の番号に付け直す（新植2 → 番号不明1）
-  const m = $("addNo").value.match(/^(新植|実生|番号不明|その他)(\d+)$/);
+  // 番号を自動のまま使っているときは、その種別の次の番号に付け直す（新植2 → 数量表に無い1）
+  const m = $("addNo").value.match(/^(新植|実生|数量表に無い|番号不明|その他)(\d+)$/);
   const nx = autoNo(addCtx.kind, addCtx.route, addCtx.editId);
   if(m || !$("addNo").value.trim()) $("addNo").value = nx;
   if(addCtx.auto) addCtx.auto = nx;
@@ -1211,7 +1219,7 @@ function tally(r0){
   ts.forEach(t => {
     const r = recOf(t.id);
     if(t.added){
-      if(r.st === "ok"){ o.add++; const k = t.kind || "番号不明"; o.addKind[k] = (o.addKind[k] || 0) + 1; const a = afterCls(t, r); o.after[a || "x"]++; }
+      if(r.st === "ok"){ o.add++; const k = t.kind || "数量表に無い"; o.addKind[k] = (o.addKind[k] || 0) + 1; const a = afterCls(t, r); o.after[a || "x"]++; }
       return;
     }
     o.n++;
@@ -1373,7 +1381,7 @@ $("rsFile").addEventListener("change", async e => {
     });
     (d.res.added || []).forEach(a => { if(!res.added.some(x => x.id === a.id)){ res.added.push(a); n++; } });
     Object.assign(res.pins, d.res.pins || {});
-    res.added.forEach(a => { if(a.kind === "その他") a.kind = "番号不明"; });
+    migrateKinds();
     if(d.res.renum !== 1) renumberAdded();    // 古い版のバックアップは番号を付け直す
     saveRes(); fillDwSel(); updProgress(); scheduleMarks();
     toast(n + " 件を読み込みました（新しい方を採用）");
