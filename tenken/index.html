@@ -102,6 +102,26 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 #listPanel.show{display:block}
 #listProg{font-size:13px;color:var(--tx2);margin:8px 0 0}
 #listProg b{color:var(--g)}
+/* 程度（A軽度・B処置が必要・C緊急対応）と点検コメント集 */
+#lvBox{display:none;margin-top:12px;padding:8px 10px;background:#F8F8F4;border:1px solid var(--line);border-radius:10px}
+#lvBox.show{display:block}
+#lvBox .lvHead{font-size:12px;color:var(--tx2);margin:0 0 4px}
+.lvRow{display:flex;align-items:center;gap:6px;padding:7px 0;border-top:1px dashed var(--line);flex-wrap:wrap}
+.lvRow:first-of-type{border-top:none}
+.lvName{flex:1;min-width:130px;font-size:13px;font-weight:600}
+.lvBtn{min-width:64px;min-height:40px;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:600;font-family:inherit;color:var(--tx);line-height:1.15}
+.lvBtn small{display:block;font-size:10px;font-weight:400}
+.lvBtn.on[data-lv=A]{background:#E3F1E0;border-color:#4C8C3F;color:#2D5E24}
+.lvBtn.on[data-lv=B]{background:var(--warn-bg);border-color:#C98A00;color:var(--warn-tx)}
+.lvBtn.on[data-lv=C]{background:var(--ng-bg);border-color:var(--ng-tx);color:var(--ng-tx)}
+.lvTool{min-height:40px;padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:12px;font-family:inherit;color:var(--acc)}
+#urgent{display:none;background:var(--ng-tx);color:#fff}
+.tcItem{padding:10px 0;border-top:1px solid var(--line)}
+.tcItem b{font-size:14px}
+.tcL{display:block;font-size:12px;font-weight:600;margin:6px 0 2px}
+.tcL[data-l=A]{color:#2D5E24}.tcL[data-l=B]{color:var(--warn-tx)}.tcL[data-l=C]{color:var(--ng-tx)}
+.tcItem textarea{font-size:14px}
+.tcMod{color:var(--acc);font-weight:400}
 .toast{position:fixed;bottom:16px;left:12px;right:12px;max-width:640px;margin:0 auto;background:var(--g-dark);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
 .toast.show{opacity:1}
 #view-sum{display:none}
@@ -184,6 +204,22 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
       <label class="lbl">黒板の業務名（写真の小黒板に表示）</label>
       <input id="koji" placeholder="例）令和8年度 街路樹診断業務（未入力なら事務所+路線名）">
       <p class="note">一度入力すれば記憶されます。変えるときだけ開いてください</p>
+    </div>
+  </details>
+
+  <details id="tcPanel">
+    <summary>点検コメント集（特記事項に自動で入る文）</summary>
+    <div class="card">
+      <p class="note" style="margin-top:0">点検項目と程度（A＝軽度／B＝処置が必要／C＝緊急対応が必要）ごとの文です。
+        1行に1つの文。複数行にすると、入力画面の［候補］で切り替えられます（1行目が既定）。
+        ここで直した文はこのiPadに保存されます。［書き出し］したファイルを事務所PCに送れば、全員の初期値に取り込めます。</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+        <button type="button" class="miniBtn pri" id="tcExport">書き出し</button>
+        <button type="button" class="miniBtn" id="tcImport">読み込み</button>
+        <input type="file" id="tcFile" accept=".json,application/json" style="display:none">
+        <button type="button" class="miniBtn del" id="tcReset">初期値に戻す</button>
+      </div>
+      <div id="tcEdit"></div>
     </div>
   </details>
 
@@ -298,6 +334,10 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     <div class="grid2" id="g2"></div>
     <p class="sec">③樹木の異常</p>
     <div class="grid2" id="g3"></div>
+    <div id="lvBox">
+      <p class="lvHead">程度を選ぶと、その他特記事項に文が入ります（A＝軽度　B＝処置が必要　C＝緊急対応が必要）。✎で文を直すと次から使われます</p>
+      <div id="lvList"></div>
+    </div>
 
     <label class="lbl" style="margin-top:16px">その他特記事項<span id="memoAutoHint" style="color:var(--acc)"></span></label>
     <textarea id="memo" data-key="memo" rows="2" placeholder="例）キノコ：根元に子実体2個"></textarea>
@@ -305,6 +345,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 
     <div id="statusRow">
       <span id="judge" class="badge"></span>
+      <span id="urgent" class="badge">C 緊急：監督員へ速やかに報告</span>
       <span id="photoHint"></span>
     </div>
     <div id="photoRow">
@@ -447,6 +488,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 <div id="camFlash"></div>
 <div id="toast" class="toast"></div>
 
+<script src="comments.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const ITEMS = [
@@ -485,9 +527,132 @@ let sumSel = null;
 ITEMS.forEach((it,i)=>{
   const b = document.createElement("button");
   b.type = "button"; b.className = "itm"; b.dataset.i = i; b.textContent = it.label;
-  b.onclick = () => { b.classList.toggle("on"); calc(); };
+  b.onclick = () => {
+    b.classList.toggle("on");
+    if(b.classList.contains("on")){ alt[i] = 0; setLevel(i, lv[i] || "A"); }     // 押すと「A 軽度」の文が入る
+    else dropLevel(i);
+    calc();
+  };
   $("g"+it.g).appendChild(b);
 });
+
+/* ================= 程度（A・B・C）と特記事項の自動コメント ================= */
+/* 文の初期値は comments.js（CMT_DEFAULT）。iPadで直した文は gj_tc に保存され、初期値より優先 */
+const LV = {A: "軽度", B: "処置が必要", C: "緊急対応"};
+let tcUser = load("gj_tc", {});            // {点検項目: {A:[文…], B:[…], C:[…]}}
+let lv = {}, autoTxt = {}, alt = {};       // 入力中の樹木：項目番号 → 程度／特記事項に入れた文／候補の番号
+const SENT_END = /[。．.！!）)]$/;
+function tcDefault(i, g){ const d = (typeof CMT_DEFAULT !== "undefined" && CMT_DEFAULT[ITEMS[i].csv]) || {}; return d[g] || []; }
+function tcList(i, g){ const u = tcUser[ITEMS[i].csv]; return (u && u[g] && u[g].length) ? u[g] : tcDefault(i, g); }
+function tcText(i){ if(!lv[i]) return ""; const L = tcList(i, lv[i]); return L.length ? L[Math.min(alt[i] || 0, L.length - 1)] : ""; }
+/* 特記事項の中の oldT を newT に差し替える。見つからなければ（手で書き換えた等）newT を後ろに足す */
+function memoPut(oldT, newT){
+  let m = $("memo").value;
+  if(oldT && m.includes(oldT)) m = m.replace(oldT, newT || "");
+  else if(newT){ m = m.trim(); m = m ? m + (SENT_END.test(m) ? "" : "。") + newT : newT; }
+  $("memo").value = m.replace(/。{2,}/g, "。").replace(/^[。\s]+/, "").trim();
+}
+function setLevel(i, g){
+  lv[i] = g;
+  const t = tcText(i);
+  memoPut(autoTxt[i], t);
+  if(t) autoTxt[i] = t; else delete autoTxt[i];
+}
+function dropLevel(i){
+  memoPut(autoTxt[i], "");
+  delete lv[i]; delete autoTxt[i]; delete alt[i];
+}
+function resetLevels(){ lv = {}; autoTxt = {}; alt = {}; }
+/* 特記事項の欄は文の量に合わせて高さを変える */
+function memoFit(){ const m = $("memo"); m.style.height = "auto"; m.style.height = Math.max(m.scrollHeight + 2, 52) + "px"; }
+$("memo").addEventListener("input", memoFit);
+function renderLv(){
+  memoFit();
+  const on = [...document.querySelectorAll(".itm.on")].map(b => +b.dataset.i)
+    .sort((a, b) => ITEMS[a].g - ITEMS[b].g || a - b);
+  const show = on.length > 0 && !isNoTree($("sp").value);
+  $("lvBox").classList.toggle("show", show);
+  $("urgent").style.display = show && on.some(i => lv[i] === "C") ? "inline-block" : "none";
+  $("lvList").innerHTML = on.map(i => {
+    const n = lv[i] ? tcList(i, lv[i]).length : 0;
+    return '<div class="lvRow" data-i="' + i + '"><span class="lvName">' + esc(ITEMS[i].csv) + '</span>' +
+      ["A", "B", "C"].map(g => '<button type="button" class="lvBtn' + (lv[i] === g ? " on" : "") + '" data-lv="' + g + '">' +
+        g + '<small>' + LV[g] + '</small></button>').join("") +
+      (n > 1 ? '<button type="button" class="lvTool" data-k="alt">候補 ' + ((alt[i] || 0) % n + 1) + '/' + n + '</button>' : '') +
+      (lv[i] ? '<button type="button" class="lvTool" data-k="edit">✎ 文を直す</button>' : '') + '</div>';
+  }).join("");
+  $("lvList").querySelectorAll(".lvRow").forEach(row => {
+    const i = +row.dataset.i;
+    row.querySelectorAll(".lvBtn").forEach(b => b.onclick = () => {
+      if(lv[i] !== b.dataset.lv) alt[i] = 0;
+      setLevel(i, b.dataset.lv); renderLv();
+    });
+    const a = row.querySelector('[data-k="alt"]');
+    if(a) a.onclick = () => { alt[i] = ((alt[i] || 0) + 1) % tcList(i, lv[i]).length; setLevel(i, lv[i]); renderLv(); };
+    const e = row.querySelector('[data-k="edit"]');
+    if(e) e.onclick = () => editTc(i);
+  });
+}
+/* いま使っている文をその場で直す（直した文は次の樹木からも使われる） */
+function editTc(i){
+  const g = lv[i]; if(!g) return;
+  const k = ITEMS[i].csv, idx = alt[i] || 0, L = tcList(i, g).slice();
+  const v = prompt("「" + k + "」 " + g + "（" + LV[g] + "）の文を直します。\n直した文はこのiPadに保存され、次の樹木からも使われます。\n（空にすると、この候補を消します）", L[idx] || "");
+  if(v === null) return;
+  const t = v.trim().replace(/\s*\n\s*/g, "");
+  if(t){ L[idx] = SENT_END.test(t) ? t : t + "。"; } else { L.splice(idx, 1); alt[i] = 0; }
+  tcSave(k, g, L);
+  setLevel(i, g); renderLv();
+  toast(t ? "文を直しました（次の樹木からも使われます）" : "候補を消しました");
+}
+function tcSave(k, g, L){
+  const d = (typeof CMT_DEFAULT !== "undefined" && CMT_DEFAULT[k] && CMT_DEFAULT[k][g]) || [];
+  tcUser[k] = tcUser[k] || {};
+  if(JSON.stringify(L) === JSON.stringify(d)) delete tcUser[k][g]; else tcUser[k][g] = L;
+  if(!Object.keys(tcUser[k]).length) delete tcUser[k];
+  store("gj_tc", tcUser);
+}
+/* 点検コメント集（設定の欄）：全項目・全程度の文を直せる */
+function renderTcEdit(){
+  const order = ITEMS.map((it, i) => i).sort((a, b) => ITEMS[a].g - ITEMS[b].g || a - b);
+  $("tcEdit").innerHTML = order.map(i => {
+    const k = ITEMS[i].csv;
+    return '<div class="tcItem"><b>' + esc(k) + '</b>' + ["A", "B", "C"].map(g =>
+      '<label class="tcL" data-l="' + g + '">' + g + '　' + LV[g] + (tcUser[k] && tcUser[k][g] ? '<span class="tcMod">（このiPadで変更）</span>' : '') + '</label>' +
+      '<textarea rows="' + Math.max(2, tcList(i, g).length + 1) + '" data-i="' + i + '" data-l="' + g + '">' + esc(tcList(i, g).join("\n")) + '</textarea>').join("") + '</div>';
+  }).join("");
+  $("tcEdit").querySelectorAll("textarea").forEach(t => t.onchange = () => {
+    const L = t.value.split("\n").map(x => x.trim()).filter(Boolean).map(x => SENT_END.test(x) ? x : x + "。");
+    tcSave(ITEMS[+t.dataset.i].csv, t.dataset.l, L);
+    renderTcEdit(); renderLv();
+    toast("保存しました");
+  });
+}
+$("tcPanel").addEventListener("toggle", () => { if($("tcPanel").open) renderTcEdit(); });
+$("tcExport").onclick = () => {
+  const all = {};
+  ITEMS.forEach((it, i) => { all[it.csv] = {A: tcList(i, "A"), B: tcList(i, "B"), C: tcList(i, "C")}; });
+  const d = new Date();
+  const body = JSON.stringify({type: "gairoju-tenken-comments", version: 1, exported: d.toISOString(),
+                               inspector: settings.inspector || "", changed: tcUser, comments: all}, null, 1);
+  dl(new Blob([body], {type: "application/json"}), "点検コメント集_" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".json");
+};
+$("tcImport").onclick = () => $("tcFile").click();
+$("tcFile").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if(!f) return;
+  try{
+    const d = JSON.parse(await f.text());
+    if(d.type !== "gairoju-tenken-comments") throw new Error("点検コメント集のファイルではありません");
+    if(!confirm("このiPadの点検コメント集を、読み込んだファイルの内容に置き換えますか？")) return;
+    Object.entries(d.comments || {}).forEach(([k, v]) => ["A", "B", "C"].forEach(g => { if(Array.isArray(v[g])) tcSave(k, g, v[g]); }));
+    renderTcEdit(); renderLv(); toast("読み込みました");
+  }catch(err){ alert("読み込めませんでした\n" + err.message); }
+});
+$("tcReset").onclick = () => {
+  if(!confirm("このiPadで直した文をすべて消して、初期値に戻しますか？\n（先に［書き出し］で控えておくと安心です）")) return;
+  tcUser = {}; store("gj_tc", tcUser); renderTcEdit(); renderLv(); toast("初期値に戻しました");
+};
 for(let i = 0; i < 8; i++){
   const inp = document.createElement("input");
   inp.type = "number"; inp.inputMode = "decimal"; inp.className = "stem"; inp.placeholder = (i+1)+"本目";
@@ -1206,7 +1371,7 @@ function calc(){
   if(noTree){
     j.textContent = $("sp").value.trim();
     j.style.background = "#EAE8E0"; j.style.color = "var(--tx2)";
-    updatePhotoButtons();
+    updatePhotoButtons(); renderLv();
     return;
   }
   const btns = [...document.querySelectorAll(".itm")];
@@ -1215,7 +1380,7 @@ function calc(){
   if(on23 > 0){ j.textContent = "樹木の外観診断が必要"; j.style.background = "var(--ng-bg)"; j.style.color = "var(--ng-tx)"; }
   else if(on1 > 0){ j.textContent = "維持管理の処置が必要"; j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
   else { j.textContent = "概ね良好・異常なし"; j.style.background = "var(--ok-bg)"; j.style.color = "var(--ok-tx)"; }
-  updatePhotoButtons();
+  updatePhotoButtons(); renderLv();
 }
 
 /* 空桝・桝無しを設定する。樹木の情報は使わないので消してしまう */
@@ -1227,7 +1392,7 @@ function setNoTree(label){
   $("kabuChk").checked = false; $("kabuBox").classList.remove("show");
   $("kabuNote").textContent = ""; $("memoAutoHint").textContent = "";
   document.querySelectorAll(".stem").forEach(i => i.value = "");
-  document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
+  document.querySelectorAll(".itm.on").forEach(b => { b.classList.remove("on"); dropLevel(+b.dataset.i); });
   calc(); girthWarnUpd();
 }
 function clearNoTree(){
@@ -1285,6 +1450,8 @@ function saveAndMove(move){
     girthPrev: $("girthPrev").value.trim(),
     kabu: stems, kabuNote: (kabuOn && stems.length) ? kabuText(stems, $("girth").value) : "",
     dt: $("dt").value, items, memo: $("memo").value.trim(),
+    lv: Object.fromEntries(Object.entries(lv).filter(([i]) => items[i] === "○")),
+    autoTxt: Object.fromEntries(Object.entries(autoTxt).filter(([i]) => items[i] === "○")),
     created: editingId ? (records.find(r => r.id === editingId) || {}).created || Date.now() : Date.now()
   };
   const wasEdit = !!editingId;
@@ -1355,6 +1522,7 @@ function clearTreeFields(){
   $("kabuNote").textContent = ""; $("memoAutoHint").textContent = "";
   document.querySelectorAll(".stem").forEach(i => i.value = "");
   document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
+  resetLevels();
   calc(); girthWarnUpd();
 }
 
@@ -1385,6 +1553,7 @@ function startEdit(id, quiet){
   if(stems.length){ $("kabuNote").textContent = r.kabuNote; $("memoAutoHint").textContent = "　※株立ちの計算式は自動で追記されます"; }
   else { $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; }
   document.querySelectorAll(".itm").forEach(b => b.classList.toggle("on", r.items[+b.dataset.i] === "○"));
+  lv = Object.assign({}, r.lv || {}); autoTxt = Object.assign({}, r.autoTxt || {}); alt = {};
   $("editBanner").style.display = "block"; $("editBanner").textContent = r.no + " を編集中（上書きされます）";
   $("saveHere").textContent = "上書き保存"; $("cancelEdit").style.display = "block";
   if(!quiet){

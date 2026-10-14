@@ -1,9 +1,10 @@
 // 古い版のキャッシュだけ消す（同じ場所にある他のアプリのキャッシュは残す）
-const VERSION = "gj-v24";
+const VERSION = "gj-v25";
 const ASSETS = [
   "./",
   "./index.html",
   "./zumen.js",
+  "./comments.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
