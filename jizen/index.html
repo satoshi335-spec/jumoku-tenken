@@ -269,6 +269,8 @@ td.chg{background:#FFF3A0!important;font-weight:600}
     <input class="inp" id="addSp" list="spList" placeholder="例）クスノキ（分からなければ空欄）">
     <label class="lbl">樹木番号（そのままで構いません）</label>
     <input class="inp" id="addNo">
+    <label class="lbl">桝No（空欄なら近くの台帳の樹木の桝）</label>
+    <input class="inp" id="addMasu">
     <div class="nav"><button id="addCancel">やめる</button><button class="pri" id="addOk">追加する</button></div>
   </div>
 </div>
@@ -328,7 +330,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 13;   // このファイルを直したら1つ増やす
+const APP_VER = 14;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -402,6 +404,26 @@ function allTrees(){
 function treeById(id){ return allTrees().find(t => t.id === id); }
 /* 図面に書く樹木番号。別の図面から持ってきた樹木は、元の図面番号を付けて区別する（例 049-L12） */
 function dispNo(t){ return t.moved ? zShort(t.zumen) + "-" + t.no : String(t.no || ""); }
+/* 追加した樹木の桝No：自分で入れた値。無ければ同じ図面でいちばん近い台帳の樹木の桝、
+   図面上の位置が無いときは同じ図面番号で並び順が直前の台帳の樹木の桝 */
+function autoMasu(t){
+  const ts = allTrees().filter(u => !u.added && u.masu);
+  if(t.drawing && t.x != null){
+    let best = null, bd = Infinity;
+    ts.forEach(u => {
+      if(u.drawing !== t.drawing) return;
+      const p = posOf(u); if(!p) return;
+      const d = Math.hypot(p.x - t.x, p.y - t.y);
+      if(d < bd){ bd = d; best = u; }
+    });
+    if(best) return best.masu;
+  }
+  const o = t.order >= 1e9 ? Infinity : t.order;
+  const same = ts.filter(u => u.route === t.route && u.zumen === t.zumen).sort((a, b) => a.order - b.order);
+  const prev = same.filter(u => u.order <= o).pop() || same[0];
+  return prev ? prev.masu : "";
+}
+function masuOf(t){ return t.added ? (t.masu || autoMasu(t)) : (t.masu || ""); }
 function dwZumen(key){ const d = pkg.drawings.find(x => x.id === key); return d ? d.zumen : ""; }
 function posOf(t){
   const p = res.pins && res.pins[t.id];
@@ -570,7 +592,7 @@ function renderNoDraw(key){
       const r0 = recOf(t.id);
       const g = girthOf(r0.g);
       return '<button data-id="' + esc(t.id) + '" class="' + r0.st + '"><b>' + esc(t.no) + '</b>　' + esc(t.added ? (t.kind || "追加") + " " + (r0.sp2 || "") : t.sp) +
-             '<br><small>桝 ' + esc(t.masu) + '　台帳C ' + esc(t.c || "—") + (g.c != null ? '　実測 ' + g.c : '') +
+             '<br><small>桝 ' + esc(masuOf(t)) + '　台帳C ' + esc(t.c || "—") + (g.c != null ? '　実測 ' + g.c : '') +
              '　' + ST_LABEL[r0.st] + '</small></button>';
     }).join("") + '<button class="addNd">＋ 台帳に無い樹木を追加<br><small>新植・実生など</small></button></div>';
   box.querySelectorAll("button[data-id]").forEach(b => b.onclick = ()=> select(b.dataset.id, false));
@@ -824,6 +846,10 @@ function openAddDlg(ctx, editId){
   $("addOk").textContent = a ? "変更する" : "追加する";
   $("addWhere").textContent = ctx.route + "　図面 " + zShort(ctx.zumen) + (ctx.drawing ? "" : "（図面なし）");
   $("addNo").value = a ? a.no : addCtx.auto;
+  $("addMasu").value = a ? (a.masu || "") : "";
+  const am = autoMasu(Object.assign({route: ctx.route, zumen: ctx.zumen, drawing: ctx.drawing, x: ctx.x, y: ctx.y,
+                                     order: a ? a.order : 1e9}, a || {}, {masu: ""}));
+  $("addMasu").placeholder = am ? "自動：" + am : "例）L3";
   $("addSp").value = a ? (recOf(a.id).sp2 || "") : "";
   renderKinds();
   renderPick();
@@ -920,10 +946,12 @@ $("addCancel").onclick = ()=> $("addDlg").classList.remove("show");
 $("addOk").onclick = ()=>{
   const c = addCtx, sp = $("addSp").value.trim();
   const no = $("addNo").value.trim() || c.auto || autoNo(c.kind, c.route);
+  const masu = $("addMasu").value.trim();
   lsSet("jizen_addkind", c.kind);
   if(c.editId){
     const a = res.added.find(x => x.id === c.editId);
     a.no = no; a.kind = c.kind;
+    if(masu) a.masu = masu; else delete a.masu;
     const r = rec(a.id); r.sp2 = sp; r.t = Date.now();
     renumberAdded();
     saveRes();
@@ -934,6 +962,7 @@ $("addOk").onclick = ()=>{
   }
   const a = {id: "add-" + Date.now().toString(36), route: c.route, zumen: c.zumen, drawing: c.drawing,
              no, kind: c.kind, x: c.x, y: c.y, order: 0};
+  if(masu) a.masu = masu;
   a.order = insertOrder(a, c.prevId);
   res.added.push(a);
   const r = rec(a.id); r.st = "ok"; r.sp2 = sp; r.t = Date.now();
@@ -997,7 +1026,7 @@ function renderSheet(){
   const t = treeById(selId); if(!t) return;
   const r = recOf(t.id);
   $("sNo").textContent = t.no;
-  $("sSub").innerHTML = esc(t.route) + "　図面 " + esc(zShort(t.zumen)) + (t.masu ? "　桝 " + esc(t.masu) : "") +
+  $("sSub").innerHTML = esc(t.route) + "　図面 " + esc(zShort(t.zumen)) + (masuOf(t) ? "　桝 " + esc(masuOf(t)) : "") +
                         (t.moved ? '　<b style="color:var(--acc)">位置は図面 ' + esc(zShort(dwZumen(t.drawing))) + '</b>' : "") +
                         (t.added ? '　<b style="color:var(--acc)">台帳外（' + esc(t.kind || "追加") + '）</b>' : "");
   $("sp2Lbl").textContent = t.added ? "樹種" : "現地の樹種（台帳と違うときだけ）";
@@ -1203,7 +1232,7 @@ function renderList(){
   let h = "<tr><th>図面</th><th>桝</th><th>樹木No</th><th>樹種</th><th>台帳C</th><th>現況</th><th>実測C</th><th>区分</th><th>メモ</th></tr>";
   ts.forEach(t => {
     const r = recOf(t.id), g = girthOf(r.g), chg = clsChanged(t, r), ac = afterCls(t, r);
-    h += '<tr data-id="' + esc(t.id) + '" class="' + (r.st || "none") + '"><td>' + esc(zShort(t.zumen)) + (t.moved ? "→" + esc(zShort(dwZumen(t.drawing))) : "") + "</td><td>" + esc(t.masu) +
+    h += '<tr data-id="' + esc(t.id) + '" class="' + (r.st || "none") + '"><td>' + esc(zShort(t.zumen)) + (t.moved ? "→" + esc(zShort(dwZumen(t.drawing))) : "") + "</td><td>" + esc(masuOf(t)) +
          "</td><td><b>" + esc(t.no) + "</b>" + (t.added ? "（" + esc(t.kind || "追加") + "）" : "") + (t.flag ? ' <span style="color:var(--ng)">図面で撤去</span>' : "") + "</td><td>" + esc(t.added ? (r.sp2 || "") : r.sp2 ? r.sp2 + "（台帳 " + (t.sp || "—") + "）" : t.sp) +
          '</td><td class="n">' + esc(t.c) + "</td><td>" + ST_LABEL[r.st] + '</td><td class="n">' + (g.c != null ? g.c : "") +
          '</td><td class="' + (chg ? "chg" : "") + '">' + (ac ? CLS_TXT[ac] : (ac === null ? "—" : "")) + "</td><td>" + esc(r.memo) + "</td></tr>";
@@ -1574,7 +1603,7 @@ function buildWorkbook(){
       const r = recOf(t.id), g = girthOf(r.g), chg = clsChanged(t, r), ac = afterCls(t, r), lc = t.added ? "" : ledgerCls(t);
       const s = t.added ? 9 : r.st === "gone" ? 3 : r.st === "nomasu" ? 4 : !r.st ? 7 : 2;
       const c = v => ({v, s}), cn = v => ({v: (v === "" || v == null || isNaN(+v)) ? (v == null ? "" : v) : +v, s});
-      R.rows.push([cn(i + 1), c(t.zumen), c(t.masu), c(t.no), c(t.sp), cn(t.h), cn(t.c), c(lc ? CLS_TXT[lc] : ""),
+      R.rows.push([cn(i + 1), c(t.zumen), c(masuOf(t)), c(t.no), c(t.sp), cn(t.h), cn(t.c), c(lc ? CLS_TXT[lc] : ""),
         c(t.added ? "追加（" + (t.kind || "台帳外") + "）" : ST_LABEL[r.st]), cn(g.c != null ? g.c : ""), c(g.note),
         chg ? {v: ac ? CLS_TXT[ac] : "", s: 5} : c(ac ? CLS_TXT[ac] : (ac === null ? "—" : "")),
         chg ? {v: "変更", s: 5} : c(""), c(r.sp2), c(r.memo), c(t.bikou),
