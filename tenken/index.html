@@ -193,7 +193,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v20</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v21</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -1652,9 +1652,10 @@ function renderSummary(){
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 function csvField(v){ v = String(v ?? ""); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
-$("csvBtn").onclick = ()=>{
-  const rr = sumRecords().slice().sort((a,b) => a.created - b.created);
-  if(!rr.length){ toast("この路線の保存データがありません"); return; }
+/* 路線の点検CSV（CSV書き出し・写真ZIPに同梱）。記録が無ければ null */
+function buildCsv(key){
+  const rr = records.filter(r => (r.office + "|" + r.route) === key).sort((a,b) => a.created - b.created);
+  if(!rr.length) return null;
   const head = ["点検事務所","路線名","図面番号","樹木番号","補助番号","樹木名","幹周り(cm)","前回幹周り(cm)","市名","町名","点検日時","点検者",
     ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数"];
   const rows = rr.map(r => [r.office, r.route, r.zumen || "",
@@ -1665,8 +1666,14 @@ $("csvBtn").onclick = ()=>{
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();
-  const [ko, kr] = sumKey().split("|");
+  const [ko, kr] = key.split("|");
   const fname = (ko + "_" + kr + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".csv").replace(/[\\/:*?"<>|]/g,"");
+  return {fname, csv};
+}
+$("csvBtn").onclick = ()=>{
+  const c = buildCsv(sumKey());
+  if(!c){ toast("この路線の保存データがありません"); return; }
+  const fname = c.fname, csv = c.csv;
   const blob = new Blob([csv], {type:"text/csv"});
   const file = new File([blob], fname, {type:"text/csv"});
   if(navigator.canShare && navigator.canShare({files:[file]})){
@@ -2131,22 +2138,34 @@ async function makeZip(files){
 /* iPadの「共有（ファイルに保存）」は、ボタンを押すたびに1回しか開けない。
    続けて自動で開こうとすると2個目からは断られて保存されないので、ZIPごとに［保存する］を押してもらう。
    次のZIPは前のZIPを保存している間に作っておく（押してすぐ共有画面が開くように） */
-let zipJob = null;     // {chunks, base, st:["idle"|"building"|"ready"|"done"], ready:{ci, file}}
-$("zipBtn").onclick = ()=>{
+let zipJob = null;     // {key, chunks, base, st:["idle"|"building"|"ready"|"done"], ready:{ci, file}, all}
+/* 写真は一度書き出したら印（exp＝書き出した日時）を付け、次からは新しい写真（撮り直しを含む）だけを書き出す。
+   どのZIPにもその路線の点検CSV（その時点の全記録）を入れる → PCのハブはZIPを取り込むだけで点検表を作れる */
+$("zipBtn").onclick = ()=> openZipDlg(false);
+function openZipDlg(all){
   const key = sumKey();
-  const ps = photoMetas.filter(m => m.key === key).sort((a,b)=>a.filename < b.filename ? -1 : 1);
-  if(!ps.length){ toast("この路線の写真がありません"); return; }
+  const psAll = photoMetas.filter(m => m.key === key).sort((a,b)=>a.filename < b.filename ? -1 : 1);
+  const ps = all ? psAll : psAll.filter(m => !m.exp);
+  const csv = buildCsv(key);
+  if(!psAll.length && !csv){ toast("この路線の写真・記録がありません"); return; }
   const CHUNK = 50, chunks = [];
   for(let i = 0; i < ps.length; i += CHUNK) chunks.push(ps.slice(i, i + CHUNK));
+  if(!chunks.length) chunks.push([]);          // 新しい写真が無くても、点検CSVだけのZIPを保存できる
   const d = new Date(), [ko, kr] = key.split("|");
-  const base = ("写真_" + ko + "_" + kr + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate())).replace(/[\\/:*?"<>|]/g,"");
-  zipJob = {chunks, base, total: ps.length, st: chunks.map(() => "idle"), ready: null};
-  $("zipNote").textContent = ps.length + "枚を" + chunks.length + "個のZIPに分けて保存します。" +
-    (chunks.length > 1 ? "［保存する］を1個ずつ押してください（iPadでは続けて自動で保存できません）。" : "");
+  const base = ("写真_" + ko + "_" + kr + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds())).replace(/[\\/:*?"<>|]/g,"");
+  zipJob = {key, chunks, base, total: ps.length, all, st: chunks.map(() => "idle"), ready: null};
+  const nOld = psAll.length - psAll.filter(m => !m.exp).length;
+  $("zipNote").innerHTML = (all ? "すべての写真 " + ps.length + "枚" : "まだ書き出していない写真 " + ps.length + "枚") +
+    (ps.length ? "（" + chunks.length + "個のZIP）" : "") + "と、点検CSV（" + (csv ? sumRecordsOf(key) + "本" : "記録なし") + "）を保存します。" +
+    (chunks.length > 1 ? "［保存する］を1個ずつ押してください（iPadでは続けて自動で保存できません）。" : "") +
+    "<br>保存先は「ファイル」→ OneDrive の <b>街路樹診断システム／iPadから</b> にすると、PCのハブで［iPadから取り込んで点検表を作成］を押すだけになります。" +
+    (!all && nOld ? '<br><a href="#" id="zipAll">書き出し済みの写真（' + nOld + '枚）も含めて、すべて書き出し直す</a>' : "");
+  if($("zipAll")) $("zipAll").onclick = e => { e.preventDefault(); openZipDlg(true); };
   renderZipDlg();
   $("zipDlg").classList.add("show");
   prepZip(0);
-};
+}
+function sumRecordsOf(key){ return records.filter(r => (r.office + "|" + r.route) === key).length; }
 function zipName(J, ci){ return J.chunks.length > 1 ? J.base + "_" + (ci + 1) + ".zip" : J.base + ".zip"; }
 function renderZipDlg(){
   const J = zipJob; if(!J) return;
@@ -2154,8 +2173,8 @@ function renderZipDlg(){
   $("zipList").innerHTML = J.chunks.map((c, ci) => {
     const a = ci * 50 + 1, b = ci * 50 + c.length, st = J.st[ci];
     const lab = st === "building" ? "準備中…" : st === "ready" ? "保存する" : st === "done" ? "✓ 保存済み" : "準備する";
-    return '<div class="zipRow"><div class="zl"><b>' + (NUM[ci] || (ci + 1)) + ' ' + a + '〜' + b + '枚目</b><br><small>' +
-      esc(c[0].filename) + ' 〜 ' + esc(c[c.length - 1].filename) + '</small></div>' +
+    return '<div class="zipRow"><div class="zl"><b>' + (c.length ? (NUM[ci] || (ci + 1)) + ' 写真 ' + a + '〜' + b + '枚目' : '新しい写真なし（点検CSVだけ）') +
+      '</b><br><small>' + (c.length ? esc(c[0].filename) + ' 〜 ' + esc(c[c.length - 1].filename) + '　＋点検CSV' : '記録のバックアップ用') + '</small></div>' +
       '<button type="button" data-ci="' + ci + '" class="' + st + '"' + (st === "building" ? " disabled" : "") + '>' + lab + '</button></div>';
   }).join("");
   $("zipList").querySelectorAll("button[data-ci]").forEach(b => b.onclick = () => saveZip(+b.dataset.ci));
@@ -2170,6 +2189,8 @@ async function prepZip(ci){
   try{
     const files = [];
     for(const m of J.chunks[ci]) files.push({name: m.filename, blob: await getPhotoBlob(m.id)});
+    const c = buildCsv(J.key);
+    if(c) files.push({name: c.fname, blob: new Blob([c.csv], {type: "text/csv"})});
     const zip = await makeZip(files);
     if(zipJob !== J) return;
     J.ready = {ci, file: new File([zip], zipName(J, ci), {type: "application/zip"})};
@@ -2187,7 +2208,12 @@ async function saveZip(ci){
     catch(e){ if(e.name !== "AbortError"){ dl(f, f.name); ok = true; } }     // キャンセルなら、もう一度押せるよう残す
   } else { dl(f, f.name); ok = true; }
   if(zipJob !== J) return;
-  if(ok){ J.st[ci] = "done"; J.ready = null; toast(f.name + " を保存しました"); }
+  if(ok){
+    J.st[ci] = "done"; J.ready = null; toast(f.name + " を保存しました");
+    // この写真は書き出し済み（次からは出さない）。撮り直すと新しい写真になるので、また書き出される
+    const now = Date.now();
+    for(const m of J.chunks[ci]){ m.exp = now; try{ await preq(ptx("meta","readwrite").put(m)); }catch(_){} }
+  }
   renderZipDlg();
   const nx = J.st.findIndex(st => st !== "done");
   if(ok && nx >= 0) prepZip(nx);
