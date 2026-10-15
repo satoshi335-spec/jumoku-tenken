@@ -179,7 +179,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v17</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v18</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -2185,9 +2185,17 @@ SysProject.attachBar("tenken", {
     // 路線名の候補は「この案件の路線」だけにする（前に開いた別の案件の路線が混ざらないように）
     try{
       // 外観診断だけを行う路線（gaikanOnly）は樹木点検の路線にしない
-      var rs = (p.routes || []).filter(function(r){ return !(r && r.gaikanOnly); })
+      var rs = (p.routes || []).filter(function(r){ return !(r && (r.gaikanOnly || r.gaikan_only)); })
                  .map(function(r){ return typeof r === "string" ? r : (r && r.name) || ""; })
                  .filter(Boolean);
+      // この事務所で点検リストを取り込んだ路線・点検記録がある路線も候補に入れる
+      // （iPadの案件情報が古く路線名が載っていなくても、起動のたびに路線名を消さないように）
+      var off = String(p.office || $("office").value || "").trim();
+      var mine = Object.keys(typeof imports !== "undefined" ? imports : {})
+        .concat(typeof records !== "undefined" ? records.map(function(r){ return r.office + "|" + r.route; }) : [])
+        .filter(function(k){ return off && k.indexOf(off + "|") === 0; })
+        .map(function(k){ return k.slice(off.length + 1); });
+      mine.forEach(function(n){ if(n && rs.indexOf(n) < 0) rs.push(n); });
       if(rs.length && typeof recents !== "undefined"){
         recents.route = rs.slice();
         store("gj_recents", recents);
@@ -2196,6 +2204,11 @@ SysProject.attachBar("tenken", {
         var cur = $("route").value.trim();
         if(rs.indexOf(cur) < 0){
           var back = (lastP[p.id] && rs.indexOf(lastP[p.id]) > -1) ? lastP[p.id] : "";
+          if(!back && typeof records !== "undefined"){      // 最後に点検を保存した路線に戻す
+            var rec = records.filter(function(r){ return r.office === off && rs.indexOf(r.route) > -1; })
+                             .sort(function(a, b){ return (b.created || 0) - (a.created || 0); })[0];
+            if(rec) back = rec.route;
+          }
           $("route").value = back;
           routeChanged();
           if(!back){ $("setPanel").open = true; toast("この案件の路線名を選んでください（路線名の欄をタップすると候補が出ます）"); }
