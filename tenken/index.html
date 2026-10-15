@@ -187,13 +187,23 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 #camBottom{display:flex;align-items:center;justify-content:center;padding:14px 0 calc(env(safe-area-inset-bottom) + 14px);background:#000}
 #camShutter{width:74px;height:74px;border-radius:50%;background:#fff;border:5px solid #999}
 #camShutter:disabled{opacity:.4}
+/* 撮った写真の確認（少しの間そのまま表示。撮り直しもできる） */
+#camReview{display:none;position:absolute;inset:0;z-index:60;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px}
+#camReview.show{display:flex}
+#camRevImg{max-width:100%;max-height:calc(100% - 90px);object-fit:contain;border:2px solid #fff;border-radius:4px}
+#camRevBar{display:flex;align-items:center;gap:10px;color:#fff;font-size:15px;font-weight:600;flex-wrap:wrap;justify-content:center}
+#camRevBar button{min-height:46px;padding:8px 20px;border-radius:10px;border:none;font-size:16px;font-weight:600;font-family:inherit}
+#camRetake{background:#fff;color:#c62828}
+#camRevOk{background:#1b6b5f;color:#fff}
+#camRevTime{width:220px;height:4px;background:#444;border-radius:2px;overflow:hidden}
+#camRevTime i{display:block;height:100%;width:100%;background:#7fd3b8}
 #camFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
 </style>
 </head>
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v21</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v23</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -389,6 +399,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
       </div>
     </div>
   </div>
+  <p class="note" id="storeInfo" style="margin:0 0 8px"></p>
   <div id="sumChips">
     <div class="sumChip" style="background:#fff;border:1px solid var(--line)"><b id="sumAll">0</b>合計</div>
     <div class="sumChip" style="background:var(--ok-bg);color:var(--ok-tx)"><b id="sumOk">0</b>良好</div>
@@ -489,6 +500,11 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     <button type="button" id="markClearBtn">囲み消去</button>
   </div>
   <div id="camBottom"><button type="button" id="camShutter"></button></div>
+  <div id="camReview">
+    <img id="camRevImg" alt="">
+    <div id="camRevBar"><span id="camRevTxt"></span><button type="button" id="camRetake">撮り直す</button><button type="button" id="camRevOk">OK</button></div>
+    <div id="camRevTime"><i></i></div>
+  </div>
 </div>
 <!-- 状況コメント選択パネル -->
 <div id="cmtPicker">
@@ -533,7 +549,20 @@ const ITEMS = [
   {g:3,label:"その他",csv:"その他（樹木の異常）"}
 ];
 const load = (k,d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
-const store = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+/* 保存に失敗したら（iPadの保存領域が一杯など）必ず知らせる。黙って失敗すると記録が残らないため */
+let storeWarned = 0;
+const store = (k,v) => {
+  try{ localStorage.setItem(k, JSON.stringify(v)); return true; }
+  catch(e){
+    if(Date.now() - storeWarned > 5000){
+      storeWarned = Date.now();
+      alert("⚠ 保存できませんでした（iPadの保存領域が一杯の可能性があります）\n\n" +
+            "いまの入力は保存されていません。一覧・集計タブの［写真ZIP］で書き出してから、" +
+            "iPadの空き容量を確保してください。\n（" + e.name + "）");
+    }
+    return false;
+  }
+};
 let recents  = Object.assign({office:[],route:[],sp:[],memo:[],zumen:[],city:[],town:[]}, load("gj_recents", {}));
 let records  = load("gj_records", []);
 let settings = load("gj_settings", {inspector:""});
@@ -1598,8 +1627,23 @@ function endEdit(quiet){
 }
 $("cancelEdit").onclick = ()=>{ endEdit(); clearTreeFields(); };
 
+/* iPadの保存領域（写真・記録）の使用量と空き */
+async function renderStoreInfo(){
+  const el = $("storeInfo"); if(!el) return;
+  const n = photoMetas.length, mb = photoMetas.reduce((a, m) => a + (m.size || 0), 0) / 1048576;
+  const nNew = photoMetas.filter(m => !m.exp).length;
+  let t = "このiPadの写真 " + n + "枚（約" + Math.round(mb) + "MB、未書き出し " + nNew + "枚）・点検記録 " + records.length + "本";
+  try{
+    if(navigator.storage && navigator.storage.estimate){
+      const e = await navigator.storage.estimate();
+      if(e.quota) t += "　保存領域の空き 約" + Math.max(0, Math.round((e.quota - (e.usage || 0)) / 1073741824 * 10) / 10) + "GB";
+    }
+  }catch(_){}
+  el.textContent = t;
+}
 function renderSummary(){
   renderSumSel();
+  renderStoreInfo();
   const rr = sumRecords().slice().sort((a,b) => a.created - b.created);
   const jd = rr.map(r => judgeOf(r.items, r.sp));
   $("sumAll").textContent = rr.length;
@@ -1882,6 +1926,7 @@ async function openCam(branch){
   const no = fullNo();
   if(!no){ toast("樹木番号を入力してください"); return; }
   camBranch = branch; camNo = no;
+  clearTimeout(revTimer); $("camReview").classList.remove("show");   // 前の確認表示が残っていたら消す
   $("camNo").textContent = no;
   $("camKind").textContent = branch === 1 ? "全体" : "被害部";
   $("camKoji").textContent = kojiText();
@@ -1894,6 +1939,7 @@ async function openCam(branch){
   await restartCamStream();
 }
 function closeCam(){
+  clearTimeout(revTimer); $("camReview").classList.remove("show");
   $("camModal").style.display = "none";
   $("cmtPicker").classList.remove("show");
   if(camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; }
@@ -1901,6 +1947,31 @@ function closeCam(){
   $("camNoCam").style.display = "none";
 }
 $("camClose").onclick = closeCam;
+/* 撮った写真の確認：1.5秒表示して閉じる。［撮り直す］でカメラに戻る（同じ枠の写真は撮り直しで置き換わる） */
+const REVIEW_MS = 1500;
+let revTimer = 0, revUrl = "";
+function showReview(blob, fname){
+  if(revUrl) URL.revokeObjectURL(revUrl);
+  revUrl = URL.createObjectURL(blob);
+  $("camRevImg").src = revUrl;
+  $("camRevTxt").textContent = "✔ " + fname + " を保存しました";
+  const bar = $("camRevTime").firstElementChild;
+  bar.style.transition = "none"; bar.style.width = "100%";
+  $("camReview").classList.add("show");
+  requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = "width " + REVIEW_MS + "ms linear"; bar.style.width = "0%"; }));
+  clearTimeout(revTimer);
+  revTimer = setTimeout(() => endReview(true), REVIEW_MS);
+}
+function endReview(close){
+  clearTimeout(revTimer); revTimer = 0;
+  $("camReview").classList.remove("show");
+  $("camRevImg").removeAttribute("src");
+  if(revUrl){ URL.revokeObjectURL(revUrl); revUrl = ""; }
+  if(close) closeCam();
+}
+$("camRetake").onclick = e => { e.stopPropagation(); endReview(false); toast("撮り直してください（前の写真と置き換わります）"); };
+$("camRevOk").onclick = e => { e.stopPropagation(); endReview(true); };
+$("camRevImg").onclick = () => endReview(true);
 $("shot1").onclick = ()=>openCam(1);
 $("shot2").onclick = ()=>openCam(2);
 
@@ -2100,10 +2171,9 @@ $("camShutter").onclick = async ()=>{
     const meta = await addPhotoBlob(routeKey(), camNo, camBranch, blob);
     $("camFlash").style.opacity = "0.9";
     setTimeout(()=>$("camFlash").style.opacity = "0", 120);
-    toast(meta.filename + " を保存しました");
-    closeCam();
     updatePhotoButtons();
     renderSummary();
+    showReview(blob, meta.filename);      // 撮れた写真を少しの間見せてから閉じる
   } finally { camShooting = false; $("camShutter").disabled = false; }
 };
 
