@@ -122,6 +122,18 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 .tcL[data-l=A]{color:#2D5E24}.tcL[data-l=B]{color:var(--warn-tx)}.tcL[data-l=C]{color:var(--ng-tx)}
 .tcItem textarea{font-size:14px}
 .tcMod{color:var(--acc);font-weight:400}
+/* 写真ZIPの書き出し（iPadは1個ずつボタンを押して保存） */
+#zipDlg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:45;align-items:center;justify-content:center;padding:16px}
+#zipDlg.show{display:flex}
+#zipBox{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:520px;max-height:90vh;overflow:auto}
+#zipBox h3{margin:0 0 6px;font-size:17px}
+.zipRow{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.zipRow .zl{flex:1;font-size:14px;line-height:1.5}
+.zipRow .zl small{color:var(--tx2);font-size:12px}
+.zipRow button{min-width:118px;min-height:44px;border-radius:10px;border:1px solid var(--g);background:#fff;color:var(--g);font-size:14px;font-weight:600;font-family:inherit}
+.zipRow button.ready{background:var(--g);color:#fff}
+.zipRow button.done{border-color:var(--ok-tx);color:var(--ok-tx);background:var(--ok-bg)}
+.zipRow button:disabled{opacity:.55}
 .toast{position:fixed;bottom:16px;left:12px;right:12px;max-width:640px;margin:0 auto;background:var(--g-dark);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
 .toast.show{opacity:1}
 #view-sum{display:none}
@@ -181,7 +193,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v19</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v20</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -489,6 +501,12 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
   <button type="button" id="cmtCloseBtn">閉じる</button>
 </div>
 <div id="camFlash"></div>
+<div id="zipDlg"><div id="zipBox">
+  <h3>写真ZIPの書き出し</h3>
+  <p class="note" id="zipNote" style="margin:0 0 6px"></p>
+  <div id="zipList"></div>
+  <button type="button" class="btn" id="zipClose" style="margin-top:12px;background:#fff;border:1px solid var(--line);color:var(--tx2);min-height:44px;font-size:15px">閉じる</button>
+</div></div>
 <div id="toast" class="toast"></div>
 
 <script src="comments.js"></script>
@@ -2110,32 +2128,72 @@ async function makeZip(files){
   end.setUint32(12, cSize, true); end.setUint32(16, offset, true);
   return new Blob([...parts, ...central, end.buffer], {type:"application/zip"});
 }
-$("zipBtn").onclick = async ()=>{
+/* iPadの「共有（ファイルに保存）」は、ボタンを押すたびに1回しか開けない。
+   続けて自動で開こうとすると2個目からは断られて保存されないので、ZIPごとに［保存する］を押してもらう。
+   次のZIPは前のZIPを保存している間に作っておく（押してすぐ共有画面が開くように） */
+let zipJob = null;     // {chunks, base, st:["idle"|"building"|"ready"|"done"], ready:{ci, file}}
+$("zipBtn").onclick = ()=>{
   const key = sumKey();
   const ps = photoMetas.filter(m => m.key === key).sort((a,b)=>a.filename < b.filename ? -1 : 1);
   if(!ps.length){ toast("この路線の写真がありません"); return; }
-  const CHUNK = 50;
-  const chunks = [];
+  const CHUNK = 50, chunks = [];
   for(let i = 0; i < ps.length; i += CHUNK) chunks.push(ps.slice(i, i + CHUNK));
-  const d = new Date();
-  const [ko, kr] = key.split("|");
-  toast("ZIP作成中…（" + ps.length + "枚）");
-  for(let ci = 0; ci < chunks.length; ci++){
-    const files = [];
-    for(const m of chunks[ci]) files.push({name: m.filename, blob: await getPhotoBlob(m.id)});
-    const zip = await makeZip(files);
-    const base = ("写真_" + ko + "_" + kr + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate())).replace(/[\\/:*?"<>|]/g,"");
-    const name = chunks.length > 1 ? base + "_" + (ci+1) + ".zip" : base + ".zip";
-    const file = new File([zip], name, {type:"application/zip"});
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      try { await navigator.share({files:[file], title:name}); } catch(e){}
-    } else {
-      dl(zip, name);
-      await new Promise(r => setTimeout(r, 800));
-    }
-  }
-  toast(ps.length + "枚を" + chunks.length + "個のZIPに書き出しました");
+  const d = new Date(), [ko, kr] = key.split("|");
+  const base = ("写真_" + ko + "_" + kr + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate())).replace(/[\\/:*?"<>|]/g,"");
+  zipJob = {chunks, base, total: ps.length, st: chunks.map(() => "idle"), ready: null};
+  $("zipNote").textContent = ps.length + "枚を" + chunks.length + "個のZIPに分けて保存します。" +
+    (chunks.length > 1 ? "［保存する］を1個ずつ押してください（iPadでは続けて自動で保存できません）。" : "");
+  renderZipDlg();
+  $("zipDlg").classList.add("show");
+  prepZip(0);
 };
+function zipName(J, ci){ return J.chunks.length > 1 ? J.base + "_" + (ci + 1) + ".zip" : J.base + ".zip"; }
+function renderZipDlg(){
+  const J = zipJob; if(!J) return;
+  const NUM = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
+  $("zipList").innerHTML = J.chunks.map((c, ci) => {
+    const a = ci * 50 + 1, b = ci * 50 + c.length, st = J.st[ci];
+    const lab = st === "building" ? "準備中…" : st === "ready" ? "保存する" : st === "done" ? "✓ 保存済み" : "準備する";
+    return '<div class="zipRow"><div class="zl"><b>' + (NUM[ci] || (ci + 1)) + ' ' + a + '〜' + b + '枚目</b><br><small>' +
+      esc(c[0].filename) + ' 〜 ' + esc(c[c.length - 1].filename) + '</small></div>' +
+      '<button type="button" data-ci="' + ci + '" class="' + st + '"' + (st === "building" ? " disabled" : "") + '>' + lab + '</button></div>';
+  }).join("");
+  $("zipList").querySelectorAll("button[data-ci]").forEach(b => b.onclick = () => saveZip(+b.dataset.ci));
+}
+async function prepZip(ci){
+  const J = zipJob;
+  if(!J || ci < 0 || ci >= J.chunks.length || J.st[ci] === "building") return;
+  if(J.ready && J.ready.ci === ci) return;
+  if(J.ready){ J.st[J.ready.ci] = J.st[J.ready.ci] === "ready" ? "idle" : J.st[J.ready.ci]; J.ready = null; }   // 作り置きは1個だけ（メモリ節約）
+  const was = J.st[ci];
+  J.st[ci] = "building"; renderZipDlg();
+  try{
+    const files = [];
+    for(const m of J.chunks[ci]) files.push({name: m.filename, blob: await getPhotoBlob(m.id)});
+    const zip = await makeZip(files);
+    if(zipJob !== J) return;
+    J.ready = {ci, file: new File([zip], zipName(J, ci), {type: "application/zip"})};
+    J.st[ci] = "ready";
+  }catch(e){ J.st[ci] = was === "done" ? "done" : "idle"; toast("ZIPを作れませんでした：" + e.message); }
+  renderZipDlg();
+}
+async function saveZip(ci){
+  const J = zipJob; if(!J) return;
+  if(!(J.ready && J.ready.ci === ci)){ prepZip(ci); return; }     // まだ作っていなければ作る（できたらもう一度押す）
+  const f = J.ready.file;
+  let ok = false;
+  if(navigator.canShare && navigator.canShare({files: [f]})){
+    try{ await navigator.share({files: [f], title: f.name}); ok = true; }
+    catch(e){ if(e.name !== "AbortError"){ dl(f, f.name); ok = true; } }     // キャンセルなら、もう一度押せるよう残す
+  } else { dl(f, f.name); ok = true; }
+  if(zipJob !== J) return;
+  if(ok){ J.st[ci] = "done"; J.ready = null; toast(f.name + " を保存しました"); }
+  renderZipDlg();
+  const nx = J.st.findIndex(st => st !== "done");
+  if(ok && nx >= 0) prepZip(nx);
+  else if(ok) toast("すべてのZIP（" + J.total + "枚）を保存しました");
+}
+$("zipClose").onclick = ()=>{ $("zipDlg").classList.remove("show"); zipJob = null; };
 $("koji").addEventListener("change", ()=>{ settings.koji = $("koji").value.trim(); store("gj_settings", settings); });
 $("tno").addEventListener("input", updatePhotoButtons);
 $("hojo").addEventListener("input", updatePhotoButtons);
