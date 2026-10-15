@@ -203,7 +203,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v24</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v25</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -1804,8 +1804,10 @@ let camTrack = null, hwZoom = null, digitalZ = 1, curZoom = 1, lensAutoPicked = 
 
 // ---- カメラ取得（レンズ記憶・広角優先） ----
 function getCam(){
-  // 4:3 の広い映像を要求し、Safari による切り抜きを抑えて画角を広く取る
-  const base = { width:{ideal:1920}, height:{ideal:1440}, resizeMode:"none" };
+  // 写真は縦長（3:4）なので、縦長の映像を求める。iPadのSafariは求めた縦横に合わせて映像を切り抜くため、
+  // 横長（1920×1440）を求めると、縦向きに持っても上下を切られて狭くなっていた（2026-10-15 iPad Air 13で判明）。
+  // 縦向きならカメラの写せる範囲をまるごと使える。横向きでは中央を縦長に切り抜く（いままでと同じ）
+  const base = { width:{ideal:1440}, height:{ideal:1920}, aspectRatio:{ideal:3/4}, resizeMode:"none" };
   const make = v => navigator.mediaDevices.getUserMedia({ video: v, audio: false });
   if(settings.camId){
     return make(Object.assign({deviceId:{exact:settings.camId}}, base))
@@ -1862,7 +1864,7 @@ function zoomStep(dir){
   applyZoom(curZoom + dir * (curZoom >= 3 ? 0.5 : 0.2));
 }
 /* 樹木写真は縦長（3:4）。横向きのiPadでは横長の映像から縦長に切り抜くので狭くなる → 縦に持つよう案内 */
-function camLandscape(){ const v = $("camVideo"); return !!(camStream && v.videoWidth && v.videoWidth > v.videoHeight * 1.05); }
+function camLandscape(){ return !!camStream && window.innerWidth > window.innerHeight * 1.05; }   // iPadを横向きに持っている
 function updWideHint(){
   $("camWide").style.display = camLandscape() ? "block" : "none";
   // iPadから届いている映像の大きさ（広さの確認用）。縦長の写真は、この映像の中央を3:4で使う
@@ -1927,7 +1929,18 @@ function fitCamFrame(){
   f.style.width = fw + "px"; f.style.height = fh + "px";
   f.style.left = (w - fw) / 2 + "px"; f.style.top = (h - fh) / 2 + "px";
 }
-window.addEventListener("resize", ()=>{ if($("camModal").style.display === "flex") fitCamFrame(); });
+/* カメラを開いたままiPadの向きを変えたら、その向きで映像を取り直す（縦向きにしたとき広く写せるように） */
+let camOrient = null, camOrientT = 0;
+window.addEventListener("resize", ()=>{
+  if($("camModal").style.display !== "flex") return;
+  fitCamFrame();
+  const o = window.innerWidth > window.innerHeight ? "land" : "port";
+  if(camOrient && o !== camOrient && camStream){
+    clearTimeout(camOrientT);
+    camOrientT = setTimeout(() => { if($("camModal").style.display === "flex") restartCamStream(); }, 500);
+  }
+  camOrient = o;
+});
 async function openCam(branch){
   const no = fullNo();
   if(!no){ toast("樹木番号を入力してください"); return; }
@@ -1941,6 +1954,7 @@ async function openCam(branch){
   $("camCmtBar").classList.toggle("show", branch === 2);
   renderCamCmts(); updateMarkUI();
   $("camModal").style.display = "flex";
+  camOrient = window.innerWidth > window.innerHeight ? "land" : "port";
   fitCamFrame();
   await restartCamStream();
 }
