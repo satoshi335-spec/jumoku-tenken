@@ -203,7 +203,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v23</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v24</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -471,6 +471,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
   <div id="camTop">
     <span id="camNo">-</span>
     <span id="camKind">全体</span>
+    <span id="camRes" style="color:#aaa;font-size:11px"></span>
     <button type="button" id="camClose">閉じる</button>
   </div>
   <div id="camWrap">
@@ -1862,7 +1863,12 @@ function zoomStep(dir){
 }
 /* 樹木写真は縦長（3:4）。横向きのiPadでは横長の映像から縦長に切り抜くので狭くなる → 縦に持つよう案内 */
 function camLandscape(){ const v = $("camVideo"); return !!(camStream && v.videoWidth && v.videoWidth > v.videoHeight * 1.05); }
-function updWideHint(){ $("camWide").style.display = camLandscape() ? "block" : "none"; }
+function updWideHint(){
+  $("camWide").style.display = camLandscape() ? "block" : "none";
+  // iPadから届いている映像の大きさ（広さの確認用）。縦長の写真は、この映像の中央を3:4で使う
+  const v = $("camVideo");
+  $("camRes").textContent = (camStream && v.videoWidth) ? "映像 " + v.videoWidth + "×" + v.videoHeight : "";
+}
 $("camVideo").addEventListener("loadedmetadata", updWideHint);
 $("camVideo").addEventListener("resize", updWideHint);
 window.addEventListener("resize", () => setTimeout(updWideHint, 400));
