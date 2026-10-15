@@ -1749,7 +1749,8 @@ async function restartCamStream(){
     $("camNoCam").style.display = "none";
     camTrack = camStream.getVideoTracks()[0];
     const caps = camTrack.getCapabilities ? camTrack.getCapabilities() : {};
-    hwZoom = (caps.zoom && caps.zoom.max > caps.zoom.min) ? caps.zoom : null;
+    // レンズズームが効かなかった端末（iPadなど。対応と出るのに拡大されない）は、デジタルズームにする
+    hwZoom = (caps.zoom && caps.zoom.max > caps.zoom.min && !settings.noHwZoom) ? caps.zoom : null;
     applyZoom(settings.zoom || 1);
     await renderLensCtl();
   } catch(e){ $("camNoCam").style.display = "flex"; }
@@ -1759,7 +1760,15 @@ async function restartCamStream(){
 function applyZoom(z){
   if(camStream && hwZoom){
     z = Math.min(hwZoom.max, Math.max(hwZoom.min, z));
-    camTrack.applyConstraints({advanced:[{zoom:z}]}).catch(()=>{});
+    const want = z, track = camTrack;
+    // 拡大されたかをカメラの設定値で確かめ、効いていなければデジタルズームに切り替える
+    track.applyConstraints({advanced:[{zoom:z}]})
+      .catch(() => track.applyConstraints({zoom: z}))
+      .then(() => {
+        const st = track.getSettings ? track.getSettings() : {};
+        if(track === camTrack && hwZoom && (st.zoom == null || Math.abs(st.zoom - want) > 0.05)) hwZoomFail();
+      })
+      .catch(() => { if(track === camTrack) hwZoomFail(); });
     digitalZ = 1;
     $("camVideo").style.transform = "";
   } else {
@@ -1772,6 +1781,12 @@ function applyZoom(z){
   $("zoomVal").textContent = "×" + curZoom.toFixed(1);
 }
 function zoomStep(dir){ applyZoom(curZoom + dir * (curZoom >= 3 ? 0.5 : 0.2)); }
+function hwZoomFail(){
+  if(!hwZoom) return;
+  hwZoom = null;
+  settings.noHwZoom = true; store("gj_settings", settings);   // 次からは最初からデジタルズーム
+  applyZoom(curZoom);
+}
 
 // ---- レンズ切り替え（超広角0.5×/広角1×/望遠。望遠が選ばれて拡大される対策） ----
 async function renderLensCtl(){

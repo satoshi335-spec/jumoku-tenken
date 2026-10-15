@@ -408,6 +408,10 @@ function tapAt(sx, sy){
   hideChoose();
   if(addMode){ placeAdd(sx, sy); return; }
   if(fixing){
+    if(fixSel && swapping){
+      if(!chooseNear(sx, sy, i => doSwap(i))) toast("入れ替える相手の樹木の印をタップしてください");
+      return;
+    }
     if(fixSel){ placeFix(sx, sy); return; }
     if(!chooseNear(sx, sy, i => selectFix(i))) toast("動かす樹木の印をタップしてください");
     return;
@@ -417,11 +421,11 @@ function tapAt(sx, sy){
 function hideChoose(){ $z("zChoose").style.display = "none"; }
 
 /* ================= 位置を直す（続けて何本でも直せる。直すたびにiPadに保存） ================= */
-let fixing = false, fixSel = null;
+let fixing = false, fixSel = null, swapping = false;
 let addMode = false, addPt = null;
 function setFixing(on){
   if(on && addMode) setAdding(false);
-  fixing = on; fixSel = null;
+  fixing = on; fixSel = null; swapping = false;
   document.body.classList.toggle("zFixing", on);
   $z("zFixBtn").classList.toggle("on", on);
   if(on){
@@ -434,6 +438,7 @@ function setFixing(on){
 function selectFix(i){
   const st = listState(); if(!st) return;
   const it = st.items[i]; if(!it) return;
+  swapping = false;
   fixSel = Object.assign({it, i}, itemKey(it));
   updateBar(); schedule();
 }
@@ -455,9 +460,13 @@ function updateBar(){
     if(!fixSel){
       bar.innerHTML = '<span><b>位置を直す</b>：動かす樹木の印をタップ → 正しい位置をタップ（続けて直せます）</span><span style="flex:1"></span>' +
                       '<button type="button" data-a="fixEnd">終わる</button>';
+    } else if(swapping){
+      bar.innerHTML = '<span><b>' + esc(treeLabel(fixSel.it, false)) + '</b> と番号（位置）を入れ替える樹木の印をタップ</span><span style="flex:1"></span>' +
+        '<button type="button" data-a="swapEnd">やめる</button><button type="button" data-a="fixEnd">終わる</button>';
     } else {
       const f = fixesFor()[fixSel.k];
       bar.innerHTML = '<span><b>' + esc(treeLabel(fixSel.it, false)) + '</b> の正しい位置をタップ（拡大すると正確です）</span><span style="flex:1"></span>' +
+        '<button type="button" data-a="swap">番号を入れ替える</button>' +
         (f && f.add ? '<button type="button" data-a="addDel">追加を取り消す</button>'
                     : (f ? '<button type="button" data-a="fixUndo">元の位置に戻す</button>' : '')) +
         '<button type="button" data-a="fixOther">別の樹木</button><button type="button" data-a="fixEnd">終わる</button>';
@@ -467,7 +476,9 @@ function updateBar(){
 }
 function barAction(a){
   if(a === "fixEnd") setFixing(false);
-  else if(a === "fixOther"){ fixSel = null; updateBar(); schedule(); }
+  else if(a === "fixOther"){ fixSel = null; swapping = false; updateBar(); schedule(); }
+  else if(a === "swap"){ swapping = true; updateBar(); }
+  else if(a === "swapEnd"){ swapping = false; updateBar(); }
   else if(a === "fixUndo"){
     const f = FIX[rKey] || {}; delete f[fixSel.k]; FIX[rKey] = f; store("gj_zfix", FIX);
     toast(treeLabel(fixSel.it, false) + " を元の位置に戻しました");
@@ -486,6 +497,21 @@ function placeFix(sx, sy){
   FIX[rKey] = f; store("gj_zfix", FIX);
   toast(treeLabel(fixSel.it, false) + " の位置を保存しました");
   fixSel = null; updateBar(); schedule();
+}
+/* 2本の樹木の位置を入れ替える（図面の番号と印が逆になっていたとき）。直した位置として保存 */
+function doSwap(i){
+  const st = listState(); if(!st || !fixSel) return;
+  const it = st.items[i]; if(!it) return;
+  const b = itemKey(it);
+  if(b.k === fixSel.k){ toast("別の樹木の印をタップしてください"); return; }
+  const pos = allPos(), pa = pos.find(p => p.k === fixSel.k), pb = pos.find(p => p.k === b.k);
+  if(!pa || !pb){ toast("位置が分からない樹木とは入れ替えできません"); return; }
+  const f = FIX[rKey] || {}, t = Date.now();
+  f[fixSel.k] = Object.assign({}, f[fixSel.k] || {}, {z: pb.z, x: pb.x, y: pb.y, m: fixSel.m, h: fixSel.h, t});
+  f[b.k] = Object.assign({}, f[b.k] || {}, {z: pa.z, x: pa.x, y: pa.y, m: b.m, h: b.h, t});
+  FIX[rKey] = f; store("gj_zfix", FIX);
+  toast(treeLabel(fixSel.it, false) + " と " + treeLabel(it, false) + " の位置を入れ替えました");
+  fixSel = null; swapping = false; updateBar(); schedule();
 }
 $z("zFixBar").addEventListener("pointerdown", e => e.stopPropagation());
 
@@ -701,6 +727,21 @@ $z("zInpBtn").onclick = ()=>{
 applyInp();
 $z("zHide").onclick = ()=>{ opt.hide = true; store("gj_zopt", opt); document.body.classList.remove("zOn"); };
 showBtn.onclick = ()=>{ opt.hide = false; store("gj_zopt", opt); document.body.classList.add("zOn"); layoutTop(); setTimeout(()=>{ fitView(); applyView(); sync(); }, 50); };
+
+/* 入力欄を押したとき、図面（縦向き・狭い画面では上に固定）やヘッダーの下に隠れていたら見える所までスクロール。
+   iPad が自分でスクロールした後や、テンキーが出た後に直す */
+document.addEventListener("focusin", e => {
+  const el = e.target;
+  if(!document.body.classList.contains("zOn") || document.body.classList.contains("zNoInp")) return;
+  if(!el.closest || !el.closest("#view-input") || el.closest("#zCard")) return;
+  setTimeout(() => {
+    const wide = window.matchMedia("(min-width:1000px) and (orientation:landscape)").matches;
+    const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zTop")) || 120;
+    const minY = wide ? top + 8 : $z("zCard").getBoundingClientRect().bottom + 10;
+    const r = el.getBoundingClientRect();
+    if(r.top < minY) window.scrollBy({top: r.top - minY, behavior: "smooth"});
+  }, 380);
+});
 
 /* ヘッダーの下に図面を固定するため、ヘッダーの高さを測る */
 function layoutTop(){
