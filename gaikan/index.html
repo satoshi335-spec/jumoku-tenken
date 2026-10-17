@@ -85,6 +85,23 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
 .toast.show{opacity:1}
 #view-sum{display:none}
 @media(min-width:700px){ main{padding:16px 24px} }
+/* 要確認（写真だけで未保存・写真不足・総合判定なし） */
+#issueBar{display:none;background:var(--ng-bg);color:var(--ng-tx);border:1px solid var(--ng-bd);border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:13px;font-weight:600}
+#issueBar.show{display:block}
+#issueBar button,#issueList button{font-size:13px;padding:6px 10px;margin:4px 6px 0 0;border-radius:8px;border:1px solid var(--ng-bd);background:#fff;color:var(--ng-tx);font-family:inherit;font-weight:600}
+#issueList button small,#issueBar button small{font-weight:400;color:var(--tx2)}
+/* 写真ZIPの書き出し（iPadは1個ずつボタンを押して保存） */
+#zipDlg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:45;align-items:center;justify-content:center;padding:16px}
+#zipDlg.show{display:flex}
+#zipBox{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:520px;max-height:90vh;overflow:auto}
+#zipBox h3{margin:0 0 6px;font-size:17px}
+.zipRow{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.zipRow .zl{flex:1;font-size:14px;line-height:1.5}
+.zipRow .zl small{color:var(--tx2);font-size:12px}
+.zipRow button{min-width:118px;min-height:44px;border-radius:10px;border:1px solid var(--g);background:#fff;color:var(--g);font-size:14px;font-weight:600;font-family:inherit}
+.zipRow button.ready{background:var(--g);color:#fff}
+.zipRow button.done{border-color:var(--ok-tx);color:var(--ok-tx);background:var(--ok-bg)}
+.zipRow button:disabled{opacity:.55}
 /* ===== カメラ ===== */
 #camModal{display:none;position:fixed;inset:0;background:#000;z-index:40;flex-direction:column}
 #camTop{display:flex;gap:8px;align-items:center;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;color:#fff}
@@ -130,12 +147,22 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
 #camShutter{width:74px;height:74px;border-radius:50%;background:#fff;border:5px solid #999}
 #camShutter:disabled{opacity:.4}
 #camFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
+/* 撮った写真の確認（少しの間そのまま表示。撮り直しもできる） */
+#camReview{display:none;position:absolute;inset:0;z-index:60;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px}
+#camReview.show{display:flex}
+#camRevImg{max-width:100%;max-height:calc(100% - 90px);object-fit:contain;border:2px solid #fff;border-radius:4px}
+#camRevBar{display:flex;align-items:center;gap:10px;color:#fff;font-size:15px;font-weight:600;flex-wrap:wrap;justify-content:center}
+#camRevBar button{min-height:46px;padding:8px 20px;border-radius:10px;border:none;font-size:16px;font-weight:600;font-family:inherit}
+#camRetake{background:#fff;color:#c62828}
+#camRevOk{background:#1b6b5f;color:#fff}
+#camRevTime{width:220px;height:4px;background:#444;border-radius:2px;overflow:hidden}
+#camRevTime i{display:block;height:100%;width:100%;background:#7fd3b8}
 </style>
 </head>
 <body>
 <header>
   <div class="hdTop">
-    <h1>外観診断 <span style="font-size:11px;opacity:.7;font-weight:400">v4</span></h1>
+    <h1>外観診断 <span style="font-size:11px;opacity:.7;font-weight:400">v5</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -185,6 +212,7 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
   </div>
 
   <div class="card">
+    <div id="issueBar"></div>
     <div id="editBanner"></div>
     <label class="lbl">診断日時（自動・タップで変更可）</label>
     <input id="dt" type="datetime-local">
@@ -235,8 +263,12 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
   </div>
 
   <div class="card">
-    <label class="lbl">部位診断の所見（1行1項目で「・」付きになります）</label>
+    <div class="rowFlex" style="margin-bottom:5px">
+      <label class="lbl" style="margin:0">部位診断の所見（1行1項目で「・」付きになります）</label>
+      <button type="button" class="miniBtn pri" id="autoShoken">選んだ項目から所見を作る</button>
+    </div>
     <textarea id="buiShoken" rows="3" placeholder="根元部に樹皮欠損100cm×30cmが広がっている&#10;枯れ枝あり"></textarea>
+    <p class="note">部位診断・建築限界で選んだ項目とメモから文を作り、まだ無い行だけ足します。外観診断・総合判定の理由が空なら、いちばん重い被害の文を入れます</p>
   </div>
 
   <div class="card">
@@ -318,6 +350,12 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
     <div class="sumChip" style="background:var(--warn-bg);color:var(--warn-tx)"><b id="sumWarn">0</b>注意</div>
     <div class="sumChip" style="background:var(--ng-bg);color:var(--ng-tx)"><b id="sumNg">0</b>著しい/不健全</div>
   </div>
+  <p class="note" id="storeInfo" style="margin:0 0 8px"></p>
+  <div class="card" id="issueCard" style="display:none;border-color:var(--ng-bd)">
+    <div style="font-size:14px;font-weight:600;color:var(--ng-tx)" id="issueTitle"></div>
+    <p class="note" style="margin:4px 0 0">タップするとその樹木を開きます。写真を撮る・判定を入れて保存すると消えます。</p>
+    <div id="issueList"></div>
+  </div>
   <div class="card">
     <div class="rowFlex">
       <span style="font-size:14px;font-weight:600" id="sumTitle">一覧</span>
@@ -372,6 +410,11 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
     <button type="button" id="markClearBtn">囲み消去</button>
   </div>
   <div id="camBottom"><button type="button" id="camShutter"></button></div>
+  <div id="camReview">
+    <img id="camRevImg" alt="">
+    <div id="camRevBar"><span id="camRevTxt"></span><button type="button" id="camRetake">撮り直す</button><button type="button" id="camRevOk">OK</button></div>
+    <div id="camRevTime"><i></i></div>
+  </div>
 </div>
 <div id="cmtPicker">
   <div class="cpHead">被害状況コメント（タップで黒板に記載 ⇔ 解除、✕で削除）</div>
@@ -383,12 +426,31 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
   <button type="button" id="cmtCloseBtn">閉じる</button>
 </div>
 <div id="camFlash"></div>
+<div id="zipDlg"><div id="zipBox">
+  <h3>写真ZIPの書き出し</h3>
+  <p class="note" id="zipNote" style="margin:0 0 6px"></p>
+  <div id="zipList"></div>
+  <button type="button" class="btn" id="zipClose" style="margin-top:12px;background:#fff;border:1px solid var(--line);color:var(--tx2);min-height:44px;font-size:15px">閉じる</button>
+</div></div>
 <div id="toast" class="toast"></div>
 
 <script>
 const $ = id => document.getElementById(id);
 const load = (k,d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
-const store = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+/* 保存に失敗したら（iPadの保存領域が一杯など）必ず知らせる。黙って失敗すると記録が残らないため */
+let storeWarned = 0;
+const store = (k,v) => {
+  try{ localStorage.setItem(k, JSON.stringify(v)); return true; }
+  catch(e){
+    if(Date.now() - storeWarned > 5000){
+      storeWarned = Date.now();
+      alert("⚠ 保存できませんでした（iPadの保存領域が一杯の可能性があります）\n\n" +
+            "いまの入力は保存されていません。一覧・集計タブの［写真ZIP］で書き出してから、" +
+            "iPadの空き容量を確保してください。\n（" + e.name + "）");
+    }
+    return false;
+  }
+};
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad = n => String(n).padStart(2,"0");
 
@@ -793,9 +855,11 @@ function fillFromList(){
   if(it.sp) $("sp").value = it.sp;
   $("tnoNote").textContent = "リスト " + (i+1) + " 番目。内容は手で修正できます";
   renderProgress(); updatePhotoHint();
+  markClean();
 }
 $("skipBtn").onclick = ()=>{
   const st = listState(); if(!st){ toast("リストが取り込まれていません"); return; }
+  if(!guardLeave()) return;
   let i = nextListIndex(st.idx);
   if(i < 0) i = nextListIndex(0);
   if(i < 0){ toast("未診断の樹木はありません"); return; }
@@ -830,21 +894,23 @@ function anyDamage(){
   return Object.values(buiState).some(v => v && (v.on || (v.v || 0) >= 2)) ||
          Object.values(kenState).some(v => v && v.on);
 }
-$("saveBtn").onclick = async ()=>{
+$("saveBtn").onclick = () => saveCurrent();
+/* いま入力している樹木を保存する。保存できたら true（撮り忘れの確認で止めた・番号が無い等は false） */
+function saveCurrent(){
   const no = $("tno").value.trim();
-  if(!blockKey()){ $("setPanel").open = true; toast("基本設定のブロック名を入力してください"); return; }
-  if(!no){ toast("樹木番号を入力してください"); return; }
+  if(!blockKey()){ $("setPanel").open = true; toast("基本設定のブロック名を入力してください"); return false; }
+  if(!no){ toast("樹木番号を入力してください"); return false; }
   const dup = blockRecords().find(r => r.no === no && r.id !== editingId);
-  if(dup){ toast("樹木番号 " + no + " はこのブロックで保存済みです"); return; }
+  if(dup){ toast("樹木番号 " + no + " はこのブロックで保存済みです（一覧の［編集］で直してください）"); return false; }
   // 撮り忘れチェック
   if(pdb){
     const ps = photosFor(blockKey(), no);
     const has1 = ps.some(m => m.branch === 1);
     const hasPos = ps.some(m => m.branch === 2);
     const n3 = ps.filter(m => m.branch >= 3).length;
-    if(!has1 && !confirm("⚠ 全景写真がありません。撮影せずに保存しますか？")) return;
-    if(!hasPos && !confirm("⚠ 位置（根元の状況）写真がありません。撮影せずに保存しますか？")) return;
-    if(anyDamage() && !n3 && !confirm("⚠ 被害項目がありますが被害部写真がありません。\n撮影せずに保存しますか？")) return;
+    if(!has1 && !confirm("⚠ 全景写真がありません。撮影せずに保存しますか？")) return false;
+    if(!hasPos && !confirm("⚠ 位置（根元の状況）写真がありません。撮影せずに保存しますか？")) return false;
+    if(anyDamage() && !n3 && !confirm("⚠ 被害項目がありますが被害部写真がありません。\n撮影せずに保存しますか？")) return false;
   }
   const dmg = {};
   PARTS.forEach(([p])=>{ const d = buiState["dmg_" + p]; if(d && (d.w || d.l)) dmg[p] = {w: d.w, l: d.l}; });
@@ -882,16 +948,16 @@ $("saveBtn").onclick = async ()=>{
     created: editingId ? (records.find(r => r.id === editingId) || {}).created || Date.now() : Date.now()
   };
   const wasEdit = !!editingId;
+  const before = records.slice();
   if(wasEdit){
     const i = records.findIndex(r => r.id === editingId);
     if(i > -1) records[i] = rec;
-    endEdit();
-    toast(no + " を更新しました");
   } else {
     records.push(rec);
-    toast(no + " を保存しました（計 " + blockRecords().length + " 本）");
   }
-  store("gk_records", records);
+  if(!store("gk_records", records)){ records = before; return false; }     // 保存できなければ入力を消さない
+  if(wasEdit){ endEdit(); toast(no + " を更新しました"); }
+  else toast(no + " を保存しました（計 " + blockRecords().length + " 本）");
   bump("block", rec.block); bump("sp", rec.sp);
   clearFields();
   if(!wasEdit){
@@ -900,8 +966,10 @@ $("saveBtn").onclick = async ()=>{
     else { $("tno").value = nextNo(no); noteAuto(no); }
   }
   renderCnt(); renderSummary(); renderProgress(); updatePhotoHint();
+  markClean();
   window.scrollTo({top:0, behavior:"smooth"});
-};
+  return true;
+}
 function clearFields(){
   ["sp","th","tc","tw","lat","lng","katsShoken","buiShoken","gaiRiyu",
    "gl1","fukyu1","gl2","fukyu2","kikiRiyu","soRiyu","naiyo","tokki","sokuteiBui"]
@@ -919,10 +987,12 @@ function clearFields(){
   Object.keys(kenState).forEach(k => delete kenState[k]);
   curPart = "root";
   buildBuiTabs(); renderBuiBody(); renderKen();
+  markClean();
 }
 
-function startEdit(id){
+function startEdit(id, noGuard){
   const r = records.find(x => x.id === id); if(!r) return;
+  if(!noGuard && id !== editingId && !guardLeave()) return;      // 保存していない入力を黙って消さない
   editingId = id;
   setView("input");
   $("block").value = r.block; renderHeader();
@@ -959,14 +1029,171 @@ function startEdit(id){
   $("editBanner").style.display = "block"; $("editBanner").textContent = r.no + " を編集中";
   $("saveBtn").textContent = "変更を保存"; $("cancelEdit").style.display = "block";
   updatePhotoHint();
+  markClean();
   window.scrollTo({top:0, behavior:"smooth"});
 }
+
+/* ================= 保存し忘れの防止と「要確認」（樹木点検アプリ v27 と同じ考え方） ================= */
+/* 画面に出している樹木の入力（開いた時・保存した時の状態と比べて、変わっていれば未保存） */
+let formBase = "", guardOn = false;
+const SNAP_IDS = ["sp","th","tc","tw","lat","lng","katsShoken","buiShoken","gaiRiyu","gl1","fukyu1","gl2","fukyu2",
+  "kikiRiyu","soRiyu","naiyo","tokki","sokuteiBui"];
+const SNAP_SEGS = ["segKeitai","segShichu","segJusei","segJukei","segKats","segGai","segSogo","segKiki",
+  "segHitsuyo","segKinkyu","segJikai","segNext"];
+function formSnap(){
+  const clean = o => Object.fromEntries(Object.entries(o).filter(([k, v]) => v && (v.on || v.v || v.note || v.w || v.l)).sort());
+  return JSON.stringify([SNAP_IDS.map(id => $(id).value.trim()), SNAP_SEGS.map(segGet),
+    PARTS.map(([p]) => [segGet("segH_" + p), $("sho_sen_" + p).classList.contains("pri"), $("sho_sei_" + p).classList.contains("pri")]),
+    clean(buiState), clean(kenState), Object.keys(shochiSel).filter(k => shochiSel[k]).sort()]);
+}
+function markClean(){ formBase = formSnap(); }
+function unsavedReason(){
+  const no = $("tno").value.trim(); if(!no) return "";
+  if(formSnap() !== formBase) return "入力";
+  if(!editingId && !blockRecords().some(r => r.no === no) && pdb && photosFor(blockKey(), no).length) return "診断（写真は撮影済み）";
+  return "";
+}
+/* 別の樹木へ移る前に呼ぶ。移ってよければ true */
+function guardLeave(){
+  if(!guardOn) return true;
+  const why = unsavedReason(); if(!why) return true;
+  const no = $("tno").value.trim();
+  if(confirm("⚠ " + no + " の" + why + "がまだ保存されていません。\n\n［OK］保存してから移動します\n［キャンセル］保存しないで移動するか選べます")){
+    return saveCurrent();                       // 保存できなかったら移動しない
+  }
+  return confirm(no + " を保存しないで移動しますか？\n（入力した内容は消えます。撮った写真は残ります）");
+}
+/* 被害（部位診断・建築限界）の項目がある記録か */
+function recDamage(r){
+  return Object.values(r.bui3 || {}).some(v => v >= 2) || Object.values(r.bui || {}).some(v => v && v.on) ||
+         Object.values(r.ken || {}).some(v => v && v.on);
+}
+/* 要確認の樹木：写真だけあって診断が未保存／全景・位置・被害部の写真が無い／総合判定が無い */
+function issuesOf(key){
+  const recs = records.filter(r => r.block === key);
+  const byNo = new Map(recs.map(r => [r.no, r]));
+  const out = [], seen = new Set();
+  photoMetas.filter(m => m.key === key).forEach(m => {
+    if(!byNo.has(m.no) && !seen.has(m.no)){ seen.add(m.no); out.push({no: m.no, label: "写真だけ（診断が未保存）"}); }
+  });
+  recs.forEach(r => {
+    const probs = [];
+    if(!r.soHantei) probs.push("総合判定なし");
+    if(pdb){
+      const ps = photosFor(key, r.no);
+      const miss = [];
+      if(!ps.some(m => m.branch === 1)) miss.push("全景");
+      if(!ps.some(m => m.branch === 2)) miss.push("位置");
+      if(recDamage(r) && !ps.some(m => m.branch >= 3)) miss.push("被害部");
+      if(miss.length) probs.push(miss.join("・") + "の写真なし");
+    }
+    if(probs.length) out.push({no: r.no, id: r.id, label: probs.join("・")});
+  });
+  // 診断対象リストの並び（無ければ番号順）
+  const st = imports[key], ord = new Map(st && st.items ? st.items.map((x, i) => [x.no, i]) : []);
+  return out.sort((a, b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || (a.no < b.no ? -1 : 1));
+}
+function issueBtns(list){
+  return list.map((x, k) => '<button type="button" data-k="' + k + '"><b>' + esc(x.no) + '</b> <small>' + esc(x.label) + '</small></button>').join("");
+}
+function renderIssues(){
+  const sk = sumKey(), list = issuesOf(sk);
+  $("issueCard").style.display = list.length ? "" : "none";
+  $("issueTitle").textContent = "⚠ 要確認 " + list.length + "本（" + (sk || "ブロック未設定") + "）";
+  $("issueList").innerHTML = issueBtns(list);
+  $("issueList").querySelectorAll("button").forEach(b => b.onclick = () => openIssue(list[+b.dataset.k], sk));
+  // 入力画面の上にも出す（いま入力しているブロック）
+  const bk = blockKey(), l2 = bk === sk ? list : issuesOf(bk);
+  $("issueBar").classList.toggle("show", l2.length > 0);
+  $("issueBar").innerHTML = "⚠ 要確認 " + l2.length + "本（写真の撮り忘れ・総合判定なし・診断が未保存）<br>" +
+    issueBtns(l2.slice(0, 8)) + (l2.length > 8 ? '<button type="button" data-all="1">ほか ' + (l2.length - 8) + '本は一覧・集計で</button>' : "");
+  $("issueBar").querySelectorAll("button[data-k]").forEach(b => b.onclick = () => openIssue(l2[+b.dataset.k], bk));
+  const all = $("issueBar").querySelector("button[data-all]");
+  if(all) all.onclick = () => setView("sum");
+}
+function openIssue(x, key){
+  if(!x) return;
+  if(!guardLeave()) return;
+  setView("input");
+  if(key && key !== blockKey()){ $("block").value = key; blockChanged(); }
+  if(x.id){ startEdit(x.id, true); return; }
+  if(editingId) endEdit();
+  clearFields();
+  const st = listState(), i = st && st.items ? st.items.findIndex(it => it.no === x.no) : -1;
+  if(i >= 0){ st.idx = i; store("gk_imports", imports); fillFromList(); }
+  else { $("tno").value = x.no; updatePhotoHint(); markClean(); }
+  window.scrollTo({top: 0, behavior: "smooth"});
+  toast(x.no + "：" + x.label);
+}
+
+/* ================= 部位診断の所見を、選んだ項目から作る ================= */
+/* 樹木点検アプリの「程度を選ぶと特記事項に文が入る」と同じ考え方。文は現地に合わせて直してください */
+const PART_WORD = {root:"根元部", trunk:"幹部", branch:"骨格となる大枝"};
+function autoShokenLines(){
+  const lines = [];      // [{t: 文, w: 重さ}]
+  const ratioTxt = p => {
+    const d = buiState["dmg_" + p] || {}, w = parseFloat(d.w), l = parseFloat(d.l);
+    return (w > 0 && l > 0) ? "（被害部幅" + d.w + "cm／周囲長" + d.l + "cm＝" + Math.round(w / l * 100) + "%）" : "";
+  };
+  PARTS.forEach(([p]) => {
+    const pw = PART_WORD[p];
+    let rt = ratioTxt(p);
+    BUI3_ITEMS.forEach(([k, lb]) => {
+      const v = (buiState[k + "_" + p] || {}).v || 0;
+      if(v < 2) return;
+      const what = k === "hifu" ? "樹皮枯死・欠損・腐朽" : k === "kudo1" ? "芯に達した開口空洞" : "芯に達していない開口空洞";
+      lines.push({t: pw + "に周囲長の" + (v === 3 ? "1/3以上" : "1/3未満") + "の" + what + "がある" + rt, w: (v === 3 ? 30 : 20) + (k === "kudo1" ? 3 : 0)});
+      rt = "";          // 比率は最初の文にだけ付ける
+    });
+    itemsOfPart(p).forEach(([k, lb]) => {
+      const st = buiState[k + "_" + p];
+      if(!st || !st.on) return;
+      const memo = (st.note || "").trim();
+      const base = {
+        kinoko: pw + "にキノコ（子実体）の発生がある", kozuchi: pw + "で小槌打診の異常音がある",
+        bunki: pw + "の分岐部・付根に異常がある", dogare: pw + "に胴枯れなどの被害がある",
+        mushi: pw + "に虫穴・虫フン・ヤニがある", yuragi: "根元に揺らぎがある", kobo: "鋼棒貫入に異常がある",
+        makine: "巻き根がある", rcollar: "ルートカラーが見えない", roshutsu: "露出根に被害がある",
+        keisha: "幹が不自然に傾斜している", kareeda: "大枝に枯枝がある", stub: "大枝にスタブカットがある"
+      }[k] || (pw + "に" + lb + "がある");
+      const w = {kinoko: 25, yuragi: 28, kobo: 26, keisha: 24, kozuchi: 22, bunki: 18, dogare: 16, mushi: 15, kareeda: 12}[k] || 10;
+      lines.push({t: base + (memo ? "（" + memo + "）" : ""), w});
+    });
+  });
+  KEN_ITEMS.forEach(([k, lb]) => {
+    const st = kenState[k];
+    if(!st || !st.on) return;
+    const [part, side] = lb.split("・");
+    lines.push({t: part + "が" + side + "の建築限界を超えている" + ((st.note || "").trim() ? "（" + st.note.trim() + "）" : ""), w: 8});
+  });
+  return lines;
+}
+$("autoShoken").onclick = ()=>{
+  const lines = autoShokenLines();
+  if(!lines.length){ toast("部位診断・建築限界で項目を選んでください"); return; }
+  const cur = $("buiShoken").value.split("\n").map(x => x.trim()).filter(Boolean);
+  const add = lines.map(x => x.t).filter(t => !cur.includes(t));
+  $("buiShoken").value = cur.concat(add).join("\n");
+  const top = lines.slice().sort((a, b) => b.w - a.w)[0].t;
+  if(!$("gaiRiyu").value.trim()) $("gaiRiyu").value = top;
+  if(!$("soRiyu").value.trim()) $("soRiyu").value = top;
+  toast(add.length ? "所見に " + add.length + "行を足しました（文は現地に合わせて直してください）" : "所見には全部入っています");
+};
 function endEdit(){
   editingId = null;
   $("editBanner").style.display = "none";
   $("saveBtn").textContent = "保存して次の樹木へ"; $("cancelEdit").style.display = "none";
 }
-$("cancelEdit").onclick = ()=>{ endEdit(); clearFields(); const st = listState(); if(st) fillFromList(); };
+$("cancelEdit").onclick = ()=>{
+  endEdit(); clearFields();
+  const st = listState();
+  if(st && st.items.length) fillFromList();
+  else {     // 編集していた樹木の番号を残さず、次の番号に戻す（そのまま入力すると保存済みの番号と重なるため）
+    const rr = blockRecords();
+    if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); } else $("tno").value = "";
+    updatePhotoHint();
+  }
+};
 
 /* ===== 一覧・集計 ===== */
 function allBlocks(){
@@ -986,7 +1213,12 @@ function renderSummary(){
     op.value = b; op.textContent = b || "（未設定）"; op.selected = b === cur;
     sb.appendChild(op);
   });
-  const rr = records.filter(r => r.block === cur).slice().sort((a,b) => a.created - b.created);
+  renderStoreInfo();
+  try{ renderIssues(); }catch(e){ console.warn(e); }
+  // 診断対象リストの順に並べる。リストに無い樹木は保存した順で後ろに
+  const ls = imports[cur], ord = new Map(ls && ls.items ? ls.items.map((x, i) => [x.no, i]) : []);
+  const rr = records.filter(r => r.block === cur).slice()
+    .sort((a,b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || a.created - b.created);
   $("sumAll").textContent = rr.length;
   $("sumOk").textContent = rr.filter(r => r.soHantei === 1).length;
   $("sumWarn").textContent = rr.filter(r => r.soHantei === 2).length;
@@ -1015,7 +1247,7 @@ function renderSummary(){
       if(!confirm(r.no + " の診断記録を削除しますか？（取り消せません）")) return;
       records = records.filter(x => x.id !== r.id);
       store("gk_records", records);
-      if(editingId === r.id) endEdit();
+      if(editingId === r.id){ endEdit(); clearFields(); }
       renderCnt(); renderSummary(); renderProgress();
       toast(r.no + " を削除しました");
     };
@@ -1023,6 +1255,19 @@ function renderSummary(){
     tr.appendChild(td);
     tb.appendChild(tr);
   });
+}
+async function renderStoreInfo(){
+  const el = $("storeInfo"); if(!el) return;
+  const n = photoMetas.length, mb = photoMetas.reduce((a, m) => a + (m.size || 0), 0) / 1048576;
+  const nNew = photoMetas.filter(m => !m.exp).length;
+  let t = "このiPadの写真 " + n + "枚（約" + Math.round(mb) + "MB、未書き出し " + nNew + "枚）・診断記録 " + records.length + "本";
+  try{
+    if(navigator.storage && navigator.storage.estimate){
+      const e = await navigator.storage.estimate();
+      if(e.quota) t += "　保存領域の空き 約" + Math.max(0, Math.round((e.quota - (e.usage || 0)) / 1073741824 * 10) / 10) + "GB";
+    }
+  }catch(_){}
+  el.textContent = t;
 }
 $("delAllBtn").onclick = ()=>{
   const k = sumKey();
@@ -1043,9 +1288,18 @@ function csvField(v){ v = String(v ?? ""); return /[",\n]/.test(v) ? '"' + v.rep
 const mk = v => v || "";
 const onMark = st => (st && st.on) ? "○" : "";
 $("csvBtn").onclick = ()=>{
-  const k = sumKey();
+  const c = buildCsv(sumKey());
+  if(!c){ toast("このブロックの保存データがありません"); return; }
+  const blob = new Blob([c.csv], {type:"text/csv"});
+  const file = new File([blob], c.fname, {type:"text/csv"});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    navigator.share({files:[file], title:c.fname}).catch(() => dl(blob, c.fname));
+  } else { dl(blob, c.fname); }
+};
+/* ブロックの診断CSV（{csv, fname}）。記録が無ければ null。写真ZIPにも同じものを入れる */
+function buildCsv(k){
   const rr = records.filter(r => r.block === k).slice().sort((a,b) => a.created - b.created);
-  if(!rr.length){ toast("このブロックの保存データがありません"); return; }
+  if(!rr.length) return null;
   const head = ["ブロック名","樹木番号","樹種名","樹高H","幹周C","枝張W","植栽形態","支柱","診断日時","樹木医","緯度","経度",
     "樹勢","樹形","活力所見","活力判定"];
   BUI3_ITEMS.forEach(([key,lb])=>{
@@ -1107,12 +1361,8 @@ $("csvBtn").onclick = ()=>{
   const csv = "﻿" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();
   const fname = ("外観診断_" + k + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".csv").replace(/[\\/:*?"<>|]/g,"");
-  const blob = new Blob([csv], {type:"text/csv"});
-  const file = new File([blob], fname, {type:"text/csv"});
-  if(navigator.canShare && navigator.canShare({files:[file]})){
-    navigator.share({files:[file], title:fname}).catch(() => dl(blob, fname));
-  } else { dl(blob, fname); }
-};
+  return {csv, fname};
+}
 function dl(blob, fname){
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = fname;
@@ -1197,7 +1447,9 @@ const CAM_AR = 3/4, CAM_MAXH = 1280;
 let camStream = null, camBranch = 1, camNo = "";
 let camTrack = null, hwZoom = null, digitalZ = 1, curZoom = 1, lensAutoPicked = false;
 function getCam(){
-  const base = { width:{ideal:1920}, height:{ideal:1440}, resizeMode:"none" };
+  // 写真は縦長（3:4）なので縦長の映像を求める。横長（1920×1440）を求めると、iPadを縦に持っても
+  // 上下を切られた映像が届いて狭く写っていた（樹木点検アプリで 2026-10-15 に判明・v25で修正）
+  const base = { width:{ideal:1440}, height:{ideal:1920}, aspectRatio:{ideal:3/4}, resizeMode:"none" };
   const make = v => navigator.mediaDevices.getUserMedia({ video: v, audio: false });
   if(settings.camId){
     return make(Object.assign({deviceId:{exact:settings.camId}}, base))
@@ -1214,7 +1466,8 @@ async function restartCamStream(){
     $("camNoCam").style.display = "none";
     camTrack = camStream.getVideoTracks()[0];
     const caps = camTrack.getCapabilities ? camTrack.getCapabilities() : {};
-    hwZoom = (caps.zoom && caps.zoom.max > caps.zoom.min) ? caps.zoom : null;
+    // レンズズームが効かなかった端末（iPadなど。対応と出るのに拡大されない）は、デジタルズームにする
+    hwZoom = (caps.zoom && caps.zoom.max > caps.zoom.min && !settings.noHwZoom) ? caps.zoom : null;
     applyZoom(settings.zoom || 1);
     await renderLensCtl();
   } catch(e){ $("camNoCam").style.display = "flex"; }
@@ -1222,7 +1475,15 @@ async function restartCamStream(){
 function applyZoom(z){
   if(camStream && hwZoom){
     z = Math.min(hwZoom.max, Math.max(hwZoom.min, z));
-    camTrack.applyConstraints({advanced:[{zoom:z}]}).catch(()=>{});
+    const want = z, track = camTrack;
+    // 拡大されたかをカメラの設定値で確かめ、効いていなければデジタルズームに切り替える
+    track.applyConstraints({advanced:[{zoom:z}]})
+      .catch(() => track.applyConstraints({zoom: z}))
+      .then(() => {
+        const st = track.getSettings ? track.getSettings() : {};
+        if(track === camTrack && hwZoom && (st.zoom == null || Math.abs(st.zoom - want) > 0.05)) hwZoomFail();
+      })
+      .catch(() => { if(track === camTrack) hwZoomFail(); });
     digitalZ = 1;
     $("camVideo").style.transform = "";
   } else {
@@ -1234,7 +1495,17 @@ function applyZoom(z){
   settings.zoom = curZoom; store("gk_settings", settings);
   $("zoomVal").textContent = "×" + curZoom.toFixed(1);
 }
-function zoomStep(dir){ applyZoom(curZoom + dir * (curZoom >= 3 ? 0.5 : 0.2)); }
+function zoomStep(dir){
+  const minZ = hwZoom ? hwZoom.min : 1;
+  if(dir < 0 && curZoom <= minZ + 0.001){ toast("これ以上広くできません（いちばん広い状態です）"); return; }
+  applyZoom(curZoom + dir * (curZoom >= 3 ? 0.5 : 0.2));
+}
+function hwZoomFail(){
+  if(!hwZoom) return;
+  hwZoom = null;
+  settings.noHwZoom = true; store("gk_settings", settings);   // 次からは最初からデジタルズーム
+  applyZoom(curZoom);
+}
 async function renderLensCtl(){
   const box = $("lensCtl");
   box.innerHTML = "";
@@ -1281,7 +1552,18 @@ function fitCamFrame(){
   f.style.width = fw + "px"; f.style.height = fh + "px";
   f.style.left = (w - fw) / 2 + "px"; f.style.top = (h - fh) / 2 + "px";
 }
-window.addEventListener("resize", ()=>{ if($("camModal").style.display === "flex") fitCamFrame(); });
+/* カメラを開いたままiPadの向きを変えたら、その向きで映像を取り直す */
+let camOrient = null, camOrientT = 0;
+window.addEventListener("resize", ()=>{
+  if($("camModal").style.display !== "flex") return;
+  fitCamFrame();
+  const o = window.innerWidth > window.innerHeight ? "land" : "port";
+  if(camOrient && o !== camOrient && camStream){
+    clearTimeout(camOrientT);
+    camOrientT = setTimeout(() => { if($("camModal").style.display === "flex") restartCamStream(); }, 500);
+  }
+  camOrient = o;
+});
 async function openCam(branch){
   const no = $("tno").value.trim();
   if(!no){ toast("樹木番号を入力してください"); return; }
@@ -1290,6 +1572,7 @@ async function openCam(branch){
     if(n3 >= 3){ toast("被害部写真は3枚までです（不要なら「この樹木の写真を削除」）"); return; }
   }
   camBranch = branch; camNo = no;
+  clearTimeout(revTimer); $("camReview").classList.remove("show");   // 前の確認表示が残っていたら消す
   $("camNo").textContent = no;
   $("camKind").textContent = branch === 1 ? "全景" : branch === 2 ? "位置(根元)" : "被害部";
   $("camKoji").textContent = kojiText();
@@ -1299,10 +1582,12 @@ async function openCam(branch){
   $("cmtHint").textContent = branch === 3 ? "指でなぞると赤点線で囲めます（任意）" : "コメントは写真下の説明として印字されます";
   renderCamCmts(); updateMarkUI();
   $("camModal").style.display = "flex";
+  camOrient = window.innerWidth > window.innerHeight ? "land" : "port";
   fitCamFrame();
   await restartCamStream();
 }
 function closeCam(){
+  clearTimeout(revTimer); $("camReview").classList.remove("show");
   $("camModal").style.display = "none";
   $("cmtPicker").classList.remove("show");
   if(camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; }
@@ -1310,6 +1595,41 @@ function closeCam(){
   $("camNoCam").style.display = "none";
 }
 $("camClose").onclick = closeCam;
+/* 撮った写真の確認：1.5秒表示して閉じる。［撮り直す］でカメラに戻る（撮った写真は消して撮り直す） */
+const REVIEW_MS = 1500;
+let revTimer = 0, revUrl = "", revMeta = null;
+function showReview(blob, meta){
+  if(revUrl) URL.revokeObjectURL(revUrl);
+  revUrl = URL.createObjectURL(blob); revMeta = meta;
+  $("camRevImg").src = revUrl;
+  $("camRevTxt").textContent = "✔ " + meta.filename + " を保存しました";
+  const bar = $("camRevTime").firstElementChild;
+  bar.style.transition = "none"; bar.style.width = "100%";
+  $("camReview").classList.add("show");
+  requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = "width " + REVIEW_MS + "ms linear"; bar.style.width = "0%"; }));
+  clearTimeout(revTimer);
+  revTimer = setTimeout(() => endReview(true), REVIEW_MS);
+}
+function endReview(close){
+  clearTimeout(revTimer); revTimer = 0;
+  $("camReview").classList.remove("show");
+  $("camRevImg").removeAttribute("src");
+  if(revUrl){ URL.revokeObjectURL(revUrl); revUrl = ""; }
+  if(close){ revMeta = null; closeCam(); }
+}
+$("camRetake").onclick = async e => {
+  e.stopPropagation();
+  const m = revMeta; endReview(false); revMeta = null;
+  // 被害部は撮るたびに増えるので、撮り直すときは今の写真を消す（全景・位置は撮り直しで置き換わる）
+  if(m && m.branch >= 3){
+    try{ await preq(ptx("blobs","readwrite").delete(m.id)); await preq(ptx("meta","readwrite").delete(m.id)); }catch(_){}
+    photoMetas = photoMetas.filter(x => x.id !== m.id);
+    updatePhotoHint(); renderSummary();
+  }
+  toast("撮り直してください（前の写真と置き換わります）");
+};
+$("camRevOk").onclick = e => { e.stopPropagation(); endReview(true); };
+$("camRevImg").onclick = () => endReview(true);
 $("shot1").onclick = ()=>openCam(1);
 $("shot2").onclick = ()=>openCam(2);
 $("shot3").onclick = ()=>openCam(3);
@@ -1515,10 +1835,9 @@ $("camShutter").onclick = async ()=>{
     const meta = await addPhotoBlob(blockKey(), camNo, branch, blob, replace, selCmts.join("、"));
     $("camFlash").style.opacity = "0.9";
     setTimeout(()=>$("camFlash").style.opacity = "0", 120);
-    toast(meta.filename + " を保存しました");
-    closeCam();
     updatePhotoHint();
     renderSummary();
+    showReview(blob, meta);      // 撮れた写真を少しの間見せてから閉じる
   } finally { camShooting = false; $("camShutter").disabled = false; }
 };
 
@@ -1550,31 +1869,89 @@ async function makeZip(files){
   end.setUint32(12, cSize, true); end.setUint32(16, offset, true);
   return new Blob([...parts, ...central, end.buffer], {type:"application/zip"});
 }
-$("zipBtn").onclick = async ()=>{
+/* iPadの「共有（ファイルに保存）」は、ボタンを押すたびに1回しか開けない。続けて自動で開こうとすると
+   2個目からは断られて保存されない（樹木点検アプリで判明）。ZIPごとに［保存する］を押してもらう。
+   写真は一度書き出したら印（exp＝書き出した日時）を付け、次からは新しい写真（撮り直しを含む）だけを書き出す。
+   どのZIPにもそのブロックの診断CSV（その時点の全記録）を入れる → PCのハブは置くだけでカルテを作れる */
+let zipJob = null;
+$("zipBtn").onclick = ()=> openZipDlg(false);
+function openZipDlg(all){
   const key = sumKey();
-  const ps = photoMetas.filter(m => m.key === key).sort((a,b)=>a.filename < b.filename ? -1 : 1);
-  if(!ps.length){ toast("このブロックの写真がありません"); return; }
-  const CHUNK = 50;
-  const chunks = [];
+  const psAll = photoMetas.filter(m => m.key === key).sort((a,b)=>a.filename < b.filename ? -1 : 1);
+  const ps = all ? psAll : psAll.filter(m => !m.exp);
+  const csv = buildCsv(key);
+  if(!psAll.length && !csv){ toast("このブロックの写真・記録がありません"); return; }
+  const CHUNK = 50, chunks = [];
   for(let i = 0; i < ps.length; i += CHUNK) chunks.push(ps.slice(i, i + CHUNK));
+  if(!chunks.length) chunks.push([]);          // 新しい写真が無くても、診断CSVだけのZIPを保存できる
   const d = new Date();
-  toast("ZIP作成中…（" + ps.length + "枚）");
-  for(let ci = 0; ci < chunks.length; ci++){
+  const base = ("外観写真_" + key + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds())).replace(/[\\/:*?"<>|]/g,"");
+  zipJob = {key, chunks, base, total: ps.length, all, st: chunks.map(() => "idle"), ready: null};
+  const nOld = psAll.length - psAll.filter(m => !m.exp).length;
+  $("zipNote").innerHTML = (all ? "すべての写真 " + ps.length + "枚" : "まだ書き出していない写真 " + ps.length + "枚") +
+    (ps.length ? "（" + chunks.length + "個のZIP）" : "") + "と、診断CSV（" + (csv ? records.filter(r => r.block === key).length + "本" : "記録なし") + "）を保存します。" +
+    (chunks.length > 1 ? "［保存する］を1個ずつ押してください（iPadでは続けて自動で保存できません）。" : "") +
+    "<br>保存先は「ファイル」→ OneDrive の <b>街路樹診断システム／iPadから</b> にすると、PCのハブで［外観診断カルテを作成］を押すだけで取り込めます。" +
+    (!all && nOld ? '<br><a href="#" id="zipAll">書き出し済みの写真（' + nOld + '枚）も含めて、すべて書き出し直す</a>' : "");
+  if($("zipAll")) $("zipAll").onclick = e => { e.preventDefault(); openZipDlg(true); };
+  renderZipDlg();
+  $("zipDlg").classList.add("show");
+  prepZip(0);
+}
+function zipName(J, ci){ return J.chunks.length > 1 ? J.base + "_" + (ci + 1) + ".zip" : J.base + ".zip"; }
+function renderZipDlg(){
+  const J = zipJob; if(!J) return;
+  const NUM = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
+  $("zipList").innerHTML = J.chunks.map((c, ci) => {
+    const a = ci * 50 + 1, b = ci * 50 + c.length, st = J.st[ci];
+    const lab = st === "building" ? "準備中…" : st === "ready" ? "保存する" : st === "done" ? "✓ 保存済み" : "準備する";
+    return '<div class="zipRow"><div class="zl"><b>' + (c.length ? (NUM[ci] || (ci + 1)) + ' 写真 ' + a + '〜' + b + '枚目' : '新しい写真なし（診断CSVだけ）') +
+      '</b><br><small>' + (c.length ? esc(c[0].filename) + ' 〜 ' + esc(c[c.length - 1].filename) + '　＋診断CSV' : '記録のバックアップ用') + '</small></div>' +
+      '<button type="button" data-ci="' + ci + '" class="' + st + '"' + (st === "building" ? " disabled" : "") + '>' + lab + '</button></div>';
+  }).join("");
+  $("zipList").querySelectorAll("button[data-ci]").forEach(b => b.onclick = () => saveZip(+b.dataset.ci));
+}
+async function prepZip(ci){
+  const J = zipJob;
+  if(!J || ci < 0 || ci >= J.chunks.length || J.st[ci] === "building") return;
+  if(J.ready && J.ready.ci === ci) return;
+  if(J.ready){ J.st[J.ready.ci] = J.st[J.ready.ci] === "ready" ? "idle" : J.st[J.ready.ci]; J.ready = null; }   // 作り置きは1個だけ（メモリ節約）
+  const was = J.st[ci];
+  J.st[ci] = "building"; renderZipDlg();
+  try{
     const files = [];
-    for(const m of chunks[ci]) files.push({name: m.filename, blob: await getPhotoBlob(m.id)});
+    for(const m of J.chunks[ci]) files.push({name: m.filename, blob: await getPhotoBlob(m.id)});
+    const c = buildCsv(J.key);
+    if(c) files.push({name: c.fname, blob: new Blob([c.csv], {type: "text/csv"})});
     const zip = await makeZip(files);
-    const base = ("外観診断写真_" + key + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate())).replace(/[\\/:*?"<>|]/g,"");
-    const name = chunks.length > 1 ? base + "_" + (ci+1) + ".zip" : base + ".zip";
-    const file = new File([zip], name, {type:"application/zip"});
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      try { await navigator.share({files:[file], title:name}); } catch(e){}
-    } else {
-      dl(zip, name);
-      await new Promise(r => setTimeout(r, 800));
-    }
+    if(zipJob !== J) return;
+    J.ready = {ci, file: new File([zip], zipName(J, ci), {type: "application/zip"})};
+    J.st[ci] = "ready";
+  }catch(e){ J.st[ci] = was === "done" ? "done" : "idle"; toast("ZIPを作れませんでした：" + e.message); }
+  renderZipDlg();
+}
+async function saveZip(ci){
+  const J = zipJob; if(!J) return;
+  if(!(J.ready && J.ready.ci === ci)){ prepZip(ci); return; }     // まだ作っていなければ作る（できたらもう一度押す）
+  const f = J.ready.file;
+  let ok = false;
+  if(navigator.canShare && navigator.canShare({files: [f]})){
+    try{ await navigator.share({files: [f], title: f.name}); ok = true; }
+    catch(e){ if(e.name !== "AbortError"){ dl(f, f.name); ok = true; } }     // キャンセルなら、もう一度押せるよう残す
+  } else { dl(f, f.name); ok = true; }
+  if(zipJob !== J) return;
+  if(ok){
+    J.st[ci] = "done"; J.ready = null; toast(f.name + " を保存しました");
+    const now = Date.now();
+    for(const m of J.chunks[ci]){ m.exp = now; try{ await preq(ptx("meta","readwrite").put(m)); }catch(_){} }
+    renderStoreInfo();
   }
-  toast(ps.length + "枚を" + chunks.length + "個のZIPに書き出しました");
-};
+  renderZipDlg();
+  const nx = J.st.findIndex(st => st !== "done");
+  if(ok && nx >= 0) prepZip(nx);
+  else if(ok) toast("すべてのZIP（" + J.total + "枚）を保存しました");
+}
+$("zipClose").onclick = ()=>{ $("zipDlg").classList.remove("show"); zipJob = null; };
 
 /* ===== トースト・起動 ===== */
 let toastTimer;
@@ -1588,6 +1965,7 @@ $("koji").value = settings.koji || "";
 $("block").value = settings.block || "";
 $("dt").value = nowStr();
 renderHeader(); renderCnt(); renderProgress();
+setTimeout(()=>{ markClean(); guardOn = true; }, 800);   // 起動時の状態を「保存済み」とみなしてから、保存し忘れの確認を始める
 if(!settings.inspector || !$("block").value) $("setPanel").open = true;
 openPdb().then(async db=>{
   pdb = db;
