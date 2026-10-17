@@ -92,18 +92,16 @@ body.zOn.zNoInp #view-input > *:not(#zCard){display:none !important}
 body.zOn.zNoInp #view-input{grid-template-columns:minmax(0,1fr) !important}
 body.zOn.zNoInp #zCard{position:sticky !important;top:var(--zTop,120px) !important}
 body.zOn.zNoInp #zView{height:calc(100vh - var(--zTop,120px) - 74px) !important}
-/* iPad 横向き：図面を左、入力を右に並べる */
-@media (min-width:1000px) and (orientation:landscape){
-  body.zOn #view-input{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);column-gap:14px;align-items:start}
-  body.zOn #view-input > *{grid-column:2}
-  body.zOn #zCard{grid-column:1;grid-row:1 / span 20;position:sticky;top:calc(var(--zTop,120px) + 6px);margin-bottom:0}
-  body.zOn #zView{height:calc(100vh - var(--zTop,120px) - 74px)}
-}
+/* iPad 横向き：図面を左、入力を右に並べる（横向きなら必ず。判定は applyWide で body.zWide を付ける） */
+body.zOn.zWide #view-input{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);column-gap:14px;align-items:start}
+body.zOn.zWide #view-input > *{grid-column:2}
+body.zOn.zWide #zCard{grid-column:1;grid-row:1 / span 40;position:sticky;top:calc(var(--zTop,120px) + 6px);margin-bottom:0}
+body.zOn.zWide #zView{height:calc(100vh - var(--zTop,120px) - 74px)}
 /* iPad 縦向き・スマホ：図面を上に固定して、その下で入力 */
-@media not all and (min-width:1000px) and (orientation:landscape){
-  body.zOn #zCard{position:sticky;top:var(--zTop,120px);z-index:5;box-shadow:0 4px 10px rgba(0,0,0,.08)}
-  body.zOn #zView{height:34vh}
-}
+body.zOn:not(.zWide) #zCard{position:sticky;top:var(--zTop,120px);z-index:5;box-shadow:0 4px 10px rgba(0,0,0,.08)}
+body.zOn:not(.zWide) #zView{height:34vh}
+/* 要確認（幹周り未入力・写真不足・写真だけで未保存）の樹木 */
+.zmk.inc{box-shadow:0 0 0 3px #fff,0 0 0 6px #D32F2F}
 `;
 document.head.appendChild(css);
 
@@ -309,6 +307,8 @@ function renderMarks(){
   if(!R || !dz){ box.innerHTML = ""; $z("zLegend").innerHTML = ""; return; }
   const st = listState();
   const done = new Map(routeRecords().map(r => [r.no, r]));
+  let incNos = new Set();     // 要確認の樹木（index.html の issuesOf）→ 印に赤い輪
+  try{ incNos = new Set(issuesOf(routeKey()).map(x => x.no)); }catch(_){}
   const cur = st ? st.idx : -1;
   const d = markSize(), vs = vsize(), tags = V.s > 0.55;
   const cnt = {"": 0, ok: 0, warn: 0, ng: 0, none: 0};
@@ -326,9 +326,10 @@ function renderMarks(){
     q = {x: q.x + n * (d * 0.75), y: q.y};
     if(q.x < -40 || q.y < -40 || q.x > vs.w + 40 || q.y > vs.h + 40) return;
     const isCur = i === cur && !fixing && !addMode, isSel = !!(fixSel && fixSel.k === p.k);
+    const isInc = incNos.has(st.items[i].no);
     const dd = (isCur || isSel) ? d + 8 : d;
     html += '<div class="zmk ' + s + (isCur ? " cur" : "") + (isSel ? " sel" : "") + (p.moved ? " moved" : "") +
-            (p.added ? " added" : "") + (p.u && !p.moved ? " unsure" : "") +
+            (p.added ? " added" : "") + (p.u && !p.moved ? " unsure" : "") + (isInc ? " inc" : "") +
             '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
     if(tags || isCur || isSel){
       const it = st.items[i];
@@ -347,7 +348,8 @@ function renderMarks(){
     '<i style="border-color:#B07A00;background:rgba(240,190,40,.65)"></i>維持管理 ' + cnt.warn +
     '<i style="border-color:#C62828;background:rgba(198,40,40,.55)"></i>要外観 ' + cnt.ng +
     (cnt.none ? '<i style="border-color:#555;background:rgba(80,80,80,.45)"></i>空桝等 ' + cnt.none : "") +
-    (cnt.u ? '<i style="border-color:#E07B00;border-style:dashed"></i>位置未確定 ' + cnt.u : "");
+    (cnt.u ? '<i style="border-color:#E07B00;border-style:dashed"></i>位置未確定 ' + cnt.u : "") +
+    (incNos.size ? '<i style="border-color:#E07B00;box-shadow:0 0 0 2px #fff,0 0 0 4px #D32F2F"></i>要確認 ' + incNos.size : "");
 }
 
 /* 印・一覧に出す番号。「左27#2」（同じ桝の2本目）は「左27（2本目）」と書く。many … 同じ桝の樹木が並ぶ一覧 */
@@ -614,7 +616,7 @@ function revealInput(){
   if(!el) return;
   const r = el.getBoundingClientRect();
   const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zTop")) || 120;
-  const wide = window.matchMedia("(min-width:1000px) and (orientation:landscape)").matches;
+  const wide = document.body.classList.contains("zWide");
   const minY = wide ? top + 8 : $z("zCard").getBoundingClientRect().bottom + 8;
   if(r.top < minY || r.bottom > window.innerHeight - 20) window.scrollBy({top: r.top - minY - 70, behavior: "smooth"});
   el.classList.remove("zFlash"); void el.offsetWidth; el.classList.add("zFlash");
@@ -735,7 +737,7 @@ document.addEventListener("focusin", e => {
   if(!document.body.classList.contains("zOn") || document.body.classList.contains("zNoInp")) return;
   if(!el.closest || !el.closest("#view-input") || el.closest("#zCard")) return;
   setTimeout(() => {
-    const wide = window.matchMedia("(min-width:1000px) and (orientation:landscape)").matches;
+    const wide = document.body.classList.contains("zWide");
     const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zTop")) || 120;
     const minY = wide ? top + 8 : $z("zCard").getBoundingClientRect().bottom + 10;
     const r = el.getBoundingClientRect();
@@ -744,7 +746,15 @@ document.addEventListener("focusin", e => {
 });
 
 /* ヘッダーの下に図面を固定するため、ヘッダーの高さを測る */
+/* 横向き（幅が高さより大きく、ある程度の幅がある）なら図面と入力を横に並べる。
+   以前は「幅1000px以上かつ横向き」のメディアクエリだったが、横向きでも並ばないことがあったため、画面の実寸で判定する */
+function applyWide(){
+  const w = window.innerWidth, h = window.innerHeight;
+  document.body.classList.toggle("zWide", w > h && w >= 760);
+}
+window.addEventListener("orientationchange", () => setTimeout(() => { applyWide(); layoutTop(); }, 300));
 function layoutTop(){
+  applyWide();
   const hd = document.querySelector("header");
   const bar = document.getElementById("sysBar");
   const h = (hd ? hd.getBoundingClientRect().height : 90) + (bar ? bar.getBoundingClientRect().height : 0);

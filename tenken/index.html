@@ -122,6 +122,11 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 .tcL[data-l=A]{color:#2D5E24}.tcL[data-l=B]{color:var(--warn-tx)}.tcL[data-l=C]{color:var(--ng-tx)}
 .tcItem textarea{font-size:14px}
 .tcMod{color:var(--acc);font-weight:400}
+/* 要確認（幹周り未入力・写真不足・写真だけで点検が未保存） */
+#issueBar{display:none;background:var(--ng-bg);color:var(--ng-tx);border:1px solid var(--ng-bd);border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:13px;font-weight:600}
+#issueBar.show{display:block}
+#issueBar button,#issueList button{font-size:13px;padding:6px 10px;margin:4px 6px 0 0;border-radius:8px;border:1px solid var(--ng-bd);background:#fff;color:var(--ng-tx);font-family:inherit;font-weight:600}
+#issueList button small{font-weight:400;color:var(--tx2)}
 /* 写真ZIPの書き出し（iPadは1個ずつボタンを押して保存） */
 #zipDlg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:45;align-items:center;justify-content:center;padding:16px}
 #zipDlg.show{display:flex}
@@ -203,7 +208,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v25</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v27</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -288,6 +293,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
   </details>
 
   <div class="card">
+    <div id="issueBar"></div>
     <div id="editBanner"></div>
     <div id="insertBanner">リスト外の樹木を入力中。保存するとリストに戻ります</div>
     <div id="progWrap" style="display:none;margin-bottom:12px">
@@ -400,6 +406,11 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     </div>
   </div>
   <p class="note" id="storeInfo" style="margin:0 0 8px"></p>
+  <div class="card" id="issueCard" style="display:none;border-color:var(--ng-bd)">
+    <div style="font-size:14px;font-weight:600;color:var(--ng-tx)" id="issueTitle"></div>
+    <p class="note" style="margin:4px 0 0">タップするとその樹木を開きます。幹周りを入れる・写真を撮る・保存すると消えます。</p>
+    <div id="issueList"></div>
+  </div>
   <div id="sumChips">
     <div class="sumChip" style="background:#fff;border:1px solid var(--line)"><b id="sumAll">0</b>合計</div>
     <div class="sumChip" style="background:var(--ok-bg);color:var(--ok-tx)"><b id="sumOk">0</b>良好</div>
@@ -811,7 +822,9 @@ function renderCnt(){ $("cnt").textContent = routeRecords().length; }
 $("tab-input").onclick = () => setView("input");
 $("tab-sum").onclick = () => setView("sum");
 function setView(v){
-  $("view-input").style.display = v === "input" ? "block" : "none";
+  // 入力タブは "" にして、図面と入力の横並び（zumen.js の display:grid）を上書きしない。
+  // "block" を入れていたため、一覧・集計から戻ると横並びが崩れていた
+  $("view-input").style.display = v === "input" ? "" : "none";
   $("view-sum").style.display = v === "sum" ? "block" : "none";
   $("tab-input").classList.toggle("on", v === "input");
   $("tab-sum").classList.toggle("on", v === "sum");
@@ -1139,8 +1152,9 @@ function renderProgress(){
 }
 /* リストの現在位置にある樹木を画面に出す。
    すでに保存済みの樹木なら、その内容を呼び出して直せる状態にする（どこからでも前後に動けるように）。*/
-function showListItem(i){
+function showListItem(i, noGuard){
   const st = listState(); if(!st) return;
+  if(!noGuard && i !== st.idx && !guardLeave()) return;      // 保存していない入力を黙って消さない
   if(i < 0) i = 0;
   if(i > st.items.length - 1) i = st.items.length - 1;
   st.idx = i; store("gj_imports", imports);
@@ -1170,6 +1184,7 @@ function showListItem(i){
   updateListProg();
   updatePhotoButtons();
   updateNavButtons();
+  markClean();
 }
 
 /* 図面番号・桝No・樹木No・樹種名・樹木備考を見せる（鳳土木の台帳のように情報が多い場合に効く）*/
@@ -1469,6 +1484,84 @@ function photosOf(items, sp){
 }
 function fullMemo(r){ return (r.kabuNote ? r.kabuNote + (r.memo ? "。" : "") : "") + (r.memo || ""); }
 
+/* ================= 保存し忘れの防止と「要確認」 ================= */
+/* 画面に出している樹木の入力（保存した時・開いた時の状態と比べて、変わっていれば未保存） */
+let formBase = "", guardOn = false;
+function formSnap(){
+  return JSON.stringify([$("girth").value.trim(), $("sp").value.trim(), $("memo").value.trim(),
+    [...document.querySelectorAll(".itm.on")].map(b => b.dataset.i).join(","),
+    [...document.querySelectorAll(".stem")].map(i => i.value).join(",")]);
+}
+function markClean(){ formBase = formSnap(); }
+function unsavedReason(){
+  const no = fullNo(); if(!no) return "";
+  if(formSnap() !== formBase) return "入力";
+  const rec = routeRecords().find(r => r.no === no);
+  if(!rec && pdb && photosFor(routeKey(), no).length) return "点検（写真は撮影済み）";
+  return "";
+}
+/* 別の樹木へ移る前に呼ぶ。移ってよければ true */
+function guardLeave(){
+  if(!guardOn) return true;
+  const why = unsavedReason(); if(!why) return true;
+  const no = fullNo();
+  if(confirm("⚠ " + no + " の" + why + "がまだ保存されていません。\n\n［OK］保存してから移動します\n［キャンセル］保存しないで移動するか選べます")){
+    saveAndMove(0);
+    return !!routeRecords().find(r => r.no === no) && formSnap() === formBase;   // 保存できなかったら移動しない
+  }
+  return confirm(no + " を保存しないで移動しますか？\n（入力した内容は消えます。撮った写真は残ります）");
+}
+/* 要確認の樹木：写真だけあって点検が未保存／幹周り未入力／写真が必要枚数に足りない */
+function issuesOf(key){
+  const recs = records.filter(r => (r.office + "|" + r.route) === key);
+  const byNo = new Map(recs.map(r => [r.no, r]));
+  const out = [], seen = new Set();
+  photoMetas.filter(m => m.key === key).forEach(m => {
+    if(!byNo.has(m.no) && !seen.has(m.no)){ seen.add(m.no); out.push({no: m.no, label: "写真だけ（点検が未保存）"}); }
+  });
+  recs.forEach(r => {
+    if(isNoTree(r.sp)) return;
+    const need = photosOf(r.items || [], r.sp), have = photoMetas.filter(m => m.key === key && m.no === r.no).length;
+    const probs = [];
+    if(!String(r.girth || "").trim()) probs.push("幹周り未入力");
+    if(pdb && have < need) probs.push("写真 " + have + "/" + need + "枚");
+    if(probs.length) out.push({no: r.no, id: r.id, label: probs.join("・")});
+  });
+  // 点検リストの並び（無ければ番号順）
+  const st = imports[key], ord = new Map(st && st.items ? st.items.map((x, i) => [x.no, i]) : []);
+  return out.sort((a, b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || (a.no < b.no ? -1 : 1));
+}
+function issueBtns(list){
+  return list.map((x, k) => '<button type="button" data-k="' + k + '"><b>' + esc(x.no) + '</b> <small>' + esc(x.label) + '</small></button>').join("");
+}
+function renderIssues(){
+  const sk = sumKey(), list = issuesOf(sk);
+  $("issueCard").style.display = list.length ? "" : "none";
+  $("issueTitle").textContent = "⚠ 要確認 " + list.length + "本（" + sk.split("|")[1] + "）";
+  $("issueList").innerHTML = issueBtns(list);
+  $("issueList").querySelectorAll("button").forEach(b => b.onclick = () => openIssue(list[+b.dataset.k], sk));
+  // 入力画面の上にも出す（いま入力している路線）
+  const rk = routeKey(), l2 = rk === sk ? list : issuesOf(rk);
+  $("issueBar").classList.toggle("show", l2.length > 0);
+  $("issueBar").innerHTML = "⚠ 要確認 " + l2.length + "本（幹周り未入力・写真不足・点検が未保存）<br>" +
+    issueBtns(l2.slice(0, 8)) + (l2.length > 8 ? '<button type="button" data-all="1">ほか ' + (l2.length - 8) + '本は一覧・集計で</button>' : "");
+  $("issueBar").querySelectorAll("button[data-k]").forEach(b => b.onclick = () => openIssue(l2[+b.dataset.k], rk));
+  const all = $("issueBar").querySelector("button[data-all]");
+  if(all) all.onclick = () => setView("sum");
+}
+function openIssue(x, key){
+  if(!x) return;
+  if(!guardLeave()) return;
+  setView("input");
+  if(x.id){ startEdit(x.id, false); return; }
+  const st = imports[key];
+  const i = st && st.items ? st.items.findIndex(it => it.no === x.no) : -1;
+  if(i >= 0 && getMode() === "list"){ showListItem(i, true); }
+  else { clearTreeFields(); const sh = splitHojo(x.no); $("tno").value = sh.base; $("hojo").value = sh.hojo; updatePhotoButtons(); markClean(); }
+  window.scrollTo({top: 0, behavior: "smooth"});
+  toast(x.no + "：" + x.label);
+}
+
 /* 保存して move の向きへ動く（-1=前の樹木 / 0=この樹木 / +1=次の樹木）*/
 $("savePrev").onclick = ()=> saveAndMove(-1);
 $("saveHere").onclick = ()=> saveAndMove(0);
@@ -1575,6 +1668,7 @@ function clearTreeFields(){
   document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
   resetLevels();
   calc(); girthWarnUpd();
+  markClean();
 }
 
 /* quiet=true … リスト内を前後に動いた結果の呼び出し。路線の再読込やスクロールをしない */
@@ -1611,6 +1705,7 @@ function startEdit(id, quiet){
     $("tnoNote").textContent = "編集中は番号を変更すると上書き保存されます"; $("tnoNote").className = "note manual";
   }
   calc(); girthWarnUpd(); updateNavButtons();
+  markClean();
   if(!quiet) window.scrollTo({top:0, behavior:"smooth"});
 }
 /* quiet=true … 番号の再提案をせず、編集状態だけ解除する */
@@ -1645,6 +1740,7 @@ async function renderStoreInfo(){
 function renderSummary(){
   renderSumSel();
   renderStoreInfo();
+  try{ renderIssues(); }catch(e){ console.warn(e); }
   const rr = sumRecords().slice().sort((a,b) => a.created - b.created);
   const jd = rr.map(r => judgeOf(r.items, r.sp));
   $("sumAll").textContent = rr.length;
@@ -1858,7 +1954,7 @@ function applyZoom(z){
 function zoomStep(dir){
   const minZ = hwZoom ? hwZoom.min : 1;
   if(dir < 0 && curZoom <= minZ + 0.001){
-    toast(camLandscape() ? "これ以上広くできません。iPadを縦に持つと約1.3倍広く写せます" : "これ以上広くできません（いちばん広い状態です）");
+    toast("これ以上広くできません（いちばん広い状態です）");
     return;
   }
   applyZoom(curZoom + dir * (curZoom >= 3 ? 0.5 : 0.2));
@@ -1866,7 +1962,8 @@ function zoomStep(dir){
 /* 樹木写真は縦長（3:4）。横向きのiPadでは横長の映像から縦長に切り抜くので狭くなる → 縦に持つよう案内 */
 function camLandscape(){ return !!camStream && window.innerWidth > window.innerHeight * 1.05; }   // iPadを横向きに持っている
 function updWideHint(){
-  $("camWide").style.display = camLandscape() ? "block" : "none";
+  // 「縦に持つと広く写せる」の案内は出さない（縦長の映像を求めるようにした v25 以降、iPad Air 13 では横向きのほうが広く写ったため）
+  $("camWide").style.display = "none";
   // iPadから届いている映像の大きさ（広さの確認用）。縦長の写真は、この映像の中央を3:4で使う
   const v = $("camVideo");
   $("camRes").textContent = (camStream && v.videoWidth) ? "映像 " + v.videoWidth + "×" + v.videoHeight : "";
@@ -2325,6 +2422,7 @@ $("koji").value = settings.koji || "";
 $("office").value = last.office || ""; $("route").value = last.route || "";
 $("dt").value = nowStr();
 routeChanged(); calc(); girthWarnUpd();
+setTimeout(()=>{ markClean(); guardOn = true; }, 800);   // 起動時の状態を「保存済み」とみなしてから、保存し忘れの確認を始める
 if(!settings.inspector || !$("office").value || !$("route").value) $("setPanel").open = true;
 openPdb().then(async db=>{
   pdb = db;
