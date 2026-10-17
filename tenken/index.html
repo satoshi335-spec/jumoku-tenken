@@ -208,7 +208,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v27</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v28</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -1741,7 +1741,9 @@ function renderSummary(){
   renderSumSel();
   renderStoreInfo();
   try{ renderIssues(); }catch(e){ console.warn(e); }
-  const rr = sumRecords().slice().sort((a,b) => a.created - b.created);
+  // 点検リストの順（右283 → 右284 → …）に並べる。リストに無い樹木は保存した順で後ろに
+  const ls = sumListState(), ord = new Map(ls && ls.items ? ls.items.map((x, i) => [x.no, i]) : []);
+  const rr = sumRecords().slice().sort((a,b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || a.created - b.created);
   const jd = rr.map(r => judgeOf(r.items, r.sp));
   $("sumAll").textContent = rr.length;
   $("sumOk").textContent = jd.filter(j => j.startsWith("概ね")).length;
