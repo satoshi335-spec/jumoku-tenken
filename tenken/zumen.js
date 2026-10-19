@@ -210,7 +210,7 @@ function statusOf(i, doneMap){
   const it = st.items[i];
   const r = doneMap.get(it.no);
   if(!r) return "";
-  const j = judgeOf(r.items || [], r.sp, r.lv);
+  const j = judgeOf(r.items || [], r.sp, r.lv, r.bassai);
   if(isNoTree(r.sp)) return "none";
   if(j.indexOf("要経過観察") > -1) return "obs";
   if(j.indexOf("外観") > -1) return "ng";
@@ -817,9 +817,40 @@ function pdfStamp(withSec){
   const d = new Date(), p = n => String(n).padStart(2, "0");
   return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + (withSec ? "_" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) : "");
 }
+/* 路線（key＝事務所|路線）の図面・リスト・記録・位置をまとめる。図面が無ければ null */
+async function routeCtx(key){
+  const Rk = (key === rKey && R) ? R : await zget("routes", key).catch(() => null);
+  if(!Rk || !Rk.drawings || !Rk.drawings.length) return null;
+  const st = imports[key] || null, idx = new Map();
+  ((st && st.items) || []).forEach((it, i) => {
+    const b = it.base != null ? it.base : splitHojo(it.no).base;
+    const h = it.base != null ? (it.hojo || "") : splitHojo(it.no).hojo;
+    idx.set(keyOf(it.zumen, b, h), i);
+  });
+  const done = new Map(records.filter(r => (r.office + "|" + r.route) === key).map(r => [r.no, r]));
+  // 位置（現場で直した位置・追加した樹木を含む。allPos と同じ）
+  const fx = FIX[key] || {}, seen = new Set();
+  const pos = (Rk.pos || []).map(p => {
+    const k = keyOf(p.kz || p.z, p.m, p.h); seen.add(k);
+    const f = fx[k];
+    return f ? {z: f.z, m: p.m, h: p.h, x: f.x, y: f.y, k} : Object.assign({k}, p);
+  });
+  Object.keys(fx).forEach(k => { if(!seen.has(k)){ const f = fx[k]; pos.push({z: f.z, m: f.m, h: f.h, x: f.x, y: f.y, k}); } });
+  return {key, R: Rk, st, idx, done, pos};
+}
+function statusIn(C, i){
+  const it = C.st && C.st.items[i], r = it && C.done.get(it.no);
+  if(!r) return "";
+  const j = judgeOf(r.items || [], r.sp, r.lv, r.bassai);
+  if(isNoTree(r.sp)) return "none";
+  if(j.indexOf("要経過観察") > -1) return "obs";
+  if(j.indexOf("外観") > -1) return "ng";
+  if(j.indexOf("維持") > -1) return "warn";
+  return "ok";
+}
 /* 1枚の図面を描く。戻り値は描いた樹木の数（画像が無ければ -1） */
-async function drawResultSheet(cv, d){
-  const blob = await zget("imgs", rKey + "|" + d.zumen).catch(() => null);
+async function drawResultSheet(cv, d, C){
+  const blob = await zget("imgs", C.key + "|" + d.zumen).catch(() => null);
   if(!blob) return -1;
   const im = await blobImage(blob);
   const MAXS = 4200;                                  // 長辺の上限（iPadのメモリ対策）
@@ -833,7 +864,7 @@ async function drawResultSheet(cv, d){
   g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height);
   g.drawImage(im, 0, hb, W, H);
   // 見出し
-  const [office, route] = rKey.split("|");
+  const [office, route] = C.key.split("|");
   g.fillStyle = "#1c1c1a"; g.textBaseline = "middle"; g.textAlign = "left";
   g.font = "700 " + Math.round(u * 13) + "px sans-serif";
   g.fillText("樹木点検結果図　" + route + "　" + (d.label || ("図" + d.zumen)), u * 8, hb / 2);
@@ -843,13 +874,13 @@ async function drawResultSheet(cv, d){
   g.strokeStyle = "#1c1c1a"; g.lineWidth = Math.max(1, u * 0.6);
   g.beginPath(); g.moveTo(0, hb - g.lineWidth / 2); g.lineTo(W, hb - g.lineWidth / 2); g.stroke();
   // 印
-  const st = listState(), done = new Map(routeRecords().map(r => [r.no, r]));
+  const st = C.st, done = C.done;
   const cnt = {"": 0, ok: 0, warn: 0, ng: 0, obs: 0, none: 0, cut: 0};
   const r0 = u * 4.2, seen = new Map(), cuts = [], tags = [];
-  posOnDrawing(d.zumen).forEach(p => {
-    const i = idxOf.get(p.k);
+  C.pos.filter(p => nz(p.z) === nz(d.zumen)).forEach(p => {
+    const i = C.idx.get(p.k);
     if(i == null || !st) return;
-    const s = statusOf(i, done), it = st.items[i], rec = done.get(it.no);
+    const s = statusIn(C, i), it = st.items[i], rec = done.get(it.no);
     cnt[s]++;
     const key = Math.round(p.x) + "," + Math.round(p.y), n = seen.get(key) || 0; seen.set(key, n + 1);
     const x = p.x * sx + n * r0 * 1.6, y = p.y * sy + hb;
@@ -945,31 +976,40 @@ const pdfDlg = document.createElement("div");
 pdfDlg.id = "zPdfDlg";
 pdfDlg.innerHTML = '<div id="zPdfBox"><h3>点検結果の図面（PDF）</h3><p id="zPdfMsg"></p>' +
   '<p class="note">保存先は「ファイル」→ OneDrive の <b>街路樹診断システム／iPadから</b> にすると、PCのハブで［iPadから取り込んで点検表を作成］を押したときに ' +
-  '<b>01_樹木点検＼出力＼点検図面</b> に入ります。</p>' +
+  '<b>01_樹木点検＼出力＼点検図面</b> に入ります。（一覧・集計の［写真ZIP］の1個目のZIPにも、この路線の図面PDFが入ります）</p>' +
   '<div style="display:flex;gap:8px;margin-top:12px"><button type="button" id="zPdfSave">保存する</button><button type="button" id="zPdfClose">閉じる</button></div></div>';
 document.body.appendChild(pdfDlg);
 let pdfFile = null;
+/* 路線 key の図面（zumens を指定すればその図面だけ）を点検結果図のPDFにする。図面が無ければ null */
+async function makeRoutePdf(key, zumens, onStep){
+  const C = await routeCtx(key);
+  if(!C) return null;
+  const list = zumens ? C.R.drawings.filter(x => zumens.some(z => nz(z) === nz(x.zumen))) : C.R.drawings.slice();
+  const cv = document.createElement("canvas"), pages = [];
+  for(let i = 0; i < list.length; i++){
+    if(onStep) onStep(i + 1, list.length);
+    if(await drawResultSheet(cv, list[i], C) < 0) continue;
+    const jb = await canvasJpeg(cv, 0.8);
+    pages.push({jpg: new Uint8Array(await jb.arrayBuffer()), w: cv.width, h: cv.height});
+    await new Promise(r => setTimeout(r, 0));
+  }
+  cv.width = cv.height = 1;       // メモリを返す
+  if(!pages.length) return null;
+  const [office, route] = key.split("|");
+  const name = ("点検図面_" + office + "_" + route + (zumens && list.length === 1 ? "_" + (list[0].label || list[0].zumen) : "") + "_" + pdfStamp(true) + ".pdf").replace(/[\\/:*?"<>|]/g, "");
+  return new File([buildPdf(pages)], name, {type: "application/pdf"});
+}
 async function exportResultPdf(){
   if(!R || !R.drawings.length){ toast("この路線の図面がありません"); return; }
   const all = R.drawings.length > 1 && confirm("この路線の図面 " + R.drawings.length + "枚をすべてPDFにしますか？\n［キャンセル］で表示中の図面だけにします");
   const list = all ? R.drawings.slice() : R.drawings.filter(x => nz(x.zumen) === nz(dz));
   if(!list.length){ toast("表示中の図面がありません"); return; }
-  const cv = document.createElement("canvas"), pages = [];
   const btn = $z("zPdfBtn"); btn.disabled = true;
   try{
-    for(let i = 0; i < list.length; i++){
-      btn.textContent = "PDF " + (i + 1) + "/" + list.length;
-      if(await drawResultSheet(cv, list[i]) < 0) continue;
-      const jb = await canvasJpeg(cv, 0.8);
-      pages.push({jpg: new Uint8Array(await jb.arrayBuffer()), w: cv.width, h: cv.height});
-      await new Promise(r => setTimeout(r, 0));
-    }
-    cv.width = cv.height = 1;       // メモリを返す
-    if(!pages.length){ toast("図面の画像がありません。点検データを取り込み直してください"); return; }
-    const [office, route] = rKey.split("|");
-    const name = ("点検図面_" + office + "_" + route + (all ? "" : "_" + (list[0].label || list[0].zumen)) + "_" + pdfStamp(true) + ".pdf").replace(/[\\/:*?"<>|]/g, "");
-    pdfFile = new File([buildPdf(pages)], name, {type: "application/pdf"});
-    $z("zPdfMsg").innerHTML = "<b>" + esc(name) + "</b><br>" + pages.length + "枚（約" + Math.max(1, Math.round(pdfFile.size / 1048576)) + "MB）を作りました。［保存する］を押してください。";
+    const f = await makeRoutePdf(rKey, all ? null : list.map(x => x.zumen), (i, n) => { btn.textContent = "PDF " + i + "/" + n; });
+    if(!f){ toast("図面の画像がありません。点検データを取り込み直してください"); return; }
+    pdfFile = f;
+    $z("zPdfMsg").innerHTML = "<b>" + esc(f.name) + "</b><br>" + list.length + "枚（約" + Math.max(1, Math.round(f.size / 1048576)) + "MB）を作りました。［保存する］を押してください。";
     pdfDlg.classList.add("show");
   }catch(err){ alert("図面のPDFを作れませんでした\n" + err.message); }
   finally{ btn.disabled = false; btn.textContent = "PDF"; }
@@ -1077,7 +1117,7 @@ window.applyImport = function(items){ _import(items); buildIndex(); schedule(); 
 $("office").addEventListener("change", ()=> loadRoute());
 $("route").addEventListener("change", ()=> loadRoute());
 
-window.SysZumen = {VERSION: ZVER, reload: loadRoute, sync};
+window.SysZumen = {VERSION: ZVER, reload: loadRoute, sync, routePdf: (key) => makeRoutePdf(key, null)};
 layoutTop();
 loadRoute().then(()=> sync());
 })();

@@ -219,7 +219,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v33</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v35</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -690,7 +690,7 @@ function renderLv(){
     if(e) e.onclick = () => editTc(i);
     const cut = row.querySelector('[data-k="cut"]');
     if(cut) cut.onclick = () => {
-      setBassai(!bassai); renderLv();
+      setBassai(!bassai); calc();        // 判定（維持管理の処置が必要）も変わる
       toast(bassai ? "要伐採にしました（特記事項に「" + BASSAI_TXT + "」）" : "要伐採を外しました");
     };
   });
@@ -1485,7 +1485,8 @@ function calc(){
   const on23 = btns.filter(b => ITEMS[b.dataset.i].g !== 1 && b.classList.contains("on")).length;
   const items = new Array(ITEMS.length).fill("");
   btns.forEach(b => { if(b.classList.contains("on")) items[+b.dataset.i] = "○"; });
-  if(on23 > 0 && isObs(items, lv)){ j.textContent = JUDGE_OBS; j.style.background = "var(--obs-bg)"; j.style.color = "var(--obs-tx)"; }
+  if(bassai){ j.textContent = "維持管理の処置が必要（要伐採）"; j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
+  else if(on23 > 0 && isObs(items, lv)){ j.textContent = JUDGE_OBS; j.style.background = "var(--obs-bg)"; j.style.color = "var(--obs-tx)"; }
   else if(on23 > 0){ j.textContent = "樹木の外観診断が必要"; j.style.background = "var(--ng-bg)"; j.style.color = "var(--ng-tx)"; }
   else if(on1 > 0){ j.textContent = "維持管理の処置が必要"; j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
   else { j.textContent = "概ね良好・異常なし"; j.style.background = "var(--ok-bg)"; j.style.color = "var(--ok-tx)"; }
@@ -1519,9 +1520,11 @@ function isObs(items, lvMap){
   const on = ITEMS.map((it, i) => i).filter(i => ITEMS[i].g !== 1 && items[i] === "○");
   return on.length > 0 && !!lvMap && on.every(i => lvMap[i] === "A");
 }
-/* lvMap（項目番号→程度）を渡すと、要経過観察を見分ける */
-function judgeOf(items, sp, lvMap){
+/* lvMap（項目番号→程度）を渡すと、要経過観察を見分ける。
+   cut（要伐採）なら、②③に○があっても「維持管理の処置が必要」（伐採は維持管理の処置。外観診断はしない） */
+function judgeOf(items, sp, lvMap, cut){
   if(isNoTree(sp)) return String(sp).trim();
+  if(cut) return "維持管理の処置が必要";
   const on1 = ITEMS.filter((it, i) => it.g === 1 && items[i] === "○").length;
   const on23 = ITEMS.filter((it, i) => it.g !== 1 && items[i] === "○").length;
   if(on23 > 0) return isObs(items, lvMap) ? JUDGE_OBS : "樹木の外観診断が必要";
@@ -1796,7 +1799,7 @@ function renderSummary(){
   // 点検リストの順（右283 → 右284 → …）に並べる。リストに無い樹木は保存した順で後ろに
   const ls = sumListState(), ord = new Map(ls && ls.items ? ls.items.map((x, i) => [x.no, i]) : []);
   const rr = sumRecords().slice().sort((a,b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || a.created - b.created);
-  const jd = rr.map(r => judgeOf(r.items, r.sp, r.lv));
+  const jd = rr.map(r => judgeOf(r.items, r.sp, r.lv, r.bassai));
   $("sumAll").textContent = rr.length;
   $("sumOk").textContent = jd.filter(j => j.startsWith("概ね")).length;
   $("sumWarn").textContent = jd.filter(j => j.startsWith("維持")).length;
@@ -1859,8 +1862,8 @@ function buildCsv(key){
     (r.masu != null && r.masu !== "") ? r.masu : splitHojo(r.no).base,
     (r.hojo != null && r.hojo !== "") ? r.hojo : splitHojo(r.no).hojo,
     r.sp, r.girth || "", r.girthPrev || "", r.city || "", r.town || "",
-    (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), fullMemo(r), judgeOf(r.items, r.sp, r.lv), photosOf(r.items, r.sp), r.bassai ? "○" : "",
-    judgeOf(r.items, r.sp, r.lv) === JUDGE_OBS ? "○" : ""]
+    (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), fullMemo(r), judgeOf(r.items, r.sp, r.lv, r.bassai), photosOf(r.items, r.sp), r.bassai ? "○" : "",
+    judgeOf(r.items, r.sp, r.lv, r.bassai) === JUDGE_OBS ? "○" : ""]
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();
@@ -2432,7 +2435,8 @@ function renderZipDlg(){
     const a = ci * 50 + 1, b = ci * 50 + c.length, st = J.st[ci];
     const lab = st === "building" ? "準備中…" : st === "ready" ? "保存する" : st === "done" ? "✓ 保存済み" : "準備する";
     return '<div class="zipRow"><div class="zl"><b>' + (c.length ? (NUM[ci] || (ci + 1)) + ' 写真 ' + a + '〜' + b + '枚目' : '新しい写真なし（点検CSVだけ）') +
-      '</b><br><small>' + (c.length ? esc(c[0].filename) + ' 〜 ' + esc(c[c.length - 1].filename) + '　＋点検CSV' : '記録のバックアップ用') + '</small></div>' +
+      '</b><br><small>' + (c.length ? esc(c[0].filename) + ' 〜 ' + esc(c[c.length - 1].filename) + '　＋点検CSV' : '記録のバックアップ用') +
+      (ci === 0 ? '　＋点検結果の図面PDF' : '') + '</small></div>' +
       '<button type="button" data-ci="' + ci + '" class="' + st + '"' + (st === "building" ? " disabled" : "") + '>' + lab + '</button></div>';
   }).join("");
   $("zipList").querySelectorAll("button[data-ci]").forEach(b => b.onclick = () => saveZip(+b.dataset.ci));
@@ -2449,6 +2453,11 @@ async function prepZip(ci){
     for(const m of J.chunks[ci]) files.push({name: m.filename, blob: await getPhotoBlob(m.id)});
     const c = buildCsv(J.key);
     if(c) files.push({name: c.fname, blob: new Blob([c.csv], {type: "text/csv"})});
+    // 1個目のZIPには、点検結果を描いた図面のPDFも入れる（PCのハブが 出力\点検図面 に出す）
+    if(ci === 0 && window.SysZumen && SysZumen.routePdf){
+      try{ const pdf = await SysZumen.routePdf(J.key); if(pdf) files.push({name: pdf.name, blob: pdf}); }
+      catch(e){ toast("図面PDFは入れられませんでした（" + e.message + "）"); }
+    }
     const zip = await makeZip(files);
     if(zipJob !== J) return;
     J.ready = {ci, file: new File([zip], zipName(J, ci), {type: "application/zip"})};
