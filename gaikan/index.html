@@ -147,6 +147,10 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
 #camShutter{width:74px;height:74px;border-radius:50%;background:#fff;border:5px solid #999}
 #camShutter:disabled{opacity:.4}
 #camFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
+/* 黒板は左下／右下を切り替えられる（右にしたらズームのボタンは左へ） */
+#camBoard.right{left:auto;right:3%}
+#zoomCtl.left{right:auto;left:8px}
+#camSide{background:#1b6b5f;color:#fff;border:1px solid #fff;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;white-space:nowrap}
 /* 撮った写真の確認（少しの間そのまま表示。撮り直しもできる） */
 #camReview{display:none;position:absolute;inset:0;z-index:60;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px}
 #camReview.show{display:flex}
@@ -162,7 +166,7 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
 <body>
 <header>
   <div class="hdTop">
-    <h1>外観診断 <span style="font-size:11px;opacity:.7;font-weight:400">v5</span></h1>
+    <h1>外観診断 <span style="font-size:11px;opacity:.7;font-weight:400">v6</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -382,7 +386,8 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
   <div id="camTop">
     <span id="camNo">-</span>
     <span id="camKind">全景</span>
-    <button type="button" id="camClose">閉じる</button>
+    <button type="button" id="camSide" style="margin-left:auto">黒板を右へ</button>
+    <button type="button" id="camClose" style="margin-left:8px">閉じる</button>
   </div>
   <div id="camWrap">
     <div id="camFrame">
@@ -1581,6 +1586,7 @@ async function openCam(branch){
   $("camCmtBar").classList.add("show");   // コメントは全種類の写真で利用可（カルテの写真下に印字）
   $("cmtHint").textContent = branch === 3 ? "指でなぞると赤点線で囲めます（任意）" : "コメントは写真下の説明として印字されます";
   renderCamCmts(); updateMarkUI();
+  applyBoardSide();
   $("camModal").style.display = "flex";
   camOrient = window.innerWidth > window.innerHeight ? "land" : "port";
   fitCamFrame();
@@ -1594,6 +1600,18 @@ function closeCam(){
   $("camVideo").srcObject = null;
   $("camNoCam").style.display = "none";
 }
+/* 黒板の位置（左下／右下）。写真に描く位置もこれに合わせる */
+function applyBoardSide(){
+  const r = !!settings.boardRight;
+  $("camBoard").classList.toggle("right", r);
+  $("zoomCtl").classList.toggle("left", r);
+  $("camSide").textContent = r ? "黒板を左へ" : "黒板を右へ";
+}
+$("camSide").onclick = ()=>{
+  settings.boardRight = !settings.boardRight; store("gk_settings", settings);
+  applyBoardSide();
+  toast("黒板を" + (settings.boardRight ? "右下" : "左下") + "にしました（次からもこの位置）");
+};
 $("camClose").onclick = closeCam;
 /* 撮った写真の確認：1.5秒表示して閉じる。［撮り直す］でカメラに戻る（撮った写真は消して撮り直す） */
 const REVIEW_MS = 1500;
@@ -1737,7 +1755,8 @@ $("camDraw").addEventListener("pointermove", e=>{
 
 /* 黒板描画 */
 function drawCamBoard(ctx, W, H, num){
-  const bw = W * 0.46, bh = H * 0.20, bx = W * 0.03, by = H - bh - H * 0.03;
+  const bw = W * 0.46, bh = H * 0.20, by = H - bh - H * 0.03;
+  const bx = settings.boardRight ? W - bw - W * 0.03 : W * 0.03;     // 黒板の位置（左下／右下）
   const bd = Math.max(2, W * 0.004);
   ctx.fillStyle = "#1b6b5f"; ctx.fillRect(bx, by, bw, bh);
   ctx.strokeStyle = "#fff"; ctx.lineWidth = bd * 2; ctx.strokeRect(bx, by, bw, bh);
