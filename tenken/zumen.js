@@ -1,7 +1,7 @@
 /* 樹木点検 — 台帳図面を見ながら入力する
    ・統合ハブで作った「点検データ（リスト＋図面）」(.json) を取り込むと、路線ごとの点検リストと台帳図面が入る
    ・図面の樹木をタップすると、その樹木の点検入力に切り替わる（リストの何番目かに飛ぶ）
-   ・印の色：未点検＝橙の輪、良好＝緑、維持管理＝黄、外観診断が必要＝赤、空桝/桝無し＝灰、入力中＝青
+   ・印の色：未点検＝橙の輪、良好＝緑、維持管理＝黄、外観診断が必要＝赤、要経過観察＝紫、空桝/桝無し＝灰、入力中＝青
    index.html の関数（listState, showListItem, routeKey, routeRecords, judgeOf …）をそのまま使う */
 (function(){
 "use strict";
@@ -55,6 +55,7 @@ body.zOn #zCard{display:block}
 .zmk.warn{border-color:#B07A00;background:rgba(240,190,40,.65)}
 .zmk.ng{border-color:#C62828;background:rgba(198,40,40,.55)}
 .zmk.none{border-color:#555;background:rgba(80,80,80,.45)}
+.zmk.obs{border-color:#6A3D9A;background:rgba(106,61,154,.45)}
 .zmk.cur{border-color:#185FA5;border-width:4px;box-shadow:0 0 0 4px rgba(24,95,165,.35)}
 .zmk.unsure{border-style:dashed}
 .zmk.sel{border-color:#185FA5;border-width:4px;animation:zBlink .9s ease-in-out infinite alternate}
@@ -199,8 +200,9 @@ function statusOf(i, doneMap){
   const it = st.items[i];
   const r = doneMap.get(it.no);
   if(!r) return "";
-  const j = judgeOf(r.items || [], r.sp);
+  const j = judgeOf(r.items || [], r.sp, r.lv);
   if(isNoTree(r.sp)) return "none";
+  if(j.indexOf("要経過観察") > -1) return "obs";
   if(j.indexOf("外観") > -1) return "ng";
   if(j.indexOf("維持") > -1) return "warn";
   return "ok";
@@ -315,7 +317,7 @@ function renderMarks(){
   try{ incNos = new Set(issuesOf(routeKey()).map(x => x.no)); }catch(_){}
   const cur = st ? st.idx : -1;
   const d = markSize(), vs = vsize(), tags = V.s > 0.55;
-  const cnt = {"": 0, ok: 0, warn: 0, ng: 0, none: 0};
+  const cnt = {"": 0, ok: 0, warn: 0, ng: 0, obs: 0, none: 0};
   let html = "";
   const seen = new Map();   // 同じ位置に複数の樹木（1つの桝に数本）→ 少しずらして並べる
   posOnDrawing(dz).forEach(p => {
@@ -359,6 +361,7 @@ function renderMarks(){
     '<i style="border-color:#3B6D11;background:rgba(59,109,17,.45)"></i>良好 ' + cnt.ok +
     '<i style="border-color:#B07A00;background:rgba(240,190,40,.65)"></i>維持管理 ' + cnt.warn +
     '<i style="border-color:#C62828;background:rgba(198,40,40,.55)"></i>要外観 ' + cnt.ng +
+    '<i style="border-color:#6A3D9A;background:rgba(106,61,154,.45)"></i>要経過観察 ' + cnt.obs +
     (cnt.none ? '<i style="border-color:#555;background:rgba(80,80,80,.45)"></i>空桝等 ' + cnt.none : "") +
     (cnt.u ? '<i style="border-color:#E07B00;border-style:dashed"></i>位置未確定 ' + cnt.u : "") +
     (incNos.size ? '<i style="border-color:#E07B00;box-shadow:0 0 0 2px #fff,0 0 0 4px #D32F2F"></i>要確認 ' + incNos.size : "") +

@@ -120,6 +120,8 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 .lvCut{min-height:40px;padding:4px 10px;border-radius:8px;border:1px solid var(--ng-tx);background:#fff;font-size:13px;font-weight:700;font-family:inherit;color:var(--ng-tx)}
 .lvCut.on{background:var(--ng-tx);color:#fff}
 #cutBadge{display:none;background:#fff;color:var(--ng-tx);border:2px solid var(--ng-tx)}
+/* 要経過観察（②活力点検・③樹木の異常の項目が全部A＝軽度） */
+:root{--obs-bg:#EFE6F7;--obs-tx:#6A3D9A}
 table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 .tcItem{padding:10px 0;border-top:1px solid var(--line)}
 .tcItem b{font-size:14px}
@@ -217,7 +219,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v30</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v31</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -426,6 +428,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
     <div class="sumChip" style="background:var(--ok-bg);color:var(--ok-tx)"><b id="sumOk">0</b>良好</div>
     <div class="sumChip" style="background:var(--warn-bg);color:var(--warn-tx)"><b id="sumWarn">0</b>維持管理</div>
     <div class="sumChip" style="background:var(--ng-bg);color:var(--ng-tx)"><b id="sumNg">0</b>外観診断</div>
+    <div class="sumChip" style="background:var(--obs-bg);color:var(--obs-tx)"><b id="sumObs">0</b>要経過観察</div>
     <div class="sumChip" style="background:#EAE8E0;color:var(--tx2)"><b id="sumKara">0</b>空桝・桝無し</div>
   </div>
   <div class="card">
@@ -619,7 +622,15 @@ const BASSAI_TXT = "伐採が必要。";          // 要伐採にすると特記
 const SENT_END = /[。．.！!）)]$/;
 function tcDefault(i, g){ const d = (typeof CMT_DEFAULT !== "undefined" && CMT_DEFAULT[ITEMS[i].csv]) || {}; return d[g] || []; }
 function tcList(i, g){ const u = tcUser[ITEMS[i].csv]; return (u && u[g] && u[g].length) ? u[g] : tcDefault(i, g); }
-function tcText(i){ if(!lv[i]) return ""; const L = tcList(i, lv[i]); return L.length ? L[Math.min(alt[i] || 0, L.length - 1)] : ""; }
+function tcText(i){
+  if(!lv[i]) return "";
+  const L = tcList(i, lv[i]);
+  let t = L.length ? L[Math.min(alt[i] || 0, L.length - 1)] : "";
+  // ②活力点検・③樹木の異常でA（軽度）は、最後に（経過観察）を付ける（「経過観察とする。」で終わる文はそれを置き換える）
+  if(t && lv[i] === "A" && ITEMS[i].g !== 1 && !t.endsWith(OBS_TXT)) t = t.replace(/経過観察とする。$/, "") + OBS_TXT;
+  return t;
+}
+const OBS_TXT = "（経過観察）";
 /* 特記事項の中の oldT を newT に差し替える。見つからなければ（手で書き換えた等）newT を後ろに足す */
 function memoPut(oldT, newT){
   let m = $("memo").value;
@@ -671,7 +682,7 @@ function renderLv(){
     const i = +row.dataset.i;
     row.querySelectorAll(".lvBtn").forEach(b => b.onclick = () => {
       if(lv[i] !== b.dataset.lv) alt[i] = 0;
-      setLevel(i, b.dataset.lv); renderLv();
+      setLevel(i, b.dataset.lv); calc();      // 判定（要経過観察）も変わるので calc（中で renderLv も呼ぶ）
     });
     const a = row.querySelector('[data-k="alt"]');
     if(a) a.onclick = () => { alt[i] = ((alt[i] || 0) + 1) % tcList(i, lv[i]).length; setLevel(i, lv[i]); renderLv(); };
@@ -1472,7 +1483,10 @@ function calc(){
   const btns = [...document.querySelectorAll(".itm")];
   const on1  = btns.filter(b => ITEMS[b.dataset.i].g === 1 && b.classList.contains("on")).length;
   const on23 = btns.filter(b => ITEMS[b.dataset.i].g !== 1 && b.classList.contains("on")).length;
-  if(on23 > 0){ j.textContent = "樹木の外観診断が必要"; j.style.background = "var(--ng-bg)"; j.style.color = "var(--ng-tx)"; }
+  const items = new Array(ITEMS.length).fill("");
+  btns.forEach(b => { if(b.classList.contains("on")) items[+b.dataset.i] = "○"; });
+  if(on23 > 0 && isObs(items, lv)){ j.textContent = JUDGE_OBS; j.style.background = "var(--obs-bg)"; j.style.color = "var(--obs-tx)"; }
+  else if(on23 > 0){ j.textContent = "樹木の外観診断が必要"; j.style.background = "var(--ng-bg)"; j.style.color = "var(--ng-tx)"; }
   else if(on1 > 0){ j.textContent = "維持管理の処置が必要"; j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
   else { j.textContent = "概ね良好・異常なし"; j.style.background = "var(--ok-bg)"; j.style.color = "var(--ok-tx)"; }
   updatePhotoButtons(); renderLv();
@@ -1499,11 +1513,18 @@ $("nashiBtn").onclick = ()=> setNoTree("桝無し");
 $("treeBtn").onclick = ()=> clearNoTree();
 $("sp").addEventListener("input", ()=>{ calc(); girthWarnUpd(); });
 
-function judgeOf(items, sp){
+/* 要経過観察：②活力点検・③樹木の異常で○の項目が、全部A（軽度）。点検表の「樹木の外観診断が必要」の■は付く */
+const JUDGE_OBS = "樹木の外観診断が必要（要経過観察）";
+function isObs(items, lvMap){
+  const on = ITEMS.map((it, i) => i).filter(i => ITEMS[i].g !== 1 && items[i] === "○");
+  return on.length > 0 && !!lvMap && on.every(i => lvMap[i] === "A");
+}
+/* lvMap（項目番号→程度）を渡すと、要経過観察を見分ける */
+function judgeOf(items, sp, lvMap){
   if(isNoTree(sp)) return String(sp).trim();
   const on1 = ITEMS.filter((it, i) => it.g === 1 && items[i] === "○").length;
   const on23 = ITEMS.filter((it, i) => it.g !== 1 && items[i] === "○").length;
-  if(on23 > 0) return "樹木の外観診断が必要";
+  if(on23 > 0) return isObs(items, lvMap) ? JUDGE_OBS : "樹木の外観診断が必要";
   if(on1 > 0) return "維持管理の処置が必要";
   return "概ね良好・異常なし";
 }
@@ -1775,11 +1796,12 @@ function renderSummary(){
   // 点検リストの順（右283 → 右284 → …）に並べる。リストに無い樹木は保存した順で後ろに
   const ls = sumListState(), ord = new Map(ls && ls.items ? ls.items.map((x, i) => [x.no, i]) : []);
   const rr = sumRecords().slice().sort((a,b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || a.created - b.created);
-  const jd = rr.map(r => judgeOf(r.items, r.sp));
+  const jd = rr.map(r => judgeOf(r.items, r.sp, r.lv));
   $("sumAll").textContent = rr.length;
   $("sumOk").textContent = jd.filter(j => j.startsWith("概ね")).length;
   $("sumWarn").textContent = jd.filter(j => j.startsWith("維持")).length;
   $("sumNg").textContent = jd.filter(j => j === "樹木の外観診断が必要").length;
+  $("sumObs").textContent = jd.filter(j => j === JUDGE_OBS).length;
   $("sumKara").textContent = rr.filter(r => isNoTree(r.sp)).length;
   $("sumTitle").textContent = (sumKey().split("|")[1] || "路線未設定") + " の一覧";
   renderListTable();
@@ -1787,6 +1809,7 @@ function renderSummary(){
   rr.forEach((r,i)=>{
     const j = jd[i];
     const cls = isNoTree(r.sp) ? "background:#EAE8E0;color:var(--tx2)"
+             : j === JUDGE_OBS ? "background:var(--obs-bg);color:var(--obs-tx)"
              : j.startsWith("概ね") ? "background:var(--ok-bg);color:var(--ok-tx)"
              : j.startsWith("維持") ? "background:var(--warn-bg);color:var(--warn-tx)"
              : "background:var(--ng-bg);color:var(--ng-tx)";
@@ -1801,7 +1824,7 @@ function renderSummary(){
       '<td style="' + (bigDiff ? "color:var(--ng-tx);font-weight:600" : "") + '">' + esc(r.girth || "—") + "</td>" +
       '<td style="color:var(--tx2)">' + esc(r.girthPrev || "—") + "</td>" +
       '<td><span class="rjudge" style="' + cls + '">' +
-        (isNoTree(r.sp) ? esc(r.sp) : j.startsWith("概ね") ? "良好" : j.startsWith("維持") ? "維持管理" : "外観診断") + "</span></td>" +
+        (isNoTree(r.sp) ? esc(r.sp) : j === JUDGE_OBS ? "経過観察" : j.startsWith("概ね") ? "良好" : j.startsWith("維持") ? "維持管理" : "外観診断") + "</span></td>" +
       '<td style="' + pCls + '">' + (needP === 0 ? (haveP ? haveP + "枚" : "—")
         : (haveP >= needP ? "" : "⚠") + haveP + "/" + needP + "枚") + "</td>" +
       '<td class="memoCell' + (r.bassai ? " cut" : "") + '">' + (r.bassai ? "【要伐採】" : "") + esc(fullMemo(r)) + "</td>";
@@ -1831,12 +1854,13 @@ function buildCsv(key){
   const rr = records.filter(r => (r.office + "|" + r.route) === key).sort((a,b) => a.created - b.created);
   if(!rr.length) return null;
   const head = ["点検事務所","路線名","図面番号","樹木番号","補助番号","樹木名","幹周り(cm)","前回幹周り(cm)","市名","町名","点検日時","点検者",
-    ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数","要伐採"];
+    ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数","要伐採","要経過観察"];
   const rows = rr.map(r => [r.office, r.route, r.zumen || "",
     (r.masu != null && r.masu !== "") ? r.masu : splitHojo(r.no).base,
     (r.hojo != null && r.hojo !== "") ? r.hojo : splitHojo(r.no).hojo,
     r.sp, r.girth || "", r.girthPrev || "", r.city || "", r.town || "",
-    (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), fullMemo(r), judgeOf(r.items, r.sp), photosOf(r.items, r.sp), r.bassai ? "○" : ""]
+    (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), fullMemo(r), judgeOf(r.items, r.sp, r.lv), photosOf(r.items, r.sp), r.bassai ? "○" : "",
+    judgeOf(r.items, r.sp, r.lv) === JUDGE_OBS ? "○" : ""]
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();
