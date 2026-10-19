@@ -102,6 +102,10 @@ body.zOn:not(.zWide) #zCard{position:sticky;top:var(--zTop,120px);z-index:5;box-
 body.zOn:not(.zWide) #zView{height:34vh}
 /* 要確認（幹周り未入力・写真不足・写真だけで未保存）の樹木 */
 .zmk.inc{box-shadow:0 0 0 3px #fff,0 0 0 6px #D32F2F}
+/* 要伐採：印の左上に赤い札、矢印で印を指す */
+.zcut{position:absolute;left:0;top:0;pointer-events:none;z-index:4}
+.zcut span{display:block;background:#C62828;color:#fff;font-size:12px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.45)}
+.zcut svg{position:absolute;right:-16px;bottom:-16px;overflow:visible}
 `;
 document.head.appendChild(css);
 
@@ -319,6 +323,7 @@ function renderMarks(){
     if(i == null) return;
     const s = statusOf(i, done);
     cnt[s]++;
+    if((done.get(st.items[i].no) || {}).bassai) cnt.cut = (cnt.cut || 0) + 1;     // 要伐採（図面全体の本数）
     if(p.u && !p.moved) cnt.u = (cnt.u || 0) + 1;
     const k = Math.round(p.x) + "," + Math.round(p.y);
     const n = seen.get(k) || 0; seen.set(k, n + 1);
@@ -331,6 +336,13 @@ function renderMarks(){
     html += '<div class="zmk ' + s + (isCur ? " cur" : "") + (isSel ? " sel" : "") + (p.moved ? " moved" : "") +
             (p.added ? " added" : "") + (p.u && !p.moved ? " unsure" : "") + (isInc ? " inc" : "") +
             '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
+    const rec = done.get(st.items[i].no);
+    if(rec && rec.bassai){
+      const tx = q.x - dd * 0.36, ty = q.y - dd * 0.36;      // 矢印の先＝印の左上のふち
+      html += '<div class="zcut" style="transform:translate(' + (tx - 16) + 'px,' + (ty - 16) + 'px) translate(-100%,-100%)"><span>要伐採</span>' +
+        '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M0 0L12 12" stroke="#C62828" stroke-width="2.6"/>' +
+        '<path d="M16 16L6.5 14.2L14.2 6.5Z" fill="#C62828"/></svg></div>';
+    }
     if(tags || isCur || isSel){
       const it = st.items[i];
       const lbl = treeLabel(it, false);
@@ -349,7 +361,8 @@ function renderMarks(){
     '<i style="border-color:#C62828;background:rgba(198,40,40,.55)"></i>要外観 ' + cnt.ng +
     (cnt.none ? '<i style="border-color:#555;background:rgba(80,80,80,.45)"></i>空桝等 ' + cnt.none : "") +
     (cnt.u ? '<i style="border-color:#E07B00;border-style:dashed"></i>位置未確定 ' + cnt.u : "") +
-    (incNos.size ? '<i style="border-color:#E07B00;box-shadow:0 0 0 2px #fff,0 0 0 4px #D32F2F"></i>要確認 ' + incNos.size : "");
+    (incNos.size ? '<i style="border-color:#E07B00;box-shadow:0 0 0 2px #fff,0 0 0 4px #D32F2F"></i>要確認 ' + incNos.size : "") +
+    (cnt.cut ? '<b style="margin-left:8px;color:#fff;background:#C62828;border-radius:3px;padding:0 4px">要伐採</b> ' + cnt.cut : "");
 }
 
 /* 印・一覧に出す番号。「左27#2」（同じ桝の2本目）は「左27（2本目）」と書く。many … 同じ桝の樹木が並ぶ一覧 */

@@ -116,6 +116,11 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 .lvBtn.on[data-lv=C]{background:var(--ng-bg);border-color:var(--ng-tx);color:var(--ng-tx)}
 .lvTool{min-height:40px;padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:12px;font-family:inherit;color:var(--acc)}
 #urgent{display:none;background:var(--ng-tx);color:#fff}
+/* 伐採（程度B・Cの項目に出るボタン。押した樹木は「要伐採」） */
+.lvCut{min-height:40px;padding:4px 10px;border-radius:8px;border:1px solid var(--ng-tx);background:#fff;font-size:13px;font-weight:700;font-family:inherit;color:var(--ng-tx)}
+.lvCut.on{background:var(--ng-tx);color:#fff}
+#cutBadge{display:none;background:#fff;color:var(--ng-tx);border:2px solid var(--ng-tx)}
+table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 .tcItem{padding:10px 0;border-top:1px solid var(--line)}
 .tcItem b{font-size:14px}
 .tcL{display:block;font-size:12px;font-weight:600;margin:6px 0 2px}
@@ -203,12 +208,16 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 #camRevTime{width:220px;height:4px;background:#444;border-radius:2px;overflow:hidden}
 #camRevTime i{display:block;height:100%;width:100%;background:#7fd3b8}
 #camFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
+/* 黒板は左下／右下を切り替えられる（右にしたらズームのボタンは左へ） */
+#camBoard.right{left:auto;right:3%}
+#zoomCtl.left{right:auto;left:8px}
+#camSide{background:#1b6b5f;color:#fff;border:1px solid #fff;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;white-space:nowrap}
 </style>
 </head>
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v29</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v30</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -376,6 +385,7 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     <div id="statusRow">
       <span id="judge" class="badge"></span>
       <span id="urgent" class="badge">C 緊急：監督員へ速やかに報告</span>
+      <span id="cutBadge" class="badge">要伐採</span>
       <span id="photoHint"></span>
     </div>
     <div id="photoRow">
@@ -483,7 +493,8 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
     <span id="camNo">-</span>
     <span id="camKind">全体</span>
     <span id="camRes" style="color:#aaa;font-size:11px"></span>
-    <button type="button" id="camClose">閉じる</button>
+    <button type="button" id="camSide" style="margin-left:auto">黒板を右へ</button>
+    <button type="button" id="camClose" style="margin-left:8px">閉じる</button>
   </div>
   <div id="camWrap">
     <div id="camFrame">
@@ -603,6 +614,8 @@ ITEMS.forEach((it,i)=>{
 const LV = {A: "軽度", B: "処置が必要", C: "緊急対応"};
 let tcUser = load("gj_tc", {});            // {点検項目: {A:[文…], B:[…], C:[…]}}
 let lv = {}, autoTxt = {}, alt = {};       // 入力中の樹木：項目番号 → 程度／特記事項に入れた文／候補の番号
+let bassai = false;                        // 入力中の樹木が「要伐採」か（程度B・Cの項目の［伐採］で切り替え）
+const BASSAI_TXT = "伐採が必要。";          // 要伐採にすると特記事項に入れる文
 const SENT_END = /[。．.！!）)]$/;
 function tcDefault(i, g){ const d = (typeof CMT_DEFAULT !== "undefined" && CMT_DEFAULT[ITEMS[i].csv]) || {}; return d[g] || []; }
 function tcList(i, g){ const u = tcUser[ITEMS[i].csv]; return (u && u[g] && u[g].length) ? u[g] : tcDefault(i, g); }
@@ -624,7 +637,13 @@ function dropLevel(i){
   memoPut(autoTxt[i], "");
   delete lv[i]; delete autoTxt[i]; delete alt[i];
 }
-function resetLevels(){ lv = {}; autoTxt = {}; alt = {}; }
+function resetLevels(){ lv = {}; autoTxt = {}; alt = {}; bassai = false; }
+/* 要伐採の切り替え。特記事項に「伐採が必要。」を足す／消す */
+function setBassai(on){
+  if(!!on === bassai) return;
+  bassai = !!on;
+  memoPut(bassai ? "" : BASSAI_TXT, bassai ? BASSAI_TXT : "");
+}
 /* 特記事項の欄は文の量に合わせて高さを変える */
 function memoFit(){ const m = $("memo"); m.style.height = "auto"; m.style.height = Math.max(m.scrollHeight + 2, 52) + "px"; }
 $("memo").addEventListener("input", memoFit);
@@ -633,15 +652,20 @@ function renderLv(){
   const on = [...document.querySelectorAll(".itm.on")].map(b => +b.dataset.i)
     .sort((a, b) => ITEMS[a].g - ITEMS[b].g || a - b);
   const show = on.length > 0 && !isNoTree($("sp").value);
+  // 伐採はB・Cの項目があるときだけ。B・Cが無くなったら要伐採も外す
+  const hasBC = show && on.some(i => lv[i] === "B" || lv[i] === "C");
+  if(!hasBC && bassai) setBassai(false);
   $("lvBox").classList.toggle("show", show);
   $("urgent").style.display = show && on.some(i => lv[i] === "C") ? "inline-block" : "none";
+  $("cutBadge").style.display = bassai ? "inline-block" : "none";
   $("lvList").innerHTML = on.map(i => {
     const n = lv[i] ? tcList(i, lv[i]).length : 0;
     return '<div class="lvRow" data-i="' + i + '"><span class="lvName">' + esc(ITEMS[i].csv) + '</span>' +
       ["A", "B", "C"].map(g => '<button type="button" class="lvBtn' + (lv[i] === g ? " on" : "") + '" data-lv="' + g + '">' +
         g + '<small>' + LV[g] + '</small></button>').join("") +
       (n > 1 ? '<button type="button" class="lvTool" data-k="alt">候補 ' + ((alt[i] || 0) % n + 1) + '/' + n + '</button>' : '') +
-      (lv[i] ? '<button type="button" class="lvTool" data-k="edit">✎ 文を直す</button>' : '') + '</div>';
+      (lv[i] ? '<button type="button" class="lvTool" data-k="edit">✎ 文を直す</button>' : '') +
+      (lv[i] === "B" || lv[i] === "C" ? '<button type="button" class="lvCut' + (bassai ? " on" : "") + '" data-k="cut">' + (bassai ? "✓ 伐採" : "伐採") + '</button>' : '') + '</div>';
   }).join("");
   $("lvList").querySelectorAll(".lvRow").forEach(row => {
     const i = +row.dataset.i;
@@ -653,6 +677,11 @@ function renderLv(){
     if(a) a.onclick = () => { alt[i] = ((alt[i] || 0) + 1) % tcList(i, lv[i]).length; setLevel(i, lv[i]); renderLv(); };
     const e = row.querySelector('[data-k="edit"]');
     if(e) e.onclick = () => editTc(i);
+    const cut = row.querySelector('[data-k="cut"]');
+    if(cut) cut.onclick = () => {
+      setBassai(!bassai); renderLv();
+      toast(bassai ? "要伐採にしました（特記事項に「" + BASSAI_TXT + "」）" : "要伐採を外しました");
+    };
   });
 }
 /* いま使っている文をその場で直す（直した文は次の樹木からも使われる） */
@@ -1596,6 +1625,7 @@ function saveAndMove(move){
     dt: $("dt").value, items, memo: $("memo").value.trim(),
     lv: Object.fromEntries(Object.entries(lv).filter(([i]) => items[i] === "○")),
     autoTxt: Object.fromEntries(Object.entries(autoTxt).filter(([i]) => items[i] === "○")),
+    bassai: bassai ? 1 : 0,
     created: editingId ? (records.find(r => r.id === editingId) || {}).created || Date.now() : Date.now()
   };
   const wasEdit = !!editingId;
@@ -1699,6 +1729,7 @@ function startEdit(id, quiet){
   else { $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; }
   document.querySelectorAll(".itm").forEach(b => b.classList.toggle("on", r.items[+b.dataset.i] === "○"));
   lv = Object.assign({}, r.lv || {}); autoTxt = Object.assign({}, r.autoTxt || {}); alt = {};
+  bassai = !!r.bassai;
   $("editBanner").style.display = "block"; $("editBanner").textContent = r.no + " を編集中（上書きされます）";
   $("saveHere").textContent = "上書き保存"; $("cancelEdit").style.display = "block";
   if(!quiet){
@@ -1773,7 +1804,7 @@ function renderSummary(){
         (isNoTree(r.sp) ? esc(r.sp) : j.startsWith("概ね") ? "良好" : j.startsWith("維持") ? "維持管理" : "外観診断") + "</span></td>" +
       '<td style="' + pCls + '">' + (needP === 0 ? (haveP ? haveP + "枚" : "—")
         : (haveP >= needP ? "" : "⚠") + haveP + "/" + needP + "枚") + "</td>" +
-      '<td class="memoCell">' + esc(fullMemo(r)) + "</td>";
+      '<td class="memoCell' + (r.bassai ? " cut" : "") + '">' + (r.bassai ? "【要伐採】" : "") + esc(fullMemo(r)) + "</td>";
     const td = document.createElement("td");
     const eb = document.createElement("button"); eb.className = "miniBtn"; eb.textContent = "編集";
     eb.onclick = () => startEdit(r.id);
@@ -1800,12 +1831,12 @@ function buildCsv(key){
   const rr = records.filter(r => (r.office + "|" + r.route) === key).sort((a,b) => a.created - b.created);
   if(!rr.length) return null;
   const head = ["点検事務所","路線名","図面番号","樹木番号","補助番号","樹木名","幹周り(cm)","前回幹周り(cm)","市名","町名","点検日時","点検者",
-    ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数"];
+    ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数","要伐採"];
   const rows = rr.map(r => [r.office, r.route, r.zumen || "",
     (r.masu != null && r.masu !== "") ? r.masu : splitHojo(r.no).base,
     (r.hojo != null && r.hojo !== "") ? r.hojo : splitHojo(r.no).hojo,
     r.sp, r.girth || "", r.girthPrev || "", r.city || "", r.town || "",
-    (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), fullMemo(r), judgeOf(r.items, r.sp), photosOf(r.items, r.sp)]
+    (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), fullMemo(r), judgeOf(r.items, r.sp), photosOf(r.items, r.sp), r.bassai ? "○" : ""]
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();
@@ -2052,6 +2083,7 @@ async function openCam(branch){
   selCmts = []; camMark = null;
   $("camCmtBar").classList.toggle("show", branch === 2);
   renderCamCmts(); updateMarkUI();
+  applyBoardSide();
   $("camModal").style.display = "flex";
   camOrient = window.innerWidth > window.innerHeight ? "land" : "port";
   fitCamFrame();
@@ -2065,6 +2097,18 @@ function closeCam(){
   $("camVideo").srcObject = null;
   $("camNoCam").style.display = "none";
 }
+/* 黒板の位置（左下／右下）。写真に描く位置もこれに合わせる */
+function applyBoardSide(){
+  const r = !!settings.boardRight;
+  $("camBoard").classList.toggle("right", r);
+  $("zoomCtl").classList.toggle("left", r);
+  $("camSide").textContent = r ? "黒板を左へ" : "黒板を右へ";
+}
+$("camSide").onclick = ()=>{
+  settings.boardRight = !settings.boardRight; store("gj_settings", settings);
+  applyBoardSide();
+  toast("黒板を" + (settings.boardRight ? "右下" : "左下") + "にしました（次からもこの位置）");
+};
 $("camClose").onclick = closeCam;
 /* 撮った写真の確認：1.5秒表示して閉じる。［撮り直す］でカメラに戻る（同じ枠の写真は撮り直しで置き換わる） */
 const REVIEW_MS = 1500;
@@ -2197,7 +2241,8 @@ $("camDraw").addEventListener("pointermove", e=>{
 }));
 
 function drawCamBoard(ctx, W, H, num){
-  const bw = W * 0.46, bh = H * 0.20, bx = W * 0.03, by = H - bh - H * 0.03;
+  const bw = W * 0.46, bh = H * 0.20, by = H - bh - H * 0.03;
+  const bx = settings.boardRight ? W - bw - W * 0.03 : W * 0.03;     // 黒板の位置（左下／右下）
   const bd = Math.max(2, W * 0.004);
   ctx.fillStyle = "#1b6b5f"; ctx.fillRect(bx, by, bw, bh);
   ctx.strokeStyle = "#fff"; ctx.lineWidth = bd * 2; ctx.strokeRect(bx, by, bw, bh);
