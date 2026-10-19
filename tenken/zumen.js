@@ -105,8 +105,8 @@ body.zOn:not(.zWide) #zView{height:34vh}
 .zmk.inc{box-shadow:0 0 0 3px #fff,0 0 0 6px #D32F2F}
 /* 要伐採：印の左上に赤い札、矢印で印を指す */
 .zcut{position:absolute;left:0;top:0;pointer-events:none;z-index:4}
-.zcut span{display:block;background:#C62828;color:#fff;font-size:12px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.45)}
-.zcut svg{position:absolute;right:-16px;bottom:-16px;overflow:visible}
+.zcut span{display:block;background:#C62828;color:#fff;font-size:17px;font-weight:700;padding:3px 9px;border-radius:5px;border:2px solid #fff;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.zcut svg{position:absolute;overflow:visible}
 `;
 document.head.appendChild(css);
 
@@ -308,6 +308,7 @@ function schedule(){
   raf = {a: requestAnimationFrame(run), b: setTimeout(run, 60)};
 }
 function markSize(){ return Math.max(14, Math.min(30, V.s * 40)); }
+const CUT_LEAD = 44;     // 「要伐採」の札から印までの引き出し線（px、斜め）
 function renderMarks(){
   const box = $z("zMarks");
   if(!R || !dz){ box.innerHTML = ""; $z("zLegend").innerHTML = ""; return; }
@@ -341,9 +342,12 @@ function renderMarks(){
     const rec = done.get(st.items[i].no);
     if(rec && rec.bassai){
       const tx = q.x - dd * 0.36, ty = q.y - dd * 0.36;      // 矢印の先＝印の左上のふち
-      html += '<div class="zcut" style="transform:translate(' + (tx - 16) + 'px,' + (ty - 16) + 'px) translate(-100%,-100%)"><span>要伐採</span>' +
-        '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M0 0L12 12" stroke="#C62828" stroke-width="2.6"/>' +
-        '<path d="M16 16L6.5 14.2L14.2 6.5Z" fill="#C62828"/></svg></div>';
+      const L = CUT_LEAD;       // 引き出し線の長さ（斜め45°、縦横それぞれ L px）
+      html += '<div class="zcut" style="transform:translate(' + (tx - L) + 'px,' + (ty - L) + 'px) translate(-100%,-100%)"><span>要伐採</span>' +
+        '<svg width="' + L + '" height="' + L + '" viewBox="0 0 ' + L + ' ' + L + '" style="right:-' + L + 'px;bottom:-' + L + 'px">' +
+        '<path d="M0 0L' + (L - 9) + ' ' + (L - 9) + '" stroke="#fff" stroke-width="6"/>' +            // 図面の線に紛れないよう白い縁
+        '<path d="M0 0L' + (L - 9) + ' ' + (L - 9) + '" stroke="#C62828" stroke-width="3"/>' +
+        '<path d="M' + L + ' ' + L + 'L' + (L - 15) + ' ' + (L - 4) + 'L' + (L - 4) + ' ' + (L - 15) + 'Z" fill="#C62828" stroke="#fff" stroke-width="1"/></svg></div>';
     }
     if(tags || isCur || isSel){
       const it = st.items[i];
