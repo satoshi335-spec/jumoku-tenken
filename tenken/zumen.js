@@ -107,6 +107,15 @@ body.zOn:not(.zWide) #zView{height:34vh}
 .zcut{position:absolute;left:0;top:0;pointer-events:none;z-index:4}
 .zcut span{display:block;background:#C62828;color:#fff;font-size:17px;font-weight:700;padding:3px 9px;border-radius:5px;border:2px solid #fff;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.5)}
 .zcut svg{position:absolute;overflow:visible}
+/* 点検結果の図面PDFの保存画面 */
+#zPdfDlg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:46;align-items:center;justify-content:center;padding:16px}
+#zPdfDlg.show{display:flex}
+#zPdfBox{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:520px}
+#zPdfBox h3{margin:0 0 8px;font-size:17px}
+#zPdfBox p{font-size:14px;line-height:1.6;margin:0 0 6px;word-break:break-all}
+#zPdfBox button{flex:1;min-height:48px;border-radius:10px;font-size:16px;font-weight:600;font-family:inherit;border:1px solid #1b6b5f}
+#zPdfSave{background:#1b6b5f;color:#fff}
+#zPdfClose{background:#fff;color:#1b6b5f}
 `;
 document.head.appendChild(css);
 
@@ -119,6 +128,7 @@ card.innerHTML =
     '<button type="button" class="miniBtn" id="zNext">▶</button>' +
     '<button type="button" class="miniBtn" id="zFit">全体</button>' +
     '<button type="button" class="miniBtn" id="zRot">↻</button>' +
+    '<button type="button" class="miniBtn" id="zPdfBtn" title="点検結果を描いた図面をPDFにしてPCへ">PDF</button>' +
     '<button type="button" class="miniBtn" id="zFixBtn">位置を直す</button>' +
     '<button type="button" class="miniBtn" id="zAddBtn">＋樹木</button>' +
     '<button type="button" class="miniBtn" id="zInpBtn">入力を隠す</button>' +
@@ -787,6 +797,200 @@ window.addEventListener("resize", ()=>{ clearTimeout(rsT); rsT = setTimeout(()=>
   if(Math.abs(window.innerWidth - lastW) > 40){ lastW = window.innerWidth; fitView(); }
   applyView();
 }, 150); });
+
+/* ================= 点検結果の図面（PDF）をPCに渡す ================= */
+/* 台帳図面に点検結果（印の色・要伐採の札・要経過観察）を描いて、A3のPDFにする。
+   PDFは写真ZIPと同じく OneDrive の「街路樹診断システム／iPadから」に保存すれば、
+   PCのハブ［iPadから取り込んで点検表を作成］で 01_樹木点検\出力\点検図面 に入る */
+const PDF_COL = {"": ["#E07B00", ""], ok: ["#3B6D11", "rgba(59,109,17,.45)"], warn: ["#B07A00", "rgba(240,190,40,.65)"],
+  ng: ["#C62828", "rgba(198,40,40,.55)"], obs: ["#6A3D9A", "rgba(106,61,154,.45)"], none: ["#555", "rgba(80,80,80,.45)"]};
+const PDF_NAME = {"": "未点検", ok: "良好", warn: "維持管理", ng: "要外観診断", obs: "要経過観察", none: "空桝等"};
+async function blobImage(blob){
+  const u = URL.createObjectURL(blob);
+  try{
+    const im = new Image(); im.src = u;
+    await (im.decode ? im.decode() : new Promise((ok, ng) => { im.onload = ok; im.onerror = ng; }));
+    return im;
+  } finally { setTimeout(() => URL.revokeObjectURL(u), 2000); }
+}
+function pdfStamp(withSec){
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + (withSec ? "_" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) : "");
+}
+/* 1枚の図面を描く。戻り値は描いた樹木の数（画像が無ければ -1） */
+async function drawResultSheet(cv, d){
+  const blob = await zget("imgs", rKey + "|" + d.zumen).catch(() => null);
+  if(!blob) return -1;
+  const im = await blobImage(blob);
+  const MAXS = 4200;                                  // 長辺の上限（iPadのメモリ対策）
+  const k = Math.min(1, MAXS / Math.max(im.naturalWidth, im.naturalHeight));
+  const W = Math.round(im.naturalWidth * k), H = Math.round(im.naturalHeight * k);
+  const sx = W / (d.w || im.naturalWidth), sy = H / (d.h || im.naturalHeight);
+  const u = Math.max(W, H) / 1000;                    // 描く大きさの基準（長辺の1/1000）
+  const hb = Math.round(u * 26);                      // 上の見出しの帯
+  cv.width = W; cv.height = H + hb;
+  const g = cv.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height);
+  g.drawImage(im, 0, hb, W, H);
+  // 見出し
+  const [office, route] = rKey.split("|");
+  g.fillStyle = "#1c1c1a"; g.textBaseline = "middle"; g.textAlign = "left";
+  g.font = "700 " + Math.round(u * 13) + "px sans-serif";
+  g.fillText("樹木点検結果図　" + route + "　" + (d.label || ("図" + d.zumen)), u * 8, hb / 2);
+  g.font = Math.round(u * 10) + "px sans-serif"; g.textAlign = "right";
+  const dt = new Date();
+  g.fillText(office + "　" + dt.getFullYear() + "/" + (dt.getMonth() + 1) + "/" + dt.getDate() + " 現在", W - u * 8, hb / 2);
+  g.strokeStyle = "#1c1c1a"; g.lineWidth = Math.max(1, u * 0.6);
+  g.beginPath(); g.moveTo(0, hb - g.lineWidth / 2); g.lineTo(W, hb - g.lineWidth / 2); g.stroke();
+  // 印
+  const st = listState(), done = new Map(routeRecords().map(r => [r.no, r]));
+  const cnt = {"": 0, ok: 0, warn: 0, ng: 0, obs: 0, none: 0, cut: 0};
+  const r0 = u * 4.2, seen = new Map(), cuts = [], tags = [];
+  posOnDrawing(d.zumen).forEach(p => {
+    const i = idxOf.get(p.k);
+    if(i == null || !st) return;
+    const s = statusOf(i, done), it = st.items[i], rec = done.get(it.no);
+    cnt[s]++;
+    const key = Math.round(p.x) + "," + Math.round(p.y), n = seen.get(key) || 0; seen.set(key, n + 1);
+    const x = p.x * sx + n * r0 * 1.6, y = p.y * sy + hb;
+    const [col, fill] = PDF_COL[s] || PDF_COL[""];
+    g.beginPath(); g.arc(x, y, r0, 0, Math.PI * 2);
+    if(fill){ g.fillStyle = fill; g.fill(); }
+    g.lineWidth = u * 1.1; g.strokeStyle = col; g.stroke();
+    if(s && s !== "ok") tags.push({x, y, t: treeLabel(it, false), col});
+    if(rec && rec.bassai){ cnt.cut++; cuts.push({x, y}); }
+  });
+  // 番号（良好・未点検以外）：白い縁取りで図面の線と区別する
+  g.textAlign = "left"; g.textBaseline = "alphabetic"; g.lineJoin = "round";
+  g.font = "700 " + Math.round(u * 6.5) + "px sans-serif";
+  tags.forEach(t => {
+    g.lineWidth = u * 2; g.strokeStyle = "#fff"; g.strokeText(t.t, t.x + r0 + u, t.y - r0 * 0.4);
+    g.fillStyle = t.col; g.fillText(t.t, t.x + r0 + u, t.y - r0 * 0.4);
+  });
+  // 要伐採：左上に赤い札、引き出し線の矢印で印を指す
+  const L = u * 16, fs = Math.round(u * 8.5);
+  g.font = "700 " + fs + "px sans-serif"; g.textBaseline = "middle"; g.textAlign = "center";
+  cuts.forEach(c => {
+    const tx = c.x - r0 * 0.72, ty = c.y - r0 * 0.72, bx = tx - L, by = ty - L;
+    g.lineCap = "round";
+    g.strokeStyle = "#fff"; g.lineWidth = u * 2.8; g.beginPath(); g.moveTo(bx, by); g.lineTo(tx - u * 3, ty - u * 3); g.stroke();
+    g.strokeStyle = "#C62828"; g.lineWidth = u * 1.3; g.beginPath(); g.moveTo(bx, by); g.lineTo(tx - u * 3, ty - u * 3); g.stroke();
+    g.fillStyle = "#C62828"; g.strokeStyle = "#fff"; g.lineWidth = u * 0.5;
+    g.beginPath(); g.moveTo(tx, ty); g.lineTo(tx - u * 6.5, ty - u * 2); g.lineTo(tx - u * 2, ty - u * 6.5); g.closePath(); g.fill(); g.stroke();
+    const tw = g.measureText("要伐採").width + u * 6, th = fs + u * 4;
+    g.fillStyle = "#C62828"; g.fillRect(bx - tw, by - th, tw, th);
+    g.strokeStyle = "#fff"; g.lineWidth = u * 0.8; g.strokeRect(bx - tw, by - th, tw, th);
+    g.fillStyle = "#fff"; g.fillText("要伐採", bx - tw / 2, by - th / 2);
+  });
+  // 凡例（左下）
+  const items = ["", "ok", "warn", "ng", "obs", "none"].filter(s => s === "" || s === "ok" || cnt[s]);
+  const lf = Math.round(u * 8), lh = lf * 1.6, pad = u * 5;
+  g.font = lf + "px sans-serif"; g.textAlign = "left";
+  const rows = items.map(s => PDF_NAME[s] + "　" + cnt[s] + "本");
+  if(cnt.cut) rows.push("要伐採　" + cnt.cut + "本");
+  const bw = Math.max(...rows.map(t => g.measureText(t).width)) + lf * 2.2 + pad * 2, bh = rows.length * lh + pad * 2;
+  const lx = u * 6, ly = cv.height - bh - u * 6;
+  g.fillStyle = "rgba(255,255,255,.92)"; g.fillRect(lx, ly, bw, bh);
+  g.strokeStyle = "#555"; g.lineWidth = u * 0.5; g.strokeRect(lx, ly, bw, bh);
+  rows.forEach((t, j) => {
+    const cy = ly + pad + lh * (j + 0.5);
+    if(j < items.length){
+      const [col, fill] = PDF_COL[items[j]];
+      g.beginPath(); g.arc(lx + pad + lf * 0.6, cy, lf * 0.45, 0, Math.PI * 2);
+      if(fill){ g.fillStyle = fill; g.fill(); }
+      g.lineWidth = u * 1; g.strokeStyle = col; g.stroke();
+    } else {
+      g.fillStyle = "#C62828"; g.fillRect(lx + pad, cy - lf * 0.45, lf * 1.2, lf * 0.9);
+    }
+    g.fillStyle = "#1c1c1a"; g.fillText(t, lx + pad + lf * 1.6, cy);
+  });
+  return Object.values(cnt).reduce((a, b) => a + b, 0) - cnt.cut;
+}
+function canvasJpeg(cv, q){
+  return new Promise((ok, ng) => cv.toBlob(b => b ? ok(b) : ng(new Error("画像を作れませんでした（メモリ不足の可能性）")), "image/jpeg", q));
+}
+/* JPEG画像を1枚ずつ貼ったA3のPDFを組み立てる（事前調査アプリと同じ） */
+function buildPdf(pages){
+  const enc = new TextEncoder(), parts = [], offs = [];
+  let size = 0;
+  const put = x => { const u8 = typeof x === "string" ? enc.encode(x) : x; parts.push(u8); size += u8.length; };
+  const obj = (n, body) => { offs[n] = size; put(n + " 0 obj\n"); body(); put("\nendobj\n"); };
+  put("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+  const nPages = pages.length, kids = [];
+  for(let i = 0; i < nPages; i++) kids.push((3 + i * 3) + " 0 R");
+  obj(1, () => put("<< /Type /Catalog /Pages 2 0 R >>"));
+  obj(2, () => put("<< /Type /Pages /Kids [" + kids.join(" ") + "] /Count " + nPages + " >>"));
+  pages.forEach((pg, i) => {
+    const pn = 3 + i * 3, cn = pn + 1, iname = pn + 2;
+    const land = pg.w >= pg.h, pw = land ? 1190.55 : 841.89, ph = land ? 841.89 : 1190.55;
+    const sc = Math.min(pw / pg.w, ph / pg.h), dw = pg.w * sc, dh = pg.h * sc, dx = (pw - dw) / 2, dy = (ph - dh) / 2;
+    obj(pn, () => put("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pw.toFixed(2) + " " + ph.toFixed(2) + "] " +
+                      "/Resources << /XObject << /Im" + i + " " + iname + " 0 R >> >> /Contents " + cn + " 0 R >>"));
+    const cs = "q " + dw.toFixed(2) + " 0 0 " + dh.toFixed(2) + " " + dx.toFixed(2) + " " + dy.toFixed(2) + " cm /Im" + i + " Do Q";
+    obj(cn, () => put("<< /Length " + cs.length + " >>\nstream\n" + cs + "\nendstream"));
+    obj(iname, () => {
+      put("<< /Type /XObject /Subtype /Image /Width " + pg.w + " /Height " + pg.h +
+          " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + pg.jpg.length + " >>\nstream\n");
+      put(pg.jpg); put("\nendstream");
+    });
+  });
+  const nObj = 3 + nPages * 3, xref = size;
+  let x = "xref\n0 " + nObj + "\n0000000000 65535 f \n";
+  for(let n = 1; n < nObj; n++) x += String(offs[n]).padStart(10, "0") + " 00000 n \n";
+  put(x + "trailer\n<< /Size " + nObj + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
+  return new Blob(parts, {type: "application/pdf"});
+}
+/* 保存の画面（iPadの共有は、ボタンを押した直後でないと開けないので、作り終えてから［保存する］を押してもらう） */
+const pdfDlg = document.createElement("div");
+pdfDlg.id = "zPdfDlg";
+pdfDlg.innerHTML = '<div id="zPdfBox"><h3>点検結果の図面（PDF）</h3><p id="zPdfMsg"></p>' +
+  '<p class="note">保存先は「ファイル」→ OneDrive の <b>街路樹診断システム／iPadから</b> にすると、PCのハブで［iPadから取り込んで点検表を作成］を押したときに ' +
+  '<b>01_樹木点検＼出力＼点検図面</b> に入ります。</p>' +
+  '<div style="display:flex;gap:8px;margin-top:12px"><button type="button" id="zPdfSave">保存する</button><button type="button" id="zPdfClose">閉じる</button></div></div>';
+document.body.appendChild(pdfDlg);
+let pdfFile = null;
+async function exportResultPdf(){
+  if(!R || !R.drawings.length){ toast("この路線の図面がありません"); return; }
+  const all = R.drawings.length > 1 && confirm("この路線の図面 " + R.drawings.length + "枚をすべてPDFにしますか？\n［キャンセル］で表示中の図面だけにします");
+  const list = all ? R.drawings.slice() : R.drawings.filter(x => nz(x.zumen) === nz(dz));
+  if(!list.length){ toast("表示中の図面がありません"); return; }
+  const cv = document.createElement("canvas"), pages = [];
+  const btn = $z("zPdfBtn"); btn.disabled = true;
+  try{
+    for(let i = 0; i < list.length; i++){
+      btn.textContent = "PDF " + (i + 1) + "/" + list.length;
+      if(await drawResultSheet(cv, list[i]) < 0) continue;
+      const jb = await canvasJpeg(cv, 0.8);
+      pages.push({jpg: new Uint8Array(await jb.arrayBuffer()), w: cv.width, h: cv.height});
+      await new Promise(r => setTimeout(r, 0));
+    }
+    cv.width = cv.height = 1;       // メモリを返す
+    if(!pages.length){ toast("図面の画像がありません。点検データを取り込み直してください"); return; }
+    const [office, route] = rKey.split("|");
+    const name = ("点検図面_" + office + "_" + route + (all ? "" : "_" + (list[0].label || list[0].zumen)) + "_" + pdfStamp(true) + ".pdf").replace(/[\\/:*?"<>|]/g, "");
+    pdfFile = new File([buildPdf(pages)], name, {type: "application/pdf"});
+    $z("zPdfMsg").innerHTML = "<b>" + esc(name) + "</b><br>" + pages.length + "枚（約" + Math.max(1, Math.round(pdfFile.size / 1048576)) + "MB）を作りました。［保存する］を押してください。";
+    pdfDlg.classList.add("show");
+  }catch(err){ alert("図面のPDFを作れませんでした\n" + err.message); }
+  finally{ btn.disabled = false; btn.textContent = "PDF"; }
+}
+$z("zPdfSave").onclick = async ()=>{
+  const f = pdfFile; if(!f) return;
+  if(navigator.canShare && navigator.canShare({files: [f]})){
+    try{ await navigator.share({files: [f], title: f.name}); }
+    catch(e){ if(e.name === "AbortError") return; pdfDownload(f); }
+  } else pdfDownload(f);
+  pdfDlg.classList.remove("show"); pdfFile = null;
+  toast("図面のPDFを保存しました");
+};
+$z("zPdfClose").onclick = ()=>{ pdfDlg.classList.remove("show"); pdfFile = null; };
+function pdfDownload(f){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(f); a.download = f.name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+}
+$z("zPdfBtn").onclick = exportResultPdf;
 
 /* ================= 取込 ================= */
 $z("zImpBtn").onclick = ()=> $z("zImpFile").click();
