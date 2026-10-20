@@ -219,7 +219,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v36</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v37</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -261,6 +261,10 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
       </div>
       <div id="tcEdit"></div>
     </div>
+  </details>
+  <details>
+    <summary>全データのバックアップ・復元</summary>
+    <div class="card"><div id="sysBackup" data-app="樹木点検"></div></div>
   </details>
 
   <details id="cfgPanel">
@@ -2517,6 +2521,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
 <!-- ===== 案件連携（街路樹診断システム） ===== -->
 <script src="../common/project.js"></script>
 <script src="../common/keypad.js"></script>
+<script src="../common/backup.js"></script>
 <script>
 /* 幹周りは事前調査と同じテンキーで入力する。株立ちは「＋幹」で各幹を続けて入力し、
    これまでの株立ち欄（チェック＋幹ごとの入力欄）に値を流し込んで、保存・計算は従来の処理を使う */
