@@ -359,9 +359,11 @@ function renderMarks(){
         '<path d="M0 0L' + (L - 9) + ' ' + (L - 9) + '" stroke="#C62828" stroke-width="3"/>' +
         '<path d="M' + L + ' ' + L + 'L' + (L - 15) + ' ' + (L - 4) + 'L' + (L - 4) + ' ' + (L - 15) + 'Z" fill="#C62828" stroke="#fff" stroke-width="1"/></svg></div>';
     }
-    if(tags || isCur || isSel){
+    // g … 並べて表示する樹木（植樹帯など）。少し拡大した所から番号を出す（まだ狭いときは補助番号だけ）
+    const gShort = p.g && !tags && !isCur && !isSel && V.s >= 0.28;
+    if(tags || isCur || isSel || gShort){
       const it = st.items[i];
-      const lbl = treeLabel(it, false);
+      const lbl = gShort ? (it.hojo || treeLabel(it, false)) : treeLabel(it, false);
       html += '<div class="ztag" style="transform:translate(' + (q.x + dd / 2) + 'px,' + (q.y - dd / 2 - 8) + 'px)">' + esc(lbl) + '</div>';
     }
   });
@@ -888,7 +890,7 @@ async function drawResultSheet(cv, d, C){
     g.beginPath(); g.arc(x, y, r0, 0, Math.PI * 2);
     if(fill){ g.fillStyle = fill; g.fill(); }
     g.lineWidth = u * 1.1; g.strokeStyle = col; g.stroke();
-    if(s && s !== "ok") tags.push({x, y, t: treeLabel(it, false), col});
+    if((s && s !== "ok") || p.g) tags.push({x, y, t: treeLabel(it, false), col});
     if(rec && rec.bassai){ cnt.cut++; cuts.push({x, y}); }
   });
   // 番号（良好・未点検以外）：白い縁取りで図面の線と区別する
