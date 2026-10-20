@@ -166,7 +166,7 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
 <body>
 <header>
   <div class="hdTop">
-    <h1>外観診断 <span style="font-size:11px;opacity:.7;font-weight:400">v6</span></h1>
+    <h1>外観診断 <span style="font-size:11px;opacity:.7;font-weight:400">v7</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -189,6 +189,10 @@ table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;
       <input id="koji" placeholder="例）枚岡公園　危険木調査業務(7)">
       <p class="note">一度入力すれば記憶されます</p>
     </div>
+  </details>
+  <details>
+    <summary>全データのバックアップ・復元</summary>
+    <div class="card"><div id="sysBackup" data-app="外観診断"></div></div>
   </details>
 
   <div class="card" id="listPanel2">
@@ -2006,6 +2010,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
 <!-- ===== 案件連携（街路樹診断システム） ===== -->
 <script src="../common/project.js"></script>
 <script src="../common/keypad.js"></script>
+<script src="../common/backup.js"></script>
 <script>
 /* 寸法の入力は事前調査と同じテンキーで（樹高 → 幹周 → 枝張 の順に「次へ」で進む） */
 (function(){
