@@ -4,11 +4,12 @@
    古いキャッシュのまま新しい画面と食い違うのを防ぐため、コードは常に最新を取りに行く。
    アイコンなどは「まずキャッシュ」で速さを優先する。 */
 // 古い版のキャッシュだけ消す（同じ場所にある他のアプリのキャッシュは残す）
-const VERSION = "jizen-v14";
+const VERSION = "jizen-v15";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
+  "../common/backup.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png"

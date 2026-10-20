@@ -317,6 +317,10 @@ td.chg{background:#FFF3A0!important;font-weight:600}
         入力した内容はiPadに自動保存されますが、1日の終わりにバックアップを書き出しておくと安心です。</p>
     </div>
     <div class="card">
+      <h3>全データのバックアップ・復元</h3>
+      <div id="sysBackup" data-app="事前調査"></div>
+    </div>
+    <div class="card">
       <h3>表示</h3>
       <div class="fl" id="optTags"></div>
       <p class="note" id="verInfo"></p>
@@ -330,7 +334,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 14;   // このファイルを直したら1つ増やす
+const APP_VER = 15;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -1919,5 +1923,6 @@ function toast(msg){
 })();
 if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
 </script>
+<script src="../common/backup.js"></script>
 </body>
 </html>
