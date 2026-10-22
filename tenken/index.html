@@ -134,6 +134,11 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 #issueBar.show{display:block}
 #issueBar button,#issueList button{font-size:13px;padding:6px 10px;margin:4px 6px 0 0;border-radius:8px;border:1px solid var(--ng-bd);background:#fff;color:var(--ng-tx);font-family:inherit;font-weight:600}
 #issueList button small{font-weight:400;color:var(--tx2)}
+/* 要確認の樹木ごとの［未点検に戻す］ */
+.issueItem{display:inline-flex;align-items:stretch;margin:4px 6px 0 0}
+.issueItem button{margin:0 !important}
+.issueItem button[data-k]{border-radius:8px 0 0 8px !important}
+#issueBar .issueItem button.issueRev,#issueList .issueItem button.issueRev{border-radius:0 8px 8px 0 !important;border-left:none !important;background:#FFF7F7;color:var(--tx2);font-weight:400;font-size:12px;padding:6px 8px}
 /* 写真ZIPの書き出し（iPadは1個ずつボタンを押して保存） */
 #zipDlg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:45;align-items:center;justify-content:center;padding:16px}
 #zipDlg.show{display:flex}
@@ -219,7 +224,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v38</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v39</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -424,7 +429,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
   <p class="note" id="storeInfo" style="margin:0 0 8px"></p>
   <div class="card" id="issueCard" style="display:none;border-color:var(--ng-bd)">
     <div style="font-size:14px;font-weight:600;color:var(--ng-tx)" id="issueTitle"></div>
-    <p class="note" style="margin:4px 0 0">タップするとその樹木を開きます。幹周りを入れる・写真を撮る・保存すると消えます。</p>
+    <p class="note" style="margin:4px 0 0">タップするとその樹木を開きます。幹周りを入れる・写真を撮る・保存すると消えます。途中でやめた樹木は［未点検に戻す］で、点検結果と写真を消して未点検に戻せます。</p>
     <div id="issueList"></div>
   </div>
   <div id="sumChips">
@@ -1567,7 +1572,39 @@ function guardLeave(){
     saveAndMove(0);
     return !!routeRecords().find(r => r.no === no) && formSnap() === formBase;   // 保存できなかったら移動しない
   }
-  return confirm(no + " を保存しないで移動しますか？\n（入力した内容は消えます。撮った写真は残ります）");
+  if(!confirm(no + " を保存しないで移動しますか？\n（入力した内容は消えます）")) return false;
+  // まだ点検を保存していない樹木で写真だけ撮ってあれば、写真も消して未点検に戻すか聞く（残すと「要確認」に出る）
+  const key = routeKey(), nPh = pdb ? photosFor(key, no).length : 0;
+  if(nPh && !routeRecords().some(r => r.no === no) &&
+     confirm(no + " で撮った写真 " + nPh + "枚も消して、未点検に戻しますか？\n［キャンセル］写真は残す（「要確認」に出ます）")){
+    revertCore(key, no).then(() => toast(no + " を未点検に戻しました"));
+  }
+  return true;
+}
+/* 樹木を未点検に戻す：その樹木の点検結果と写真を消す（入力の途中で離れた樹木を「要確認」から外すため） */
+async function revertCore(key, no){
+  records = records.filter(r => !((r.office + "|" + r.route) === key && r.no === no));
+  store("gj_records", records);
+  if(pdb && photosFor(key, no).length){ try{ await deletePhotosOf(key, no); }catch(_){} }
+  if(editingId && !records.some(r => r.id === editingId)) endEdit(true);
+  renderCnt(); renderSummary(); renderProgress(); updatePhotoButtons();
+  if(window.SysZumen && SysZumen.sync) SysZumen.sync();
+}
+async function revertTree(x, key){
+  if(!x) return;
+  const saved = records.some(r => (r.office + "|" + r.route) === key && r.no === x.no);
+  const nPh = pdb ? photosFor(key, x.no).length : 0;
+  const what = [saved ? "入力した点検結果" : "", nPh ? "撮った写真 " + nPh + "枚" : ""].filter(Boolean).join("と");
+  if(!confirm(x.no + " を未点検に戻しますか？\n" + (what ? what + "を消します（取り消せません）" : ""))) return;
+  const showing = routeKey() === key && fullNo() === x.no;
+  await revertCore(key, x.no);
+  // 入力画面に出している樹木なら、入力欄も空にする
+  if(showing){
+    const st = listState();
+    if(st && getMode() === "list") showListItem(st.idx, true);
+    else { clearTreeFields(); updatePhotoButtons(); }
+  }
+  toast(x.no + " を未点検に戻しました");
 }
 /* 要確認の樹木：写真だけあって点検が未保存／幹周り未入力／写真が必要枚数に足りない */
 function issuesOf(key){
@@ -1590,20 +1627,23 @@ function issuesOf(key){
   return out.sort((a, b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || (a.no < b.no ? -1 : 1));
 }
 function issueBtns(list){
-  return list.map((x, k) => '<button type="button" data-k="' + k + '"><b>' + esc(x.no) + '</b> <small>' + esc(x.label) + '</small></button>').join("");
+  return list.map((x, k) => '<span class="issueItem"><button type="button" data-k="' + k + '"><b>' + esc(x.no) + '</b> <small>' + esc(x.label) + '</small></button>' +
+    '<button type="button" class="issueRev" data-r="' + k + '" title="この樹木の点検結果・写真を消して未点検に戻す">未点検に戻す</button></span>').join("");
 }
 function renderIssues(){
   const sk = sumKey(), list = issuesOf(sk);
   $("issueCard").style.display = list.length ? "" : "none";
   $("issueTitle").textContent = "⚠ 要確認 " + list.length + "本（" + sk.split("|")[1] + "）";
   $("issueList").innerHTML = issueBtns(list);
-  $("issueList").querySelectorAll("button").forEach(b => b.onclick = () => openIssue(list[+b.dataset.k], sk));
+  $("issueList").querySelectorAll("button[data-k]").forEach(b => b.onclick = () => openIssue(list[+b.dataset.k], sk));
+  $("issueList").querySelectorAll("button[data-r]").forEach(b => b.onclick = () => revertTree(list[+b.dataset.r], sk));
   // 入力画面の上にも出す（いま入力している路線）
   const rk = routeKey(), l2 = rk === sk ? list : issuesOf(rk);
   $("issueBar").classList.toggle("show", l2.length > 0);
   $("issueBar").innerHTML = "⚠ 要確認 " + l2.length + "本（幹周り未入力・写真不足・点検が未保存）<br>" +
     issueBtns(l2.slice(0, 8)) + (l2.length > 8 ? '<button type="button" data-all="1">ほか ' + (l2.length - 8) + '本は一覧・集計で</button>' : "");
   $("issueBar").querySelectorAll("button[data-k]").forEach(b => b.onclick = () => openIssue(l2[+b.dataset.k], rk));
+  $("issueBar").querySelectorAll("button[data-r]").forEach(b => b.onclick = () => revertTree(l2[+b.dataset.r], rk));
   const all = $("issueBar").querySelector("button[data-all]");
   if(all) all.onclick = () => setView("sum");
 }
