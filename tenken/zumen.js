@@ -131,6 +131,7 @@ card.innerHTML =
     '<button type="button" class="miniBtn" id="zPdfBtn" title="点検結果を描いた図面をPDFにしてPCへ">PDF</button>' +
     '<button type="button" class="miniBtn" id="zFixBtn">位置を直す</button>' +
     '<button type="button" class="miniBtn" id="zAddBtn">＋樹木</button>' +
+    '<button type="button" class="miniBtn del" id="zDelAdd" style="display:none">追加を取り消す</button>' +
     '<button type="button" class="miniBtn" id="zInpBtn">入力を隠す</button>' +
     '<button type="button" class="miniBtn" id="zHide">図面を隠す</button>' +
   '</div>' +
@@ -372,6 +373,7 @@ function renderMarks(){
     html += '<div class="zmk newpt" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
   }
   box.innerHTML = html;
+  updDelAdd();
   $z("zLegend").innerHTML =
     '<i style="border-color:#E07B00"></i>未点検 ' + cnt[""] +
     '<i style="border-color:#3B6D11;background:rgba(59,109,17,.45)"></i>良好 ' + cnt.ok +
@@ -481,7 +483,7 @@ function updateBar(){
   document.body.classList.toggle("zAdding", addMode);
   if(addMode){
     if(!addPt){
-      bar.innerHTML = '<span><b>樹木を追加</b>：図面・リストに無い樹木の位置をタップしてください</span><span style="flex:1"></span>' +
+      bar.innerHTML = '<span><b>樹木を追加</b>：図面・リストに無い樹木の位置をタップしてください（間違えて追加した樹木は、その樹木を開いて［追加を取り消す］）</span><span style="flex:1"></span>' +
                       '<button type="button" data-a="addEnd">やめる</button>';
     } else {
       bar.innerHTML = '<label>桝No.<input id="zAddM" value="' + esc(addPt.m) + '"></label>' +
@@ -614,11 +616,21 @@ function commitAdd(){
   pick(at);
   toast(treeLabel(it, false) + " を追加しました。続けて点検を入力できます");
 }
-function removeAdded(sel){
+async function removeAdded(sel){
   const st = listState(); if(!st || !sel) return;
   const it = st.items[sel.i];
-  const saved = routeRecords().some(r => r.no === (it && it.no));
-  if(!confirm(treeLabel(sel.it, false) + " の追加を取り消しますか？" + (saved ? "\n（入力した点検結果は消えません）" : ""))) return;
+  const no = it && it.no, key = routeKey();
+  const saved = routeRecords().some(r => r.no === no);
+  const nPh = (typeof photosFor === "function" && no) ? photosFor(key, no).length : 0;
+  if(!confirm(treeLabel(sel.it, false) + " の追加を取り消しますか？\n（図面の印とリストから消えます）")) return;
+  // 間違えて追加した樹木の点検結果・写真が残ると、一覧・点検表に出てしまうので、一緒に消すか聞く
+  if((saved || nPh) && confirm(treeLabel(sel.it, false) + " の" + (saved ? "点検結果" : "") + (saved && nPh ? "と" : "") +
+                                (nPh ? "写真 " + nPh + "枚" : "") + "も消しますか？\n［OK］消す　［キャンセル］残す（取り消せません）")){
+    records = records.filter(r => !((r.office + "|" + r.route) === key && r.no === no));
+    store("gj_records", records);
+    if(nPh && typeof deletePhotosOf === "function"){ try{ await deletePhotosOf(key, no); }catch(_){} }
+    if(editingId && !records.some(r => r.id === editingId)) endEdit(true);
+  }
   if(it && it.added){
     st.items.splice(sel.i, 1);
     if(st.idx > sel.i) st.idx--;
@@ -628,8 +640,20 @@ function removeAdded(sel){
   const f = FIX[rKey] || {}; delete f[sel.k]; store("gj_zfix", FIX);
   const a = ADD[rKey] || {}; delete a[sel.k]; store("gj_zadd", ADD);
   fixSel = null; buildIndex(); updateBar(); schedule(); fillSel();
+  if(st.items.length) showListItem(Math.max(0, Math.min(st.idx, st.items.length - 1)));
+  if(typeof renderSummary === "function") renderSummary();
   toast("追加を取り消しました");
 }
+/* 入力中の樹木が［＋樹木］で追加した樹木なら、図面の上に［追加を取り消す］を出す */
+function updDelAdd(){
+  const st = listState(), it = st && st.items[st.idx];
+  $z("zDelAdd").style.display = (it && it.added && !fixing && !addMode) ? "" : "none";
+}
+$z("zDelAdd").onclick = () => {
+  const st = listState(), it = st && st.items[st.idx];
+  if(!it || !it.added) return;
+  removeAdded(Object.assign({it, i: st.idx}, itemKey(it)));
+};
 
 /* リストのその樹木を入力欄に出す */
 function pick(i){

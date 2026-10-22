@@ -219,7 +219,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v37</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v38</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -500,6 +500,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
     <span id="camNo">-</span>
     <span id="camKind">全体</span>
     <span id="camRes" style="color:#aaa;font-size:11px"></span>
+    <button type="button" id="camReset" style="margin-left:auto;display:none;background:#c62828;color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit">映像を取り直す</button>
     <button type="button" id="camSide" style="margin-left:auto">黒板を右へ</button>
     <button type="button" id="camClose" style="margin-left:8px">閉じる</button>
   </div>
@@ -1976,20 +1977,69 @@ function getCam(){
   }
   return make(Object.assign({facingMode:"environment"}, base));
 }
-async function restartCamStream(){
-  if(camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; }
-  try {
-    camStream = await getCam();
-    $("camVideo").srcObject = camStream;
-    $("camNoCam").style.display = "none";
-    camTrack = camStream.getVideoTracks()[0];
-    const caps = camTrack.getCapabilities ? camTrack.getCapabilities() : {};
-    // レンズズームが効かなかった端末（iPadなど。対応と出るのに拡大されない）は、デジタルズームにする
-    hwZoom = (caps.zoom && caps.zoom.max > caps.zoom.min && !settings.noHwZoom) ? caps.zoom : null;
-    applyZoom(settings.zoom || 1);
-    await renderLensCtl();
-  } catch(e){ $("camNoCam").style.display = "flex"; }
+/* カメラの映像（ストリーム）は必ず1つだけにする。
+   開く途中で向きを変えた・すぐ閉じた等で2つ取ってしまうと、止め忘れた方がカメラをつかんだままになり、
+   次から真っ暗になる（iPadを再起動するまで直らない）ことがあった（2026-10-22）。
+   取った映像は全部 camLive に入れて、閉じる・取り直すときは全部止める。待っている間に古くなった映像はすぐ止める */
+const camLive = new Set();
+let camGen = 0, camWatch = 0, camRetried = false, camBroken = false;
+function stopAllCams(){
+  clearTimeout(camWatch);
+  camLive.forEach(s => s.getTracks().forEach(t => { try{ t.stop(); }catch(_){} }));
+  camLive.clear(); camStream = null; camTrack = null;
 }
+async function restartCamStream(){
+  const gen = ++camGen;
+  stopAllCams();
+  $("camVideo").srcObject = null;
+  let s;
+  try { s = await getCam(); }
+  catch(e){ if(gen === camGen) $("camNoCam").style.display = "flex"; return; }    // カメラが無い（PCで試すとき）
+  camLive.add(s);
+  if(gen !== camGen || $("camModal").style.display !== "flex"){       // 待っている間に閉じた・取り直した
+    s.getTracks().forEach(t => t.stop()); camLive.delete(s); return;
+  }
+  camStream = s;
+  $("camVideo").srcObject = s;
+  $("camNoCam").style.display = "none";
+  camTrack = s.getVideoTracks()[0];
+  if(camTrack) camTrack.onended = () => { if(gen === camGen && $("camModal").style.display === "flex") camBlack(); };
+  const caps = camTrack && camTrack.getCapabilities ? camTrack.getCapabilities() : {};
+  // レンズズームが効かなかった端末（iPadなど。対応と出るのに拡大されない）は、デジタルズームにする
+  hwZoom = (caps.zoom && caps.zoom.max > caps.zoom.min && !settings.noHwZoom) ? caps.zoom : null;
+  applyZoom(settings.zoom || 1);
+  watchCam(gen);
+  await renderLensCtl();
+}
+/* 映像が本当に来ているか4秒後に確かめる。来ていなければ1回だけ自動で取り直し、それでも駄目なら案内を出す */
+function watchCam(gen){
+  clearTimeout(camWatch);
+  camWatch = setTimeout(() => {
+    if(gen !== camGen || $("camModal").style.display !== "flex") return;
+    const v = $("camVideo");
+    const ok = v.videoWidth > 0 && v.readyState >= 2 && camTrack && camTrack.readyState === "live";
+    if(ok){ camRetried = false; setCamBroken(false); }
+    else camBlack();
+  }, 4000);
+}
+function camBlack(){
+  if(!camRetried){ camRetried = true; toast("カメラの映像を取り直しています…"); restartCamStream(); return; }
+  stopAllCams();
+  setCamBroken(true);
+  alert("カメラの映像が届きません（真っ暗）。\n\n① 上の［映像を取り直す］を押す\n② だめなら、アプリを上にスワイプして終了し、開き直す\n③ それでもだめなら、iPadを再起動する");
+}
+function setCamBroken(on){
+  camBroken = on;
+  $("camReset").style.display = on ? "" : "none";
+  $("camShutter").style.opacity = on ? ".35" : "";
+}
+$("camReset").onclick = () => { camRetried = false; setCamBroken(false); restartCamStream(); };
+/* 別のアプリに切り替えたらカメラを放し、戻ってきたら取り直す（そのままだとiPadでは映像が止まることがある） */
+document.addEventListener("visibilitychange", () => {
+  if($("camModal").style.display !== "flex") return;
+  if(document.hidden){ camGen++; stopAllCams(); }
+  else { camRetried = false; restartCamStream(); }
+});
 
 // ---- ズーム（対応機種はレンズズーム / 非対応はデジタル1〜3×） ----
 function applyZoom(z){
@@ -2118,13 +2168,14 @@ async function openCam(branch){
   $("camModal").style.display = "flex";
   camOrient = window.innerWidth > window.innerHeight ? "land" : "port";
   fitCamFrame();
+  camRetried = false; setCamBroken(false);
   await restartCamStream();
 }
 function closeCam(){
   clearTimeout(revTimer); $("camReview").classList.remove("show");
   $("camModal").style.display = "none";
   $("cmtPicker").classList.remove("show");
-  if(camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  camGen++; stopAllCams();                 // 取りかけの映像も含めて全部止める
   $("camVideo").srcObject = null;
   $("camNoCam").style.display = "none";
 }
@@ -2329,6 +2380,7 @@ function drawCamBoard(ctx, W, H, num){
 let camShooting = false;
 $("camShutter").onclick = async ()=>{
   if(camShooting) return;
+  if(camBroken){ toast("カメラの映像が届いていません。上の［映像を取り直す］を押してください"); return; }
   camShooting = true; $("camShutter").disabled = true;
   try {
     const v = $("camVideo");
