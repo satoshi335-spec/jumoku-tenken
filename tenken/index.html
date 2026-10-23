@@ -119,6 +119,9 @@ table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 /* 伐採（程度B・Cの項目に出るボタン。押した樹木は「要伐採」） */
 .lvCut{min-height:40px;padding:4px 10px;border-radius:8px;border:1px solid var(--ng-tx);background:#fff;font-size:13px;font-weight:700;font-family:inherit;color:var(--ng-tx)}
 .lvCut.on{background:var(--ng-tx);color:#fff}
+/* 半枯れ（枯死・著しい衰弱がBのときに出るボタン。処置は維持管理） */
+.lvHan{min-height:40px;padding:4px 10px;border-radius:8px;border:1px solid #8a5a00;background:#fff;font-size:13px;font-weight:700;font-family:inherit;color:#8a5a00}
+.lvHan.on{background:#8a5a00;color:#fff}
 #cutBadge{display:none;background:#fff;color:var(--ng-tx);border:2px solid var(--ng-tx)}
 /* 要経過観察（②活力点検・③樹木の異常の項目が全部A＝軽度） */
 :root{--obs-bg:#EFE6F7;--obs-tx:#6A3D9A}
@@ -224,7 +227,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v39</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v40</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -629,11 +632,17 @@ let tcUser = load("gj_tc", {});            // {点検項目: {A:[文…], B:[…
 let lv = {}, autoTxt = {}, alt = {};       // 入力中の樹木：項目番号 → 程度／特記事項に入れた文／候補の番号
 let bassai = false;                        // 入力中の樹木が「要伐採」か（程度B・Cの項目の［伐採］で切り替え）
 const BASSAI_TXT = "伐採が必要。";          // 要伐採にすると特記事項に入れる文
+/* 半枯れ：②活力点検の「枯死・著しい衰弱」をB（処置が必要）にしたときの［半枯れ］。
+   その項目の文を下の文にし、処置は維持管理（この項目は外観診断の対象に数えない） */
+let hangare = false;
+const HANGARE_TXT = "半枯れ状態、枯損部の除去が必要。";
+const KARE_I = ITEMS.findIndex(it => it.csv === "枯死・著しい衰弱");
 const SENT_END = /[。．.！!）)]$/;
 function tcDefault(i, g){ const d = (typeof CMT_DEFAULT !== "undefined" && CMT_DEFAULT[ITEMS[i].csv]) || {}; return d[g] || []; }
 function tcList(i, g){ const u = tcUser[ITEMS[i].csv]; return (u && u[g] && u[g].length) ? u[g] : tcDefault(i, g); }
 function tcText(i){
   if(!lv[i]) return "";
+  if(hangare && i === KARE_I && lv[i] === "B") return HANGARE_TXT;
   const L = tcList(i, lv[i]);
   let t = L.length ? L[Math.min(alt[i] || 0, L.length - 1)] : "";
   // ②活力点検・③樹木の異常でA（軽度）は、最後に（経過観察）を付ける（「経過観察とする。」で終わる文はそれを置き換える）
@@ -658,7 +667,7 @@ function dropLevel(i){
   memoPut(autoTxt[i], "");
   delete lv[i]; delete autoTxt[i]; delete alt[i];
 }
-function resetLevels(){ lv = {}; autoTxt = {}; alt = {}; bassai = false; }
+function resetLevels(){ lv = {}; autoTxt = {}; alt = {}; bassai = false; hangare = false; }
 /* 要伐採の切り替え。特記事項に「伐採が必要。」を足す／消す */
 function setBassai(on){
   if(!!on === bassai) return;
@@ -676,6 +685,7 @@ function renderLv(){
   // 伐採はB・Cの項目があるときだけ。B・Cが無くなったら要伐採も外す
   const hasBC = show && on.some(i => lv[i] === "B" || lv[i] === "C");
   if(!hasBC && bassai) setBassai(false);
+  if(hangare && lv[KARE_I] !== "B") hangare = false;     // 枯死・著しい衰弱がBでなくなったら半枯れも外す
   $("lvBox").classList.toggle("show", show);
   $("urgent").style.display = show && on.some(i => lv[i] === "C") ? "inline-block" : "none";
   $("cutBadge").style.display = bassai ? "inline-block" : "none";
@@ -686,6 +696,7 @@ function renderLv(){
         g + '<small>' + LV[g] + '</small></button>').join("") +
       (n > 1 ? '<button type="button" class="lvTool" data-k="alt">候補 ' + ((alt[i] || 0) % n + 1) + '/' + n + '</button>' : '') +
       (lv[i] ? '<button type="button" class="lvTool" data-k="edit">✎ 文を直す</button>' : '') +
+      (i === KARE_I && lv[i] === "B" ? '<button type="button" class="lvHan' + (hangare ? " on" : "") + '" data-k="han">' + (hangare ? "✓ 半枯れ" : "半枯れ") + '</button>' : '') +
       (lv[i] === "B" || lv[i] === "C" ? '<button type="button" class="lvCut' + (bassai ? " on" : "") + '" data-k="cut">' + (bassai ? "✓ 伐採" : "伐採") + '</button>' : '') + '</div>';
   }).join("");
   $("lvList").querySelectorAll(".lvRow").forEach(row => {
@@ -698,6 +709,13 @@ function renderLv(){
     if(a) a.onclick = () => { alt[i] = ((alt[i] || 0) + 1) % tcList(i, lv[i]).length; setLevel(i, lv[i]); renderLv(); };
     const e = row.querySelector('[data-k="edit"]');
     if(e) e.onclick = () => editTc(i);
+    const han = row.querySelector('[data-k="han"]');
+    if(han) han.onclick = () => {
+      hangare = !hangare;
+      setLevel(KARE_I, "B");               // 特記事項の文を差し替える（半枯れの文 ⇔ Bの文）
+      calc();
+      toast(hangare ? "半枯れにしました（処置は維持管理）" : "半枯れを外しました");
+    };
     const cut = row.querySelector('[data-k="cut"]');
     if(cut) cut.onclick = () => {
       setBassai(!bassai); calc();        // 判定（維持管理の処置が必要）も変わる
@@ -1495,10 +1513,11 @@ function calc(){
   const on23 = btns.filter(b => ITEMS[b.dataset.i].g !== 1 && b.classList.contains("on")).length;
   const items = new Array(ITEMS.length).fill("");
   btns.forEach(b => { if(b.classList.contains("on")) items[+b.dataset.i] = "○"; });
+  const jj = judgeOf(items, $("sp").value, lv, bassai, hangare);
   if(bassai){ j.textContent = "維持管理の処置が必要（要伐採）"; j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
-  else if(on23 > 0 && isObs(items, lv)){ j.textContent = JUDGE_OBS; j.style.background = "var(--obs-bg)"; j.style.color = "var(--obs-tx)"; }
-  else if(on23 > 0){ j.textContent = "樹木の外観診断が必要"; j.style.background = "var(--ng-bg)"; j.style.color = "var(--ng-tx)"; }
-  else if(on1 > 0){ j.textContent = "維持管理の処置が必要"; j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
+  else if(jj === JUDGE_OBS){ j.textContent = JUDGE_OBS; j.style.background = "var(--obs-bg)"; j.style.color = "var(--obs-tx)"; }
+  else if(jj === "樹木の外観診断が必要"){ j.textContent = jj; j.style.background = "var(--ng-bg)"; j.style.color = "var(--ng-tx)"; }
+  else if(jj.startsWith("維持")){ j.textContent = "維持管理の処置が必要" + (hangare ? "（半枯れ）" : ""); j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
   else { j.textContent = "概ね良好・異常なし"; j.style.background = "var(--ok-bg)"; j.style.color = "var(--ok-tx)"; }
   updatePhotoButtons(); renderLv();
 }
@@ -1526,19 +1545,20 @@ $("sp").addEventListener("input", ()=>{ calc(); girthWarnUpd(); });
 
 /* 要経過観察：②活力点検・③樹木の異常で○の項目が、全部A（軽度）。点検表の「樹木の外観診断が必要」の■は付く */
 const JUDGE_OBS = "樹木の外観診断が必要（要経過観察）";
-function isObs(items, lvMap){
-  const on = ITEMS.map((it, i) => i).filter(i => ITEMS[i].g !== 1 && items[i] === "○");
+function isObs(items, lvMap, hang){
+  const on = ITEMS.map((it, i) => i).filter(i => ITEMS[i].g !== 1 && items[i] === "○" && !(hang && i === KARE_I));
   return on.length > 0 && !!lvMap && on.every(i => lvMap[i] === "A");
 }
 /* lvMap（項目番号→程度）を渡すと、要経過観察を見分ける。
    cut（要伐採）なら、②③に○があっても「維持管理の処置が必要」（伐採は維持管理の処置。外観診断はしない） */
-function judgeOf(items, sp, lvMap, cut){
+/* hang（半枯れ）なら「枯死・著しい衰弱」は維持管理の処置として数える（外観診断の対象にしない） */
+function judgeOf(items, sp, lvMap, cut, hang){
   if(isNoTree(sp)) return String(sp).trim();
   if(cut) return "維持管理の処置が必要";
   const on1 = ITEMS.filter((it, i) => it.g === 1 && items[i] === "○").length;
-  const on23 = ITEMS.filter((it, i) => it.g !== 1 && items[i] === "○").length;
-  if(on23 > 0) return isObs(items, lvMap) ? JUDGE_OBS : "樹木の外観診断が必要";
-  if(on1 > 0) return "維持管理の処置が必要";
+  const on23 = ITEMS.filter((it, i) => it.g !== 1 && items[i] === "○" && !(hang && i === KARE_I)).length;
+  if(on23 > 0) return isObs(items, lvMap, hang) ? JUDGE_OBS : "樹木の外観診断が必要";
+  if(on1 > 0 || (hang && items[KARE_I] === "○")) return "維持管理の処置が必要";
   return "概ね良好・異常なし";
 }
 function photosOf(items, sp){
@@ -1695,6 +1715,7 @@ function saveAndMove(move){
     lv: Object.fromEntries(Object.entries(lv).filter(([i]) => items[i] === "○")),
     autoTxt: Object.fromEntries(Object.entries(autoTxt).filter(([i]) => items[i] === "○")),
     bassai: bassai ? 1 : 0,
+    hangare: (hangare && items[KARE_I] === "○") ? 1 : 0,
     created: editingId ? (records.find(r => r.id === editingId) || {}).created || Date.now() : Date.now()
   };
   const wasEdit = !!editingId;
@@ -1798,7 +1819,7 @@ function startEdit(id, quiet){
   else { $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; }
   document.querySelectorAll(".itm").forEach(b => b.classList.toggle("on", r.items[+b.dataset.i] === "○"));
   lv = Object.assign({}, r.lv || {}); autoTxt = Object.assign({}, r.autoTxt || {}); alt = {};
-  bassai = !!r.bassai;
+  bassai = !!r.bassai; hangare = !!r.hangare;
   $("editBanner").style.display = "block"; $("editBanner").textContent = r.no + " を編集中（上書きされます）";
   $("saveHere").textContent = "上書き保存"; $("cancelEdit").style.display = "block";
   if(!quiet){
@@ -1844,7 +1865,7 @@ function renderSummary(){
   // 点検リストの順（右283 → 右284 → …）に並べる。リストに無い樹木は保存した順で後ろに
   const ls = sumListState(), ord = new Map(ls && ls.items ? ls.items.map((x, i) => [x.no, i]) : []);
   const rr = sumRecords().slice().sort((a,b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || a.created - b.created);
-  const jd = rr.map(r => judgeOf(r.items, r.sp, r.lv, r.bassai));
+  const jd = rr.map(r => judgeOf(r.items, r.sp, r.lv, r.bassai, r.hangare));
   $("sumAll").textContent = rr.length;
   $("sumOk").textContent = jd.filter(j => j.startsWith("概ね")).length;
   $("sumWarn").textContent = jd.filter(j => j.startsWith("維持")).length;
@@ -1902,13 +1923,13 @@ function buildCsv(key){
   const rr = records.filter(r => (r.office + "|" + r.route) === key).sort((a,b) => a.created - b.created);
   if(!rr.length) return null;
   const head = ["点検事務所","路線名","図面番号","樹木番号","補助番号","樹木名","幹周り(cm)","前回幹周り(cm)","市名","町名","点検日時","点検者",
-    ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数","要伐採","要経過観察"];
+    ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数","要伐採","要経過観察","半枯れ"];
   const rows = rr.map(r => [r.office, r.route, r.zumen || "",
     (r.masu != null && r.masu !== "") ? r.masu : splitHojo(r.no).base,
     (r.hojo != null && r.hojo !== "") ? r.hojo : splitHojo(r.no).hojo,
     r.sp, r.girth || "", r.girthPrev || "", r.city || "", r.town || "",
-    (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), fullMemo(r), judgeOf(r.items, r.sp, r.lv, r.bassai), photosOf(r.items, r.sp), r.bassai ? "○" : "",
-    judgeOf(r.items, r.sp, r.lv, r.bassai) === JUDGE_OBS ? "○" : ""]
+    (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), fullMemo(r), judgeOf(r.items, r.sp, r.lv, r.bassai, r.hangare), photosOf(r.items, r.sp), r.bassai ? "○" : "",
+    judgeOf(r.items, r.sp, r.lv, r.bassai, r.hangare) === JUDGE_OBS ? "○" : "", r.hangare ? "○" : ""]
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();

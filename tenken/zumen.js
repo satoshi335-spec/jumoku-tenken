@@ -211,7 +211,7 @@ function statusOf(i, doneMap){
   const it = st.items[i];
   const r = doneMap.get(it.no);
   if(!r) return "";
-  const j = judgeOf(r.items || [], r.sp, r.lv, r.bassai);
+  const j = judgeOf(r.items || [], r.sp, r.lv, r.bassai, r.hangare);
   if(isNoTree(r.sp)) return "none";
   if(j.indexOf("要経過観察") > -1) return "obs";
   if(j.indexOf("外観") > -1) return "ng";
@@ -867,7 +867,7 @@ async function routeCtx(key){
 function statusIn(C, i){
   const it = C.st && C.st.items[i], r = it && C.done.get(it.no);
   if(!r) return "";
-  const j = judgeOf(r.items || [], r.sp, r.lv, r.bassai);
+  const j = judgeOf(r.items || [], r.sp, r.lv, r.bassai, r.hangare);
   if(isNoTree(r.sp)) return "none";
   if(j.indexOf("要経過観察") > -1) return "obs";
   if(j.indexOf("外観") > -1) return "ng";
