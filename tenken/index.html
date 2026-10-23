@@ -227,7 +227,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v40</span></h1>
+    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v41</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -355,6 +355,8 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
     <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
       <button type="button" class="miniBtn emptyBtn" id="karaBtn">空桝</button>
       <button type="button" class="miniBtn emptyBtn" id="nashiBtn">桝無し</button>
+      <button type="button" class="miniBtn emptyBtn" id="bassaiZumiBtn">伐採済</button>
+      <button type="button" class="miniBtn emptyBtn" id="masshoBtn" title="重複した番号を整理するとき。点検表には出ません">番号抹消</button>
       <button type="button" class="miniBtn" id="treeBtn" style="display:none">樹木ありに戻す</button>
     </div>
     <div id="sug-sp" class="sug"></div>
@@ -441,7 +443,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
     <div class="sumChip" style="background:var(--warn-bg);color:var(--warn-tx)"><b id="sumWarn">0</b>維持管理</div>
     <div class="sumChip" style="background:var(--ng-bg);color:var(--ng-tx)"><b id="sumNg">0</b>外観診断</div>
     <div class="sumChip" style="background:var(--obs-bg);color:var(--obs-tx)"><b id="sumObs">0</b>要経過観察</div>
-    <div class="sumChip" style="background:#EAE8E0;color:var(--tx2)"><b id="sumKara">0</b>空桝・桝無し</div>
+    <div class="sumChip" style="background:#EAE8E0;color:var(--tx2)"><b id="sumKara">0</b>空桝・伐採済等</div>
   </div>
   <div class="card">
     <div class="rowFlex">
@@ -492,6 +494,8 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
       <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
         <button id="bulkKaraBtn" class="miniBtn pri">選んだ樹木を「空桝」で記録</button>
         <button id="bulkNashiBtn" class="miniBtn pri">「桝無し」で記録</button>
+        <button id="bulkZumiBtn" class="miniBtn pri">「伐採済」で記録</button>
+        <button id="bulkMasshoBtn" class="miniBtn pri">「番号抹消」で記録</button>
       </div>
     </div>
 
@@ -1020,6 +1024,8 @@ $("pickPageBtn").onclick = ()=>{
 $("pickClearBtn").onclick = ()=>{ picked.clear(); rangeFirst = null; renderListTable(); };
 $("bulkKaraBtn").onclick = ()=> bulkNoTree("空桝");
 $("bulkNashiBtn").onclick = ()=> bulkNoTree("桝無し");
+$("bulkZumiBtn").onclick = ()=> bulkNoTree("伐採済");
+$("bulkMasshoBtn").onclick = ()=> bulkNoTree("番号抹消");
 
 function bulkNoTree(label){
   const st = sumListState();
@@ -1491,8 +1497,9 @@ function kabuCalc(){
   girthWarnUpd();
 }
 
-/* 樹木名が「空桝」「桝無し」＝そこに点検する樹木が無い状態 */
-const NO_TREE = ["空桝", "桝無し"];
+/* 樹木名が「空桝」「桝無し」「伐採済」「番号抹消」＝そこに点検する樹木が無い状態（点検項目・写真なし）。
+   番号抹消は、台帳で重複した番号を整理するとき。点検表を作るときハブが外す */
+const NO_TREE = ["空桝", "桝無し", "伐採済", "番号抹消"];
 function isNoTree(sp){ return NO_TREE.indexOf(String(sp || "").trim()) > -1; }
 
 function calc(){
@@ -1500,6 +1507,8 @@ function calc(){
   document.body.classList.toggle("noTree", noTree);
   $("karaBtn").classList.toggle("on", $("sp").value.trim() === "空桝");
   $("nashiBtn").classList.toggle("on", $("sp").value.trim() === "桝無し");
+  $("bassaiZumiBtn").classList.toggle("on", $("sp").value.trim() === "伐採済");
+  $("masshoBtn").classList.toggle("on", $("sp").value.trim() === "番号抹消");
   $("treeBtn").style.display = noTree ? "" : "none";
   const j = $("judge");
   if(noTree){
@@ -1540,6 +1549,8 @@ function clearNoTree(){
 }
 $("karaBtn").onclick = ()=> setNoTree("空桝");
 $("nashiBtn").onclick = ()=> setNoTree("桝無し");
+$("bassaiZumiBtn").onclick = ()=> setNoTree("伐採済");
+$("masshoBtn").onclick = ()=> setNoTree("番号抹消");
 $("treeBtn").onclick = ()=> clearNoTree();
 $("sp").addEventListener("input", ()=>{ calc(); girthWarnUpd(); });
 
