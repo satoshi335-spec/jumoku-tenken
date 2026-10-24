@@ -1,4 +1,4 @@
-const VERSION = "nagano-v7";
+const VERSION = "nagano-v8";
 // 画面(HTML/JS)は新しい版を優先（古い版が残る事故を防ぐ）。ネットが無いときはキャッシュ
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./comments.js", "../common/backup.js", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 self.addEventListener("install", e => {
