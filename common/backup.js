@@ -4,11 +4,23 @@
      分かれていることがあるので、使っているアプリそれぞれで書き出す
    ・写真が多いときは約100MBずつのZIPに分ける。iPadの共有は1回押すごとに1回しか開けないので、［保存する］を1個ずつ押す
    ・［復元する］でZIPを全部選ぶと、このアプリのデータをバックアップの内容に置き換える
-   ・使い方：<div id="sysBackup" data-app="樹木点検"></div> を置いて、このファイルを読み込む */
+   ・使い方：<div id="sysBackup" data-app="樹木点検"></div> を置いて、このファイルを読み込む
+   ・範囲：長野公園アプリ（DB「nagano」・「nagano_〜」の記録）は同じサイトにあっても別の業務なので、ふつうは入れない・戻さない。
+     長野公園アプリでは data-db="nagano" data-ls="nagano_" を付けて、長野公園のデータだけを書き出す・戻す */
 (function(){
 "use strict";
 const BK_VER = 1, PART_MAX = 100 * 1048576;
-const KNOWN_DBS = ["gj_photos", "gj_zumen", "gk_photos", "jizen"];   // indexedDB.databases() が使えないとき
+const KNOWN_DBS = ["gj_photos", "gj_zumen", "gk_photos", "jizen", "nagano"];   // indexedDB.databases() が使えないとき
+const OTHER_DB = ["nagano"], OTHER_LS = ["nagano_"];   // 別の業務のアプリ（範囲を指定しないときは入れない）
+/* 書き出す・戻すデータの範囲。box の data-db（DB名をカンマ区切り）・data-ls（記録の名前の頭をカンマ区切り）で決める */
+function scopeOf(box){
+  const dbs = (box.dataset.db || "").split(",").map(s => s.trim()).filter(Boolean);
+  const lss = (box.dataset.ls || "").split(",").map(s => s.trim()).filter(Boolean);
+  return {
+    db: n => dbs.length ? dbs.includes(n) : !OTHER_DB.includes(n),
+    ls: k => lss.length ? lss.some(p => k.startsWith(p)) : !OTHER_LS.some(p => k.startsWith(p))
+  };
+}
 
 /* ---------- 画面 ---------- */
 const css = document.createElement("style");
@@ -40,15 +52,16 @@ function mount(box){
     '<button type="button" class="sbkRest">復元する</button>' +
     '<input type="file" class="sbkFile" accept=".zip,application/zip" multiple style="display:none"></div>' +
     '<div class="sbkMsg"></div><div class="sbkParts"></div>' +
-    '<p class="sbkNote">保存先は「ファイル」→ OneDrive の「街路樹診断システム」の中の、写真ZIP（iPadから）とは別のフォルダ（例：iPadバックアップ）にしてください。' +
-    'ホーム画面に別々に追加したアプリ（樹木点検・事前調査など）は、それぞれのアプリで書き出してください。</p>';
-  const q = s => box.querySelector(s);
+    '<p class="sbkNote"></p>';
+  const q = s => box.querySelector(s), sc = scopeOf(box);
+  q(".sbkNote").textContent = box.dataset.note || ("保存先は「ファイル」→ OneDrive の「街路樹診断システム」の中の、写真ZIP（iPadから）とは別のフォルダ（例：iPadバックアップ）にしてください。" +
+    "ホーム画面に別々に追加したアプリ（樹木点検・事前調査など）は、それぞれのアプリで書き出してください。");
   const msg = t => { q(".sbkMsg").textContent = t || ""; };
-  q(".sbkMake").onclick = () => makeBackup(app, q(".sbkPh").checked, q(".sbkParts"), msg, q(".sbkMake"));
+  q(".sbkMake").onclick = () => makeBackup(app, q(".sbkPh").checked, q(".sbkParts"), msg, q(".sbkMake"), sc);
   q(".sbkRest").onclick = () => q(".sbkFile").click();
   q(".sbkFile").addEventListener("change", e => {
     const fs = [...e.target.files]; e.target.value = "";
-    if(fs.length) restore(fs, msg);
+    if(fs.length) restore(fs, msg, sc);
   });
 }
 
@@ -144,20 +157,22 @@ function decode(v, getBlob){
   return v;
 }
 const isPhotoDb = n => /_photos$/.test(n);
+const isPhotoStore = (db, st) => isPhotoDb(db) || st === "photos";     // 長野公園は DB「nagano」の中の「photos」
 
 /* ---------- バックアップを作る ---------- */
 let job = null;
-async function makeBackup(app, withPhotos, partsBox, msg, btn){
+async function makeBackup(app, withPhotos, partsBox, msg, btn, sc){
   btn.disabled = true; msg("データを集めています…"); partsBox.innerHTML = "";
   try{
     const ls = {};
-    for(let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); ls[k] = localStorage.getItem(k); }
+    for(let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); if(sc.ls(k)) ls[k] = localStorage.getItem(k); }
     const blobs = [], dbs = [];
     for(const name of await dbNames()){
-      if(!withPhotos && isPhotoDb(name)) continue;
+      if(!sc.db(name) || (!withPhotos && isPhotoDb(name))) continue;
       let d; try{ d = await openExisting(name); }catch(e){ continue; }
       const info = {name, version: d.version, stores: []};
       for(const sn of Array.from(d.objectStoreNames)){
+        if(!withPhotos && isPhotoStore(name, sn)) continue;
         const st = d.transaction(sn, "readonly").objectStore(sn);
         const s = {name: sn, keyPath: st.keyPath, autoIncrement: st.autoIncrement, rows: []};
         await new Promise((ok, ng) => {
@@ -246,7 +261,7 @@ function download(f){
 }
 
 /* ---------- 復元 ---------- */
-async function restore(files, msg){
+async function restore(files, msg, sc){
   try{
     msg("ZIPを読んでいます…");
     const ents = {};
@@ -257,6 +272,13 @@ async function restore(files, msg){
       if(z["backup.json"]) main = JSON.parse(await (await entryBlob(z["backup.json"])).text());
     }
     if(!main || main.type !== "gairoju-backup") throw new Error("バックアップの1個目のZIP（データ本体が入ったもの）が選ばれていません");
+    // このアプリの範囲のデータだけ戻す（前の版で作った、別の業務のデータも入ったバックアップでも、そちらは触らない）
+    main.dbs = main.dbs.filter(d => sc.db(d.name));
+    main.ls = Object.fromEntries(Object.entries(main.ls).filter(([k]) => sc.ls(k)));
+    const used = new Set();
+    main.dbs.forEach(d => d.stores.forEach(s => s.rows.forEach(r => { JSON.stringify(r.v, (k, v) => { if(v && typeof v.__sbk === "number") used.add(v.__sbk); return v; }); })));
+    main.blobs = main.blobs.filter(b => used.has(b.i));
+    if(!main.dbs.length && !Object.keys(main.ls).length) throw new Error("このアプリのデータが入っていないバックアップです（別のアプリで作ったバックアップかもしれません）");
     const missing = main.blobs.filter(b => !ents["b/" + b.i]).map(b => b.part);
     if(missing.length){
       const ps = [...new Set(missing)].sort((a, b) => a - b);
@@ -323,6 +345,6 @@ async function restore(files, msg){
   }catch(e){ msg("復元できませんでした：" + e.message); alert("復元できませんでした\n" + e.message); }
 }
 
-window.SysBackup = {VERSION: 1, mount};
+window.SysBackup = {VERSION: 2, mount};
 document.querySelectorAll("#sysBackup").forEach(mount);
 })();
