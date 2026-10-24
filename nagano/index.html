@@ -224,6 +224,37 @@ tr.need td{background:var(--pur-bg)}
 #camCmts button.on{background:#FFD400;font-weight:700}
 #camNoCam{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#ccc;text-align:center;padding:20px;line-height:1.8}
 #camFlash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .15s}
+#camBoard.right{left:auto;right:3%}
+#camTop #camReset{background:var(--ng)}
+#camTop #camSide{background:#1b6b5f;border:1px solid #fff}
+/* 撮った写真の確認（1.5秒） */
+#camReview{display:none;position:absolute;inset:0;z-index:5;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px}
+#camReview.show{display:flex}
+#camRevImg{max-width:100%;max-height:calc(100% - 90px);object-fit:contain;border:2px solid #fff;border-radius:4px}
+#camRevBar{display:flex;align-items:center;gap:10px;color:#fff;font-size:15px;font-weight:600;flex-wrap:wrap;justify-content:center}
+#camRevBar button{min-height:46px;padding:8px 20px;border-radius:10px;border:none;font-size:16px;font-weight:600}
+#camRetake{background:#fff;color:#222}
+#camRevOk{background:#1b6b5f;color:#fff}
+#camRevTime{width:220px;height:4px;background:#444;border-radius:2px;overflow:hidden}
+#camRevTime i{display:block;height:100%;width:100%;background:#7fd3b8}
+/* 点検項目の程度（A・B・C） */
+#lvBox{display:none;margin-top:8px;padding:6px 8px;background:#fff;border:1px solid var(--line);border-radius:10px}
+#lvBox.show{display:block}
+#lvBox .lvHead{font-size:12px;color:var(--tx2);margin:0 0 2px}
+.lvRow{display:flex;align-items:center;gap:5px;padding:6px 0;border-top:1px dashed var(--line);flex-wrap:wrap}
+.lvRow:first-of-type{border-top:none}
+.lvName{flex:1 1 100%;font-size:13px;font-weight:700}
+.lvBtn{min-width:60px;min-height:40px;padding:3px 5px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:700;color:var(--tx);line-height:1.15}
+.lvBtn small{display:block;font-size:10px;font-weight:400}
+.lvBtn.on[data-lv=A]{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.lvBtn.on[data-lv=B]{background:var(--warn-bg);border-color:var(--warn);color:#8a4b00}
+.lvBtn.on[data-lv=C]{background:var(--ng-bg);border-color:var(--ng);color:var(--ng)}
+.lvTool{min-height:40px;padding:3px 8px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:12px;color:var(--acc)}
+.lvCut{min-height:40px;padding:3px 10px;border-radius:8px;border:1px solid var(--ng);background:#fff;font-size:13px;font-weight:700;color:var(--ng)}
+.lvCut.on{background:var(--ng);color:#fff}
+.lvHan{min-height:40px;padding:3px 10px;border-radius:8px;border:1px solid #8a5a00;background:#fff;font-size:13px;font-weight:700;color:#8a5a00}
+.lvHan.on{background:#8a5a00;color:#fff}
+textarea.inp{resize:none;line-height:1.5;min-height:52px}
 </style>
 </head>
 <body>
@@ -342,9 +373,10 @@ tr.need td{background:var(--pur-bg)}
     <div id="tkBox" class="tk" style="display:none">
       <h4>樹木点検</h4>
       <div id="tkItems"></div>
+      <div id="lvBox"><p class="lvHead">○にした項目の程度（A 軽度・B 処置が必要・C 緊急対応）。選ぶと特記事項に文が入ります</p><div id="lvList"></div></div>
       <div class="lbl">その他特記事項（異常の位置・内容・程度）</div>
       <div class="chips" id="tkChips"></div>
-      <input class="inp" id="tkNote" placeholder="例）根元に開口空洞、腐朽進行">
+      <textarea class="inp" id="tkNote" rows="2" placeholder="例）根元に開口空洞、腐朽進行"></textarea>
       <div class="tkres" id="tkRes" style="margin-top:6px"></div>
     </div>
 
@@ -429,6 +461,11 @@ tr.need td{background:var(--pur-bg)}
       <p class="note">図面データ（長野公園_図面_〜.json）は事務所PCの「iPad用データを作る」で作ります。取り込み直しても入力した結果は消えません。</p>
     </div>
     <div class="card">
+      <h3>iPad の全データのバックアップ</h3>
+      <div id="sysBackup" data-app="長野公園" data-db="nagano" data-ls="nagano_"
+        data-note="保存先は「ファイル」→ OneDrive の「長野公園危険木調査システム」の中の「iPadバックアップ」など、調査結果・写真ZIP とは別のフォルダにしてください。街路樹診断のアプリ（樹木点検など）のデータは入りません（そちらはそれぞれのアプリで書き出します）。"></div>
+    </div>
+    <div class="card">
       <h3>表示</h3>
       <div class="fl" id="optTags"></div>
       <p class="note" id="calInfo"></p>
@@ -442,7 +479,7 @@ tr.need td{background:var(--pur-bg)}
 
 <!-- カメラ -->
 <div id="cam">
-  <div id="camTop"><b id="camNo"></b><span id="camKind"></span><span style="margin-left:auto"></span><button id="camClose">閉じる</button></div>
+  <div id="camTop"><b id="camNo"></b><span id="camKind"></span><span style="margin-left:auto"></span><button id="camReset" style="display:none">映像を取り直す</button><button id="camSide">黒板を右へ</button><button id="camClose">閉じる</button></div>
   <div id="camWrap">
     <div id="camFrame">
       <video id="camVideo" autoplay playsinline muted></video>
@@ -451,6 +488,11 @@ tr.need td{background:var(--pur-bg)}
       <div id="camFlash"></div>
     </div>
     <div id="camNoCam">カメラを使えません。<br>（テスト用に灰色の画像で記録できます）</div>
+    <div id="camReview">
+      <img id="camRevImg" alt="">
+      <div id="camRevBar"><span id="camRevTxt"></span><button id="camRetake">撮り直す</button><button id="camRevOk">OK</button></div>
+      <div id="camRevTime"><i></i></div>
+    </div>
   </div>
   <div id="camBot"><button class="s" id="zOut">－</button><span id="zVal" style="color:#fff">×1.0</span><button class="s" id="zIn">＋</button><button id="camShutter" aria-label="撮影"></button><button class="s" id="camEdit">コメント編集</button></div>
 </div>
@@ -458,10 +500,11 @@ tr.need td{background:var(--pur-bg)}
 <div id="busy"><div id="busyMsg">処理中…</div></div>
 <div id="toast" class="toast"></div>
 
+<script src="comments.js"></script>
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 6;
+const APP_VER = 7;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -1080,7 +1123,7 @@ $("sClose").onclick = closeSheet;
 
 function segSet(id, v){ $(id).querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === v)); }
 function chipsSet(id, list, text, onClick){
-  const parts = String(text || "").split("、");
+  const parts = String(text || "").split(/[、。]/);
   $(id).innerHTML = list.map(c => '<button class="' + (parts.includes(String(c)) ? "on" : "") + '">' + esc(c) + '</button>').join("");
   $(id).querySelectorAll("button").forEach(b => b.onclick = ()=> onClick(b.textContent));
 }
@@ -1144,6 +1187,7 @@ function renderSheet(){
   renderTenken();
   renderPhotos();
   $("delLink").style.display = t.added ? "" : "none";
+  $("undoLink").textContent = S.phase === "t" ? "未点検に戻す" : "未調査に戻す";
   $("renoLink").textContent = t.src === "circle" && !R.renamed[t.id] ? "番号を付ける" : "番号を変える（プレート付替え）";
   $("calLink").style.display = gps && !regionOf(distOf(t)).geo ? "" : "none";
 }
@@ -1258,12 +1302,90 @@ $("kanri").querySelectorAll("button").forEach(b => b.onclick = ()=>{
 });
 
 /* ---- 樹木点検 ---- */
+/* 程度（A・B・C）と特記事項の自動コメント（街路樹診断の樹木点検アプリと同じ考え方。文は comments.js の点検コメント集）
+   ・項目を○にすると「A 軽度」の文が特記事項に入る。B・C に替えると文も替わる
+   ・②活力点検・③樹木の異常の A は文の最後に（経過観察）。②③の○が全部 A なら「要経過観察」：
+     点検結果は維持管理の処置が必要（外観診断はしない）、特記事項に定期剪定の文を入れる
+   ・B・C の項目の［伐採］で要伐採（毎木の「要伐採」と同じ）。要伐採の木は維持管理の処置が必要（外観診断はしない）
+   ・「枯死・著しい衰弱」を B にしたときの［半枯れ］：文を半枯れの文にし、処置は維持管理（外観診断の対象に数えない） */
+const LV = {A: "軽度", B: "処置が必要", C: "緊急対応"};
+const OBS_TXT = "（経過観察）", BASSAI_TXT = "伐採が必要。", HANGARE_TXT = "半枯れ状態、枯損部の除去が必要。";
+const OBS_MEMO = "定期的な枯れ枝剪定、風圧軽減剪定が必要。";
+const SENT_END = /[。．.！!）)]$/;
+let tcUser = lsGet("nagano_tc", {});           // iPad で直した文 {項目: {A:[…], B:[…], C:[…]}}
+const tkG = i => pkg.tenkenItems[i].g;
+function cmtKey(i){ const t = pkg.tenkenItems[i].t; return t === "その他" ? (tkG(i) === "①" ? "その他（維持管理）" : "その他（樹木の異常）") : t; }
+function kareI(){ return pkg.tenkenItems.findIndex(x => x.t === "枯死・著しい衰弱"); }
+function tcList(i, g){
+  const k = cmtKey(i), u = tcUser[k];
+  if(u && u[g] && u[g].length) return u[g];
+  const d = (typeof CMT_DEFAULT !== "undefined" && CMT_DEFAULT[k]) || {};
+  return d[g] || [];
+}
+function tcText(tk, i){
+  const g = tk.lv && tk.lv[i]; if(!g) return "";
+  if(tk.hang && i === kareI() && g === "B") return HANGARE_TXT;
+  const L = tcList(i, g);
+  let t = L.length ? L[Math.min((tk.alt && tk.alt[i]) || 0, L.length - 1)] : "";
+  if(t && g === "A" && tkG(i) !== "①" && !t.endsWith(OBS_TXT)) t = t.replace(/経過観察とする。$/, "") + OBS_TXT;
+  return t;
+}
+/* 特記事項の中の oldT を newT に差し替える。見つからなければ（手で書き換えた等）newT を後ろに足す */
+function notePut(tk, oldT, newT){
+  let m = tk.note || "";
+  if(oldT && m.includes(oldT)) m = m.replace(oldT, newT || "");
+  else if(newT){ m = m.trim(); m = m ? m + (SENT_END.test(m) || m.endsWith("、") ? "" : "。") + newT : newT; }
+  tk.note = m.replace(/。{2,}/g, "。").replace(/、{2,}/g, "、").replace(/。、|、。/g, "。").replace(/^[。、\s]+|[、\s]+$/g, "").trim();
+}
+/* 特記事項の候補（言葉）を足す・消す */
+function noteToggle(tk, w){
+  const m = tk.note || "";
+  if(m.split(/[、。]/).includes(w)) notePut(tk, w, "");
+  else tk.note = m ? m + (SENT_END.test(m) || m.endsWith("、") ? "" : "、") + w : w;
+}
+function tkOf(r){ const tk = r.tk || (r.tk = {items: []}); tk.lv = tk.lv || {}; tk.auto = tk.auto || {}; tk.alt = tk.alt || {}; return tk; }
+function setLevel(tk, i, g){
+  tk.lv[i] = g;
+  const t = tcText(tk, i);
+  notePut(tk, tk.auto[i], t);
+  if(t) tk.auto[i] = t; else delete tk.auto[i];
+}
+function dropLevel(tk, i){ notePut(tk, tk.auto[i], ""); delete tk.lv[i]; delete tk.auto[i]; delete tk.alt[i]; }
+/* 入力のたびに：半枯れ・要経過観察の文を合わせる */
+function tkSync(r){
+  const tk = tkOf(r), ki = kareI();
+  if(tk.hang && !(tk.lv[ki] === "B" && tk.items.includes(ki))){ tk.hang = false; if(tk.lv[ki]) setLevel(tk, ki, tk.lv[ki]); }
+  // 要経過観察の定期剪定の文は、いつも最後に置く（あとから足した項目の文の後ろへ移す）
+  const obs = tkResult(r).obs;
+  if((tk.note || "").includes(OBS_MEMO)) notePut(tk, OBS_MEMO, "");
+  if(obs) notePut(tk, "", OBS_MEMO);
+  tk.t = Date.now(); tk.date = tk.date || today();
+}
+/* いま使っている文をその場で直す（直した文は次の樹木からも使われる） */
+function editTc(r, i){
+  const tk = tkOf(r), g = tk.lv[i]; if(!g) return;
+  const k = cmtKey(i), idx = tk.alt[i] || 0, L = tcList(i, g).slice();
+  const v = prompt("「" + k + "」 " + g + "（" + LV[g] + "）の文を直します。\n直した文はこの iPad に保存され、次の樹木からも使われます。\n（空にすると、この候補を消します）", L[idx] || "");
+  if(v === null) return;
+  const t = v.trim().replace(/\s*\n\s*/g, "");
+  if(t) L[idx] = SENT_END.test(t) ? t : t + "。"; else { L.splice(idx, 1); tk.alt[i] = 0; }
+  tcUser[k] = Object.assign({}, tcUser[k] || {}, {[g]: L}); lsSet("nagano_tc", tcUser);
+  setLevel(tk, i, g); tkSync(r); touch(r); renderTenken();
+  toast(t ? "文を直しました（次の樹木からも使われます）" : "候補を消しました");
+}
 function tkItems(){ return pkg.tenkenItems.map((x, i) => Object.assign({i}, x)).filter(x => (S.form || pkg.project.tenken_form) !== "様式1" || pkg.form1.includes(x.i)); }
+/* 点検結果。事務所PCの config.tenken_result と同じ決め方 */
 function tkResult(r){
-  const s = new Set((r.tk && r.tk.items) || []);
-  const n1 = [...s].filter(i => pkg.tenkenItems[i].g === "①").length, n23 = [...s].filter(i => pkg.tenkenItems[i].g !== "①").length;
-  const out = []; if(n1) out.push("維持管理の処置が必要"); if(n23) out.push("樹木の外観診断が必要");
-  return {txt: out.length ? out.join("・") : "概ね良好・異常なし", n1, n23};
+  const tk = r.tk || {}, s = [...new Set(tk.items || [])], lvm = tk.lv || {}, ki = kareI();
+  const hang = !!tk.hang && lvm[ki] === "B" && s.includes(ki), cut = !!(r.kanri && r.kanri.bas);
+  const n1 = s.filter(i => tkG(i) === "①").length, n23 = s.filter(i => tkG(i) !== "①").length;
+  const on23 = s.filter(i => tkG(i) !== "①" && !(hang && i === ki));
+  const obs = !cut && on23.length > 0 && on23.every(i => lvm[i] === "A");
+  const gaikan = !cut && !obs && on23.length > 0, kanri = cut || obs || hang || n1 > 0;
+  const out = [];
+  if(kanri) out.push("維持管理の処置が必要" + (cut ? "（要伐採）" : obs ? "（要経過観察）" : hang ? "（半枯れ）" : ""));
+  if(gaikan) out.push("樹木の外観診断が必要");
+  return {txt: out.length ? out.join("・") : "概ね良好・異常なし", n1, n23, kanri, gaikan, obs, cut, hang};
 }
 function renderTenken(){
   const r = recOf(selId);
@@ -1282,20 +1404,64 @@ function renderTenken(){
   });
   $("tkItems").innerHTML = h + "</div>";
   $("tkItems").querySelectorAll("button").forEach(b => b.onclick = ()=>{
-    const rr = rec(selId); rr.tk = rr.tk || {items: []};
-    const i = +b.dataset.i, s = new Set(rr.tk.items);
-    s.has(i) ? s.delete(i) : s.add(i);
-    rr.tk.items = [...s].sort((a, b) => a - b); rr.tk.t = Date.now(); rr.tk.date = rr.tk.date || today();
-    touch(rr); renderTenken();
+    const rr = rec(selId), tk = tkOf(rr);
+    const i = +b.dataset.i, s = new Set(tk.items);
+    if(s.has(i)){ s.delete(i); dropLevel(tk, i); }
+    else { s.add(i); tk.alt[i] = 0; tk.items = [...s]; setLevel(tk, i, tk.lv[i] || "A"); }   // ○にすると「A 軽度」の文が入る
+    tk.items = [...s].sort((a, b) => a - b);
+    tkSync(rr); touch(rr); renderTenken();
   });
+  renderLv(r);
   $("tkNote").value = (r.tk && r.tk.note) || "";
-  chipsSet("tkChips", TK_CHIPS, r.tk && r.tk.note, w => { const rr = rec(selId); rr.tk = rr.tk || {items: []}; rr.tk.note = toggleWord(rr.tk.note, w); rr.tk.t = Date.now(); rr.tk.date = rr.tk.date || today(); touch(rr); renderTenken(); });
+  noteFit();
+  chipsSet("tkChips", TK_CHIPS, r.tk && r.tk.note, w => { const rr = rec(selId), tk = tkOf(rr); noteToggle(tk, w); tkSync(rr); touch(rr); renderTenken(); });
   const res = tkResult(r);
   $("tkRes").innerHTML = "点検結果：" + esc(res.txt) + "　（①の異常 " + res.n1 + "　②＋③ " + res.n23 + "）" +
+    (res.cut && !(r.tk && r.tk.cutSet) ? '<br><span style="font-weight:400">毎木調査で「要伐採」にした木です（伐採は維持管理の処置。外観診断はしません）</span>' : "") +
     (tkDone(r) ? "" : '<br><span style="color:var(--ng)">項目にひとつも該当が無ければ下の［異常なしで点検済］を押してください</span> <button id="tkOk" style="margin-top:4px;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--pur);background:#fff;color:var(--pur)">異常なしで点検済</button>');
   const ok = $("tkOk"); if(ok) ok.onclick = ()=>{ const rr = rec(selId); rr.tk = rr.tk || {items: []}; rr.tk.t = Date.now(); rr.tk.date = rr.tk.date || today(); touch(rr); renderTenken(); };
 }
-$("tkNote").addEventListener("input", ()=>{ const r = rec(selId); r.tk = r.tk || {items: []}; r.tk.note = $("tkNote").value; r.tk.t = Date.now(); r.tk.date = r.tk.date || today(); touch(r); });
+$("tkNote").addEventListener("input", ()=>{ const r = rec(selId), tk = tkOf(r); tk.note = $("tkNote").value; tk.t = Date.now(); tk.date = tk.date || today(); touch(r); noteFit(); });
+function noteFit(){ const m = $("tkNote"); m.style.height = "auto"; m.style.height = Math.max(m.scrollHeight + 2, 52) + "px"; }
+/* ○にした項目の程度の欄 */
+function renderLv(r){
+  const tk = r.tk || {}, lvm = tk.lv || {}, ki = kareI(), cut = !!(r.kanri && r.kanri.bas);
+  const on = (tk.items || []).slice().sort((a, b) => a - b);
+  $("lvBox").classList.toggle("show", on.length > 0);
+  $("lvList").innerHTML = on.map(i => {
+    const n = lvm[i] ? tcList(i, lvm[i]).length : 0;
+    return '<div class="lvRow" data-i="' + i + '"><span class="lvName">' + esc(tkG(i) + " " + pkg.tenkenItems[i].t) + "</span>" +
+      ["A", "B", "C"].map(g => '<button class="lvBtn' + (lvm[i] === g ? " on" : "") + '" data-lv="' + g + '">' + g + "<small>" + LV[g] + "</small></button>").join("") +
+      (n > 1 ? '<button class="lvTool" data-k="alt">候補 ' + (((tk.alt && tk.alt[i]) || 0) % n + 1) + "/" + n + "</button>" : "") +
+      (lvm[i] ? '<button class="lvTool" data-k="edit">✎ 文を直す</button>' : "") +
+      (i === ki && lvm[i] === "B" ? '<button class="lvHan' + (tk.hang ? " on" : "") + '" data-k="han">' + (tk.hang ? "✓ 半枯れ" : "半枯れ") + "</button>" : "") +
+      (lvm[i] === "B" || lvm[i] === "C" ? '<button class="lvCut' + (cut ? " on" : "") + '" data-k="cut">' + (cut ? "✓ 伐採" : "伐採") + "</button>" : "") + "</div>";
+  }).join("");
+  $("lvList").querySelectorAll(".lvRow").forEach(row => {
+    const i = +row.dataset.i;
+    const done = rr => { tkSync(rr); touch(rr); renderTenken(); };
+    row.querySelectorAll(".lvBtn").forEach(b => b.onclick = ()=>{
+      const rr = rec(selId), tk = tkOf(rr);
+      if(tk.lv[i] !== b.dataset.lv) tk.alt[i] = 0;
+      if(i === ki && b.dataset.lv !== "B") tk.hang = false;
+      setLevel(tk, i, b.dataset.lv); done(rr);
+    });
+    const q = k => row.querySelector('[data-k="' + k + '"]');
+    if(q("alt")) q("alt").onclick = ()=>{ const rr = rec(selId), tk = tkOf(rr); tk.alt[i] = ((tk.alt[i] || 0) + 1) % tcList(i, tk.lv[i]).length; setLevel(tk, i, tk.lv[i]); done(rr); };
+    if(q("edit")) q("edit").onclick = ()=> editTc(rec(selId), i);
+    if(q("han")) q("han").onclick = ()=>{
+      const rr = rec(selId), tk = tkOf(rr); tk.hang = !tk.hang; setLevel(tk, i, "B"); done(rr);
+      toast(tk.hang ? "半枯れにしました（処置は維持管理）" : "半枯れを外しました");
+    };
+    if(q("cut")) q("cut").onclick = ()=>{
+      const rr = rec(selId), tk = tkOf(rr); rr.kanri = rr.kanri || {};
+      const on = !rr.kanri.bas; rr.kanri.bas = on;
+      if(on){ tk.cutSet = true; notePut(tk, "", BASSAI_TXT); } else { delete tk.cutSet; notePut(tk, BASSAI_TXT, ""); }
+      done(rr);
+      toast(on ? "要伐採にしました（維持管理の処置。特記事項に「" + BASSAI_TXT + "」）" : "要伐採を外しました");
+    };
+  });
+}
 
 /* ---- 前後・近くの未調査 ---- */
 let navHist = [];
@@ -1318,8 +1484,45 @@ $("nextTree").onclick = goNearest;
 $("prevTree").onclick = ()=>{ const id = navHist.pop(); if(id) select(id, true); else toast("前の樹木はありません"); };
 $("renoLink").onclick = e => { e.preventDefault(); const t = treeById(selId); openNoDlg({kind: t.src === "circle" && !R.renamed[t.id] ? "assign" : "reno", id: selId}); };
 $("moveLink").onclick = e => { e.preventDefault(); startNudge(); };
-$("undoLink").onclick = e => { e.preventDefault(); if(!confirm("この樹木の入力を消して未調査に戻しますか？（写真は残ります）")) return; delete R.trees[selId]; saveR(); renderSheet(); scheduleMarks(); updProg(); };
-$("delLink").onclick = e => { e.preventDefault(); if(!confirm("この新木を削除しますか？")) return; R.added = R.added.filter(a => a.id !== selId); delete R.trees[selId]; reindex(); saveR(); closeSheet(); updProg(); };
+/* その番号の写真を iPad から消す（一覧からも消す） */
+async function dropPhotos(no){
+  for(const m of photosOf(no)){ if(!m.gone){ try{ await idbDel("photos", m.key); }catch(e){} } }
+  photoMeta = photoMeta.filter(m => m.no !== no); savePhotoMeta(); thumbKey = "";
+}
+function askDropPhotos(no, what){
+  const n = no ? photosOf(no).length : 0;
+  return n > 0 && confirm(no + " で撮った写真 " + n + " 枚も消しますか？\n［キャンセル］写真は残す" + (what ? "（" + what + "）" : ""));
+}
+/* 樹木点検の途中で離れた木などを「未点検」に戻す（毎木調査の入力は残す） */
+async function revertTenken(){
+  const t = treeById(selId), r = recOf(selId), no = noOf(t);
+  if(!r.tk){ toast("この木はまだ点検していません"); return; }
+  if(!confirm(no + " の樹木点検の入力（点検項目・特記事項）を消して、未点検に戻しますか？\n（毎木調査の入力は残ります）")) return;
+  const drop = askDropPhotos(no, "写真は番号ごとなので、毎木調査で撮った写真も消えます");
+  if(r.tk.cutSet && r.kanri) delete r.kanri.bas;      // 点検で付けた要伐採も外す
+  delete r.tk; touch(r);
+  if(drop) await dropPhotos(no);
+  renderSheet(); toast(no + " を未点検に戻しました");
+}
+$("undoLink").onclick = async e => {
+  e.preventDefault();
+  if(S.phase === "t"){ revertTenken(); return; }
+  const no = noOf(treeById(selId));
+  if(!confirm("この樹木の入力を消して未調査に戻しますか？")) return;
+  const drop = askDropPhotos(no);
+  delete R.trees[selId]; saveR();
+  if(drop) await dropPhotos(no);
+  renderSheet(); scheduleMarks(); updProg();
+};
+$("delLink").onclick = async e => {
+  e.preventDefault();
+  const no = noOf(treeById(selId));
+  if(!confirm("この新木（" + no + "）を削除しますか？\n（間違えて追加したとき用。入力も消えます）")) return;
+  const drop = askDropPhotos(no);
+  R.added = R.added.filter(a => a.id !== selId); delete R.trees[selId]; reindex(); saveR();
+  if(drop) await dropPhotos(no);
+  closeSheet(); updProg(); toast(no + " を削除しました");
+};
 
 /* ================= 写真（小黒板つきで撮影） ================= */
 let photoT = 0;
@@ -1407,17 +1610,79 @@ async function openCam(kind){
   $("camKind").textContent = "　" + KIND_TXT[kind];
   $("camKoji").textContent = S.koji || pkg.project.short;
   renderCamCmts();
+  endReview(false);
+  applyBoardSide();
   $("cam").classList.add("show");
   fitCam();
-  try{
-    cam.stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment", width: {ideal: 1920}, height: {ideal: 1440}}, audio: false});
-    $("camVideo").srcObject = cam.stream; $("camNoCam").style.display = "none";
-    cam.track = cam.stream.getVideoTracks()[0];
-    const caps = cam.track.getCapabilities ? cam.track.getCapabilities() : {};
-    cam.hw = caps.zoom && caps.zoom.max > caps.zoom.min ? caps.zoom : null;
-    applyZoom(1);
-  }catch(e){ $("camNoCam").style.display = "flex"; }
+  camRetried = false; setCamBroken(false);
+  await restartCam();
 }
+/* カメラの映像は必ず1つだけにする（街路樹の樹木点検アプリで、映像を2つ取ってしまい止め忘れた方がカメラを
+   つかんだままになり、iPad を再起動するまで真っ暗になったことがある：2026-10-22）。
+   取った映像は全部 camLive に入れて、閉じる・取り直すときは全部止める。待っている間に古くなった映像はすぐ止める */
+const camLive = new Set();
+let camGen = 0, camWatch = 0, camRetried = false, camBroken = false;
+const camShown = ()=> $("cam").classList.contains("show");
+function stopAllCams(){
+  clearTimeout(camWatch);
+  camLive.forEach(s => s.getTracks().forEach(t => { try{ t.stop(); }catch(_){} }));
+  camLive.clear(); cam.stream = null; cam.track = null;
+}
+async function restartCam(){
+  const gen = ++camGen;
+  stopAllCams();
+  $("camVideo").srcObject = null;
+  let s;
+  try{ s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment", width: {ideal: 1920}, height: {ideal: 1440}}, audio: false}); }
+  catch(e){ if(gen === camGen) $("camNoCam").style.display = "flex"; return; }    // カメラが無い（PCで試すとき）
+  camLive.add(s);
+  if(gen !== camGen || !camShown()){ s.getTracks().forEach(t => t.stop()); camLive.delete(s); return; }   // 待っている間に閉じた・取り直した
+  cam.stream = s;
+  $("camVideo").srcObject = s; $("camNoCam").style.display = "none";
+  cam.track = s.getVideoTracks()[0];
+  if(cam.track) cam.track.onended = ()=>{ if(gen === camGen && camShown()) camBlack(); };
+  const caps = cam.track && cam.track.getCapabilities ? cam.track.getCapabilities() : {};
+  cam.hw = caps.zoom && caps.zoom.max > caps.zoom.min ? caps.zoom : null;
+  applyZoom(1);
+  watchCam(gen);
+}
+/* 映像が本当に来ているか4秒後に確かめる。来ていなければ1回だけ自動で取り直し、それでも駄目なら案内を出す */
+function watchCam(gen){
+  clearTimeout(camWatch);
+  camWatch = setTimeout(()=>{
+    if(gen !== camGen || !camShown()) return;
+    const v = $("camVideo");
+    if(v.videoWidth > 0 && v.readyState >= 2 && cam.track && cam.track.readyState === "live"){ camRetried = false; setCamBroken(false); }
+    else camBlack();
+  }, 4000);
+}
+function camBlack(){
+  if(!camRetried){ camRetried = true; toast("カメラの映像を取り直しています…"); restartCam(); return; }
+  stopAllCams(); setCamBroken(true);
+  alert("カメラの映像が届きません（真っ暗）。\n\n① 上の［映像を取り直す］を押す\n② だめなら、アプリを上にスワイプして終了し、開き直す\n③ それでもだめなら、iPad を再起動する");
+}
+function setCamBroken(on){
+  camBroken = on;
+  $("camReset").style.display = on ? "" : "none";
+  $("camShutter").style.opacity = on ? ".35" : "";
+}
+$("camReset").onclick = ()=>{ camRetried = false; setCamBroken(false); restartCam(); };
+/* 別のアプリに切り替えたらカメラを放し、戻ってきたら取り直す（そのままだと iPad では映像が止まることがある） */
+document.addEventListener("visibilitychange", ()=>{
+  if(!camShown()) return;
+  if(document.hidden){ camGen++; stopAllCams(); }
+  else { camRetried = false; restartCam(); }
+});
+/* 黒板の位置（左下／右下）。写真に描く位置もこれに合わせる */
+function applyBoardSide(){
+  const r = !!S.boardRight;
+  $("camBoard").classList.toggle("right", r);
+  $("camSide").textContent = r ? "黒板を左へ" : "黒板を右へ";
+}
+$("camSide").onclick = ()=>{
+  S.boardRight = !S.boardRight; saveS(); applyBoardSide();
+  toast("黒板を" + (S.boardRight ? "右下" : "左下") + "にしました（次からもこの位置）");
+};
 function boardLines(){
   const L = [];
   if(cam.kind === "S") L.push("調査状況");
@@ -1449,10 +1714,48 @@ function applyZoom(z){
 }
 $("zIn").onclick = ()=> applyZoom(cam.z + 0.3);
 $("zOut").onclick = ()=> applyZoom(cam.z - 0.3);
-function closeCam(){ $("cam").classList.remove("show"); if(cam.stream){ cam.stream.getTracks().forEach(t => t.stop()); cam.stream = null; } $("camVideo").srcObject = null; }
+function closeCam(){
+  endReview(false);
+  $("cam").classList.remove("show");
+  camGen++; stopAllCams();                 // 取りかけの映像も含めて全部止める
+  $("camVideo").srcObject = null; $("camNoCam").style.display = "none";
+}
+/* 撮った写真の確認：1.5秒表示して閉じる。［撮り直す］はいま撮った写真を消してカメラに戻る */
+const REVIEW_MS = 1500;
+let revTimer = 0, revUrl = "", revKey = "";
+function showReview(blob, name, key){
+  if(revUrl) URL.revokeObjectURL(revUrl);
+  revUrl = URL.createObjectURL(blob); revKey = key;
+  $("camRevImg").src = revUrl;
+  $("camRevTxt").textContent = "✔ " + name + " を保存しました";
+  const bar = $("camRevTime").firstElementChild;
+  bar.style.transition = "none"; bar.style.width = "100%";
+  $("camReview").classList.add("show");
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{ bar.style.transition = "width " + REVIEW_MS + "ms linear"; bar.style.width = "0%"; }));
+  clearTimeout(revTimer);
+  revTimer = setTimeout(()=> endReview(true), REVIEW_MS);
+}
+function endReview(close){
+  clearTimeout(revTimer); revTimer = 0;
+  const was = $("camReview").classList.contains("show");
+  $("camReview").classList.remove("show");
+  $("camRevImg").removeAttribute("src");
+  if(revUrl){ URL.revokeObjectURL(revUrl); revUrl = ""; }
+  revKey = "";
+  if(close && was){ closeCam(); if(selId) renderPhotos(); }
+}
+$("camRetake").onclick = async e => {
+  e.stopPropagation();
+  const key = revKey;
+  endReview(false);
+  if(key){ try{ await idbDel("photos", key); }catch(_){} photoMeta = photoMeta.filter(m => m.key !== key); savePhotoMeta(); thumbKey = ""; }
+  toast("撮り直してください（いまの写真は消しました）");
+};
+$("camRevOk").onclick = e => { e.stopPropagation(); endReview(true); };
+$("camRevImg").onclick = ()=> endReview(true);
 $("camClose").onclick = closeCam;
 function drawBoard(ctx, W, H){
-  const bw = W * 0.46, lines = boardLines(), bx = W * 0.03;
+  const bw = W * 0.46, lines = boardLines(), bx = S.boardRight ? W - bw - W * 0.03 : W * 0.03;   // 黒板の位置（左下／右下）
   const rowH = W * 0.055, lh = W * 0.06, bh = rowH + lh * lines.length + W * 0.02, by = H - bh - H * 0.03;
   const bd = Math.max(2, W * 0.004);
   ctx.fillStyle = "#1b6b5f"; ctx.fillRect(bx, by, bw, bh);
@@ -1480,9 +1783,13 @@ function drawBoard(ctx, W, H){
 }
 let shooting = false;
 $("camShutter").onclick = async ()=>{
-  if(shooting) return; shooting = true;
+  if(shooting || $("camReview").classList.contains("show")) return;
+  const v = $("camVideo");
+  // 映像が届いていないのに撮ると灰色の写真になる（灰色はカメラの無いPCでの試験用だけ）
+  if(camBroken || (cam.stream && !v.videoWidth) || (!cam.stream && $("camNoCam").style.display !== "flex")){ toast("映像が届いていません。少し待つか［映像を取り直す］を押してください"); return; }
+  shooting = true;
   try{
-    const v = $("camVideo"), c = document.createElement("canvas");
+    const c = document.createElement("canvas");
     if(cam.stream && v.videoWidth){
       const vw = v.videoWidth, vh = v.videoHeight;
       let cw, ch; if(vw / vh > CAM_AR){ ch = vh; cw = vh * CAM_AR; } else { cw = vw; ch = vw / CAM_AR; }
@@ -1505,9 +1812,8 @@ $("camShutter").onclick = async ()=>{
     photoMeta.push({key, name, no: cam.no, kind: cam.kind, t: Date.now(), sent: false, cmt: cam.cmts.join("・")});
     savePhotoMeta();
     $("camFlash").style.opacity = "0.9"; setTimeout(()=> $("camFlash").style.opacity = "0", 120);
-    toast(name + " を保存しました");
     if(cam.kind !== "S"){ const r = rec(selId); if(!r.st) r.st = "done"; touch(r); }
-    closeCam(); if(selId) renderPhotos();
+    showReview(blob, name, key);
   } catch(e){ alert(e.message); }
   finally { shooting = false; }
 };
@@ -1869,5 +2175,6 @@ function renderAll(){ renderWx(); updProg(); scheduleMarks(); if(selId) renderSh
   if(qp && !pkg){ try{ const b = await (await fetch(qp)).blob(); await importPkg(new File([b], "pkg.json")); }catch(e){ toast("読めません：" + e.message); } }
 })();
 </script>
+<script src="../common/backup.js"></script>
 </body>
 </html>
