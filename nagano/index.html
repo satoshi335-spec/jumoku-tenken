@@ -266,6 +266,16 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 .edaRow em{font-style:normal;font-size:13px;color:var(--tx2)}
 .edaRow .chips{margin-top:0}
 .edaRow .chips button{padding:5px 9px}
+/* 入力漏れ */
+#missBar{display:none;margin:6px 0 0;padding:6px 9px;border:2px solid var(--ng);border-radius:10px;background:var(--ng-bg);font-size:13px;color:var(--ng);font-weight:700}
+#missBar.show{display:block}
+#missBar button{margin:4px 4px 0 0;font-size:13px;padding:5px 9px;border-radius:14px;border:1px solid var(--ng);background:#fff;color:var(--ng);font-weight:700}
+.mk.miss::before{content:"";position:absolute;right:-6px;top:-6px;width:9px;height:9px;border-radius:50%;background:var(--ng);border:1.5px solid #fff}
+#prog .miss{display:inline-block;margin-top:2px;background:#fff;color:var(--ng);border-radius:6px;padding:0 5px;font-weight:700}
+.flash{animation:flash .5s 3}
+#wxBtns button{min-height:64px;font-size:22px;border-color:var(--g);color:var(--g)}
+#prog .wxm{display:inline-block;margin-top:2px;background:#FFD400;color:#222;border-radius:6px;padding:0 5px;font-weight:700}
+@keyframes flash{50%{box-shadow:0 0 0 4px var(--ng)}}
 </style>
 </head>
 <body>
@@ -322,6 +332,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
       </div>
       <button class="x" id="sClose" aria-label="閉じる">✕</button>
     </div>
+    <div id="missBar"></div>
     <div class="info" id="sInfo"></div>
 
     <a href="#" id="mmTgl">毎木調査の入力を見る・直す</a>
@@ -438,6 +449,16 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
   </div>
 </div>
 
+<!-- 天候（1日に1回） -->
+<div class="dlg" id="wxDlg">
+  <div class="dlgBox">
+    <h3 id="wxTitle">今日の天候</h3>
+    <p class="note">1日に1回だけ選びます。その日に入力した木すべての台帳の天候欄に入ります。<br>天気が変わったら上の［晴・曇・雨］で変えられます（その日の木すべてが変わります）。</p>
+    <div class="bigtg" id="wxBtns"><button>晴</button><button>曇</button><button>雨</button></div>
+    <div class="nav" style="grid-template-columns:1fr"><button id="wxLater">あとで選ぶ</button></div>
+  </div>
+</div>
+
 <!-- 一覧 -->
 <div class="modal" id="listM">
   <div class="mh"><h2>樹木一覧</h2><button class="hb" data-close>閉じる</button></div>
@@ -521,7 +542,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 8;
+const APP_VER = 10;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -794,7 +815,7 @@ function renderMarks(){
     if(q.x < -30 || q.y < -30 || q.x > vs.w + 30 || q.y > vs.h + 30) continue;
     const st = stateOf(t), r = recOf(t.id);
     const cls = "mk " + (st || (t.gone ? "pg" : t.src === "circle" ? "circ" : t.src === "label" ? "lbl" : "")) +
-                (t.added || R.renamed[t.id] ? " new" : "") + (r.kin ? " kin" : "") + (t.out && !st ? " out" : "") + (S.phase === "t" && !r.tenken ? " dim" : "") + (t.id === selId ? " sel" : "");
+                (t.added || R.renamed[t.id] ? " new" : "") + (r.kin ? " kin" : "") + (t.out && !st ? " out" : "") + (S.phase === "t" && !r.tenken ? " dim" : "") + (t.id === selId ? " sel" : "") + (st && missingOf(t).length ? " miss" : "");
     const dd = t.id === selId ? d + 8 : d;
     h += '<div class="' + cls + '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
     if(showTag){
@@ -815,6 +836,7 @@ function renderLegend(){
     '<i style="border-color:var(--acc);background:rgba(24,95,165,.55)"></i>点検済' +
     '<i style="border-color:#222;background:rgba(0,0,0,.45)"></i>消失' +
     '<i style="border-color:#999;border-style:dashed"></i>新木・番号なし' +
+    '<i style="border:none;background:var(--ng);width:9px;height:9px"></i>入力漏れ' +
     '<br><i style="border-color:#555;border-style:dashed"></i>前回までに伐採・消失' +
     ((pkg.map.range || []).length ? '<i style="border-radius:2px;border-color:rgba(200,30,30,.75);background:rgba(220,40,40,.1)"></i>調査範囲' +
       '<i style="border-color:var(--warn);border-style:dotted;opacity:.5"></i>範囲の外' : "");
@@ -989,7 +1011,7 @@ $("noOk").onclick = ()=>{
       if(near) put(cur, there);
       reindex(); saveR();
     }
-    navHist.push(c.id); select(dup.id, true); scheduleMarks();
+    navHist.push(c.id); select(dup.id, true, true); scheduleMarks();
     return;
   }
   if(dup && c.kind === "plate" && !confirm(no + " は" + distOf(dup) + "の番号です。この木の番号にしますか？")) return;
@@ -1112,17 +1134,77 @@ $("nOk").onclick = ()=>{ mode = null; $("addBtn").classList.remove("on"); endNud
 $("nCancel").onclick = ()=>{ mode = null; $("addBtn").classList.remove("on"); endNudge(false); };
 
 /* ================= 入力パネル ================= */
-let wxWarned = false;
 function stamp(r){
   r.t = Date.now();
   if(!r.date) r.date = today();
-  if(!S.wx || S.wxDate !== today()){
-    if(!wxWarned){ wxWarned = true; toast("上の［晴・曇・雨］で今日の天候を選んでください（台帳の天候欄に入ります）"); $("wx").animate([{opacity: 1}, {opacity: .2}, {opacity: 1}], {duration: 600, iterations: 3}); }
-  }
-  if(!r.wx && S.wxDate === today()) r.wx = S.wx || "";
+  const w = dayWx(r.date);
+  if(w) r.wx = w;                         // 天候は1日に1つ（その日の天候をそのまま入れる）
+  else if(r.date === today()) askWx(today());
   if(!r.dist){ const t = treeById(selId); r.dist = (t && distOf(t)) || S.dist; }
 }
-function select(id, center){
+/* ================= 入力漏れの防止 =================
+   毎木調査で「調査済」にした木の必須の入力（台帳に要る欄）と、写真が要る木の写真：
+   ・番号・プレートの確認・樹種・樹高・幹周・斜度・生育地・支障の有無（ありなら内容）・枯れ折れの有無（ありなら内容）・天候
+   ・緊急対応の木：全景か被害部の写真（毎木調査では写真を撮らないが、緊急対応の木だけは報告に要る）
+   ・樹木点検を入れた木：プレート・全景、異常ありなら被害部の写真
+   入力欄の上に赤く出し、地図の印に赤い点、上の進み具合に件数。足りないまま別の木に移る・閉じるときは確かめる */
+let phIdx = null;                       // 番号 → 撮った写真の種類（写真の一覧が変わったら作り直す）
+function phKinds(no){
+  if(!phIdx){ phIdx = new Map(); photoMeta.forEach(m => { if(!phIdx.has(m.no)) phIdx.set(m.no, new Set()); phIdx.get(m.no).add(m.kind); }); }
+  return phIdx.get(no) || new Set();
+}
+function missingOf(t){
+  const r = recOf(t.id), out = [];
+  if(r.st !== "done") return out;
+  const no = noOf(t), k = phKinds(no), add = (key, txt) => out.push({k: key, t: txt});
+  if(!no) add("no", "番号");
+  if(!r.plate && !t.added) add("plate", "プレートの確認");
+  if(!String(r.sp || "").trim()) add("sp", "樹種");
+  if(!String(r.h || "").trim()) add("h", "樹高");
+  if(girthOf(r.c).c == null) add("c", "幹周");
+  if(String(r.slope == null ? "" : r.slope).trim() === "") add("slope", "斜度");
+  if(!r.sei) add("sei", "生育地");
+  if(!r.shi) add("shi", "支障の有無");
+  else if(r.shi === "y" && !String(r.shiNote || "").trim()) add("shiNote", "支障の内容");
+  if(!r.kare) add("kare", "枯れ・折れの有無");
+  else if(r.kare === "y" && !String(r.kareNote || "").trim()) add("kareNote", "枯れ・折れの内容");
+  if(r.kin && !k.has("1") && !k.has("2")) add("photo", "緊急対応の写真");
+  if(r.tenken && r.tk){
+    if(!k.has("P")) add("photo", "プレートの写真");
+    if(!k.has("1")) add("photo", "全景の写真");
+    const res = tkResult(r);
+    if(res.n1 + res.n23 > 0 && !k.has("2")) add("photo", "被害部の写真");
+  }
+  return out;
+}
+const MISS_EL = {no: "renoLink", plate: "plSeg", sp: "spOk", h: "pad", c: "pad", slope: "pad", sei: "seiSeg", shi: "shiSeg", shiNote: "shiNote",
+                 kare: "kareSeg", kareNote: "kareNote", wx: "wx", photo: "phBox"};
+function renderMiss(){
+  const t = treeById(selId), bar = $("missBar");
+  const ms = t ? missingOf(t) : [];
+  bar.classList.toggle("show", ms.length > 0);
+  if(!ms.length){ bar.innerHTML = ""; return; }
+  bar.innerHTML = "⚠ 未入力 " + ms.length + "件（押すとその欄へ）<br>" + ms.map((m, i) => '<button data-i="' + i + '">' + esc(m.t) + "</button>").join("");
+  bar.querySelectorAll("button").forEach(b => b.onclick = ()=>{
+    const m = ms[+b.dataset.i];
+    if(["h", "c", "slope"].includes(m.k)){ curField = m.k; renderNums(); }
+    if(m.k !== "photo" && m.k !== "wx" && S.phase === "t") document.body.classList.add("mmOpen");   // 樹木点検では毎木の入力を開く
+    const el = $(MISS_EL[m.k]); if(!el) return;
+    if(m.k === "wx"){ toast("上の［晴・曇・雨］で今日の天候を選んでください"); }
+    else el.scrollIntoView({behavior: "smooth", block: "center"});
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  });
+}
+/* いまの木から離れてよいか。足りない入力があれば確かめる */
+function leaveOk(){
+  const t = selId && treeById(selId); if(!t) return true;
+  const ms = missingOf(t); if(!ms.length) return true;
+  return !confirm("⚠ " + (noOf(t) || "番号なし") + " の入力が足りません：\n" + ms.map(m => m.t).join("・") +
+                  "\n\n［OK］この木に戻って入力する\n［キャンセル］あとで入れる（このまま移る）");
+}
+function missCount(){ let n = 0; for(const t of allTrees()) if(missingOf(t).length) n++; return n; }
+function select(id, center, noGuard){
+  if(!noGuard && selId && selId !== id && !leaveOk()){ renderMiss(); return; }
   const t = treeById(id); if(!t) return;
   if(nudge && nudge.id !== id){ mode = null; endNudge(true); }
   setMode(null);
@@ -1136,7 +1218,7 @@ function select(id, center){
   lsSet("nagano_last", id);
 }
 function closeSheet(){ selId = null; document.body.classList.remove("selOpen"); scheduleMarks(); }
-$("sClose").onclick = closeSheet;
+$("sClose").onclick = ()=>{ if(leaveOk()) closeSheet(); else renderMiss(); };
 
 function segSet(id, v){ $(id).querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === v)); }
 function chipsSet(id, list, text, onClick){
@@ -1203,6 +1285,7 @@ function renderSheet(){
   $("memo").value = r.memo || "";
   renderTenken();
   renderPhotos();
+  renderMiss();
   $("delLink").style.display = t.added ? "" : "none";
   $("undoLink").textContent = S.phase === "t" ? "未点検に戻す" : "未調査に戻す";
   $("renoLink").textContent = t.src === "circle" && !R.renamed[t.id] ? "番号を付ける" : "番号を変える（プレート付替え）";
@@ -1257,7 +1340,7 @@ $("pad").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   touch(r); renderNums(); segSet("stSeg", r.st || "");
   if(curField === "slope") renderSheetChips();
 });
-function touch(r){ stamp(r); saveR(); scheduleMarks(); updProg(); }
+function touch(r){ stamp(r); saveR(); scheduleMarks(); updProg(); renderMiss(); }
 
 $("stSeg").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   const r = rec(selId); r.st = r.st === b.dataset.v ? "" : b.dataset.v; touch(r); renderSheet();
@@ -1541,11 +1624,16 @@ function goNearest(){
     if(d < bd){ bd = d; best = t; }
   }
   if(!best){ toast(S.phase === "t" ? "未点検の要点検の木はありません" : "未調査の樹木はありません"); return; }
+  if(!leaveOk()){ renderMiss(); return; }
   navHist.push(selId);
-  select(best.id, true);
+  select(best.id, true, true);
 }
 $("nextTree").onclick = goNearest;
-$("prevTree").onclick = ()=>{ const id = navHist.pop(); if(id) select(id, true); else toast("前の樹木はありません"); };
+$("prevTree").onclick = ()=>{
+  if(!navHist.length){ toast("前の樹木はありません"); return; }
+  if(!leaveOk()){ renderMiss(); return; }
+  select(navHist.pop(), true, true);
+};
 $("renoLink").onclick = e => { e.preventDefault(); const t = treeById(selId); openNoDlg({kind: t.src === "circle" && !R.renamed[t.id] ? "assign" : "reno", id: selId}); };
 $("moveLink").onclick = e => { e.preventDefault(); startNudge(); };
 /* その番号の写真を iPad から消す（一覧からも消す） */
@@ -1591,11 +1679,12 @@ $("delLink").onclick = async e => {
 /* ================= 写真（小黒板つきで撮影） ================= */
 let photoT = 0;
 async function loadPhotoMeta(){
-  photoMeta = lsGet("nagano_photos", []); photoT = lsGet("nagano_photos_t", 0);
-  try{ const v = await idbGet("kv", "photos"); if(v && (v.t || 0) >= photoT && v.list){ photoMeta = v.list; photoT = v.t; } }catch(e){}
+  photoMeta = lsGet("nagano_photos", []); photoT = lsGet("nagano_photos_t", 0); phIdx = null;
+  try{ const v = await idbGet("kv", "photos"); if(v && (v.t || 0) >= photoT && v.list){ photoMeta = v.list; photoT = v.t; phIdx = null; } }catch(e){}
 }
 function savePhotoMeta(){
-  photoT = Date.now();
+  photoT = Date.now(); phIdx = null;
+  if(selId) setTimeout(renderMiss, 0);
   kvSave("photos", ()=> ({t: photoT, list: photoMeta}));
   lsQuiet("nagano_photos", photoMeta); lsQuiet("nagano_photos_t", photoT);
 }
@@ -1909,17 +1998,52 @@ $("mmTgl").onclick = e => { e.preventDefault(); document.body.classList.toggle("
 
 /* ================= ヘッダー ================= */
 const WX = ["晴", "曇", "雨"];
+/* ---- 天候は1日に1回：日付ごとに S.wxDays に覚え、その日に入力した木すべてに入れる ----
+   その日の最初の入力で聞く（［あとで選ぶ］なら20分は聞かない）。前の日に選び忘れた日は、起動時と右上の表示から選ぶ */
+function dayWx(d){ return (S.wxDays && S.wxDays[d]) || (d === today() && S.wxDate === d ? S.wx : "") || ""; }
+function setDayWx(d, w){
+  S.wxDays = S.wxDays || {}; S.wxDays[d] = w;
+  if(d === today()){ S.wx = w; S.wxDate = d; }
+  saveS();
+  let n = 0; Object.values(R.trees).forEach(r => { if(r.date === d && r.wx !== w){ r.wx = w; n++; } });
+  if(n) saveR();
+  renderWx(); updProg(); scheduleMarks(); renderMiss();
+  return n;
+}
+/* 天候が決まっていない日（入力した木があるのに天候が無い日） */
+function wxMissingDays(){
+  const ds = new Set();
+  Object.values(R.trees).forEach(r => { if(r.st && r.date && !dayWx(r.date) && !r.wx) ds.add(r.date); });
+  return [...ds].sort();
+}
+let wxDlgDate = "", wxLaterT = 0;
+function askWx(d, force){
+  if($("wxDlg").classList.contains("show")) return;
+  if(!force && d === today() && Date.now() - wxLaterT < 20 * 60000) return;
+  wxDlgDate = d;
+  const [y, m, dd] = d.split("-");
+  $("wxTitle").textContent = (d === today() ? "今日（" : "") + (+m) + "月" + (+dd) + "日" + (d === today() ? "）" : "") + "の天候";
+  $("wxDlg").classList.add("show");
+}
+$("wxBtns").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+  $("wxDlg").classList.remove("show");
+  const d = wxDlgDate, n = setDayWx(d, b.textContent);
+  toast((+d.split("-")[1]) + "月" + (+d.split("-")[2]) + "日の天候を「" + b.textContent + "」にしました" + (n ? "（" + n + " 本）" : ""));
+  const rest = wxMissingDays(); if(rest.length) setTimeout(()=> askWx(rest[0], true), 400);   // 選び忘れの日が他にもあれば続けて
+});
+$("wxLater").onclick = ()=>{ $("wxDlg").classList.remove("show"); if(wxDlgDate === today()) wxLaterT = Date.now(); };
 function renderWx(){
-  const cur = S.wxDate === today() ? S.wx : "";
+  const cur = dayWx(today());
   $("wx").innerHTML = WX.map(w => '<button class="hb' + (cur === w ? " on" : "") + '">' + w + "</button>").join("");
   $("wx").querySelectorAll("button").forEach(b => b.onclick = ()=>{
-    S.wx = b.textContent; S.wxDate = today(); saveS(); renderWx();
-    // 今日入力した樹木で天候が空欄のものにも入れる
-    let n = 0; Object.values(R.trees).forEach(r => { if(r.date === today() && !r.wx){ r.wx = S.wx; n++; } });
-    if(n){ saveR(); toast("今日の " + n + " 本に天候「" + S.wx + "」を入れました"); }
+    if(cur === b.textContent) return;
+    const n = setDayWx(today(), b.textContent);
+    toast("今日の天候を「" + b.textContent + "」にしました" + (n ? "（今日の " + n + " 本）" : ""));
   });
 }
-$("distSel").onchange = ()=>{ S.dist = $("distSel").value; saveS(); closeSheet(); fitView(); applyView(); updProg(); toast(S.dist + "の図面を表示しました"); };
+$("distSel").onchange = ()=>{
+  if(!leaveOk()){ $("distSel").value = S.dist; renderMiss(); return; }
+  S.dist = $("distSel").value; saveS(); closeSheet(); fitView(); applyView(); updProg(); toast(S.dist + "の図面を表示しました"); };
 function updProg(){
   if(!pkg){ $("prog").textContent = ""; return; }
   let done = 0, tot = 0, need = 0, insp = 0, newP = 0;
@@ -1932,9 +2056,15 @@ function updProg(){
     if(st === "need") need++; if(st === "insp") insp++;
     if(r.plate === "new" || t.added) newP++;
   }
-  $("prog").innerHTML = S.phase === "t" ? "樹木点検 済 <b>" + insp + "</b> / 要点検 " + (insp + need) + " 本<br>（2地区の合計）"
-    : S.dist + " 済 <b>" + done + "</b> / " + tot + " 本<br>要点検 " + (insp + need) + "　新しい札 " + newP;
+  const nm = missCount();
+  $("prog").innerHTML = (S.phase === "t" ? "樹木点検 済 <b>" + insp + "</b> / 要点検 " + (insp + need) + " 本<br>（2地区の合計）"
+    : S.dist + " 済 <b>" + done + "</b> / " + tot + " 本<br>要点検 " + (insp + need) + "　新しい札 " + newP) +
+    (nm ? '<br><span class="miss">⚠ 入力漏れ ' + nm + " 本</span>" : "") +
+    (wxMissingDays().length ? ' <span class="wxm" id="wxMiss">天候未選択 ' + wxMissingDays().map(d => (+d.split("-")[1]) + "/" + (+d.split("-")[2])).join("・") + "</span>" : "");
 }
+$("prog").onclick = e =>{
+  if(e.target.id === "wxMiss"){ const d = wxMissingDays(); if(d.length) askWx(d[0], true); return; }
+  if(!pkg || !missCount()) return; lFilter = "miss"; renderList(); $("listM").classList.add("show"); };
 $("search").addEventListener("change", ()=>{
   const q = $("search").value.trim().replace(/[ー－―]/g, "-").toUpperCase(); if(!q || !pkg) return;
   const ts = allTrees();
@@ -2040,7 +2170,7 @@ $("gpsBtn").onclick = ()=>{
 
 /* ================= 一覧 ================= */
 let lFilter = "all";
-const FILTERS = [["all", "すべて"], ["none", "未調査"], ["done", "調査済"], ["need", "要点検（未入力）"], ["insp", "点検済"], ["kin", "緊急対応"], ["gone", "消失・対象外"], ["new", "新木・番号変更"], ["nophoto", "写真不足"]];
+const FILTERS = [["all", "すべて"], ["none", "未調査"], ["done", "調査済"], ["need", "要点検（未入力）"], ["insp", "点検済"], ["kin", "緊急対応"], ["gone", "消失・対象外"], ["new", "新木・番号変更"], ["miss", "入力漏れ・写真不足"]];
 function photoLack(t){
   const r = recOf(t.id), ps = photosOf(noOf(t)), has = k => ps.some(m => m.kind === k);
   if(r.kin && !has("1") && !has("2")) return true;                        // 緊急対応：報告の写真
@@ -2058,11 +2188,11 @@ function renderList(){
     switch(lFilter){
       case "none": return !st; case "done": return st === "done"; case "need": return st === "need"; case "insp": return st === "insp";
       case "kin": return !!r.kin; case "gone": return st === "gone" || st === "skip";
-      case "new": return t.added || !!R.renamed[t.id]; case "nophoto": return !!st && photoLack(t);
+      case "new": return t.added || !!R.renamed[t.id]; case "miss": return missingOf(t).length > 0;
       default: return true;
     }
   }).sort((a, b) => (recOf(b.id).t || 0) - (recOf(a.id).t || 0));
-  let h = "<tr><th>番号</th><th>地区</th><th>状態</th><th>樹種</th><th>樹高</th><th>幹周</th><th>要点検</th><th>点検結果</th><th>処置</th><th>写真</th><th>日付</th></tr>";
+  let h = "<tr><th>番号</th><th>地区</th><th>状態</th><th>樹種</th><th>樹高</th><th>幹周</th><th>要点検</th><th>点検結果</th><th>処置</th><th>写真</th><th>入力漏れ</th><th>日付</th></tr>";
   const ST = {"": "未調査", done: "調査済", need: "要点検", insp: "点検済", gone: "消失・倒木", skip: "対象外"};
   ts.slice(0, 800).forEach(t => {
     const r = recOf(t.id), st = stateOf(t), g = girthOf(r.c);
@@ -2071,9 +2201,9 @@ function renderList(){
       "</td><td>" + ST[st] + (r.kin ? ' <b style="color:var(--ng)">緊急</b>' : "") + "</td><td>" + esc(r.sp || (t.past && t.past.sp) || "") +
       '</td><td class="n">' + esc(r.h || "") + '</td><td class="n">' + (g.c != null ? g.c : "") + "</td><td>" + (r.tenken ? "●" : "") +
       "</td><td>" + (r.tenken && tkDone(r) ? esc(tkResult(r).txt) : "") + "</td><td>" + esc(kan) + "</td><td>" + photosOf(noOf(t)).length + (st && photoLack(t) ? ' <b style="color:var(--ng)">不足</b>' : "") +
-      "</td><td>" + esc(r.date || "") + "</td></tr>";
+      '</td><td style="color:var(--ng);font-weight:700">' + esc(missingOf(t).map(m => m.t).join("・")) + "</td><td>" + esc(r.date || "") + "</td></tr>";
   });
-  if(ts.length > 800) h += '<tr><td colspan="11">ほか ' + (ts.length - 800) + ' 本</td></tr>';
+  if(ts.length > 800) h += '<tr><td colspan="12">ほか ' + (ts.length - 800) + ' 本</td></tr>';
   $("lTbl").innerHTML = h;
   $("lTbl").querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = ()=>{ $("listM").classList.remove("show"); select(tr.dataset.id, true); });
 }
@@ -2116,7 +2246,8 @@ document.querySelectorAll("[data-close]").forEach(b => b.onclick = ()=> b.closes
 $("menuBtn").onclick = ()=>{
   $("setInsp").value = S.insp || ""; $("setKoji").value = S.koji || (pkg ? pkg.project.short : ""); $("setNext").value = S.nextNo || 1;
   const unsent = photoMeta.filter(m => !m.sent).length, gone = photoMeta.filter(m => m.gone).length;
-  $("bkInfo").innerHTML = "写真 " + photoMeta.length + " 枚（未送信 " + unsent + " 枚" + (gone ? "・送信済みで iPad から消した " + gone + " 枚" : "") + "）。" +
+  const nmi = missCount();
+  $("bkInfo").innerHTML = (nmi ? '<b style="color:var(--ng)">⚠ 入力漏れ・写真不足 ' + nmi + " 本（上の赤い件数を押すと一覧）</b><br>" : "") + "写真 " + photoMeta.length + " 枚（未送信 " + unsent + " 枚" + (gone ? "・送信済みで iPad から消した " + gone + " 枚" : "") + "）。" +
     (S.lastBk ? "前回の書き出し：" + esc(S.lastBk) : "まだ書き出していません") +
     "<br>書き出したファイルを AirDrop・OneDrive などで事務所PCへ送り、システムの［iPadの結果を取り込む］で読み込みます。" +
     '<br><span id="stoInfo"></span>';
@@ -2151,6 +2282,10 @@ async function share(blob, name){
 }
 function stampName(){ const d = new Date(); return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + "_" + pad2(d.getHours()) + pad2(d.getMinutes()); }
 $("bkBtn").onclick = async ()=>{
+  const wd = wxMissingDays();
+  if(wd.length){ askWx(wd[0], true); toast("先に天候を選んでください（" + wd.join("・") + "）"); return; }
+  const nm = missCount();
+  if(nm && !confirm("⚠ 入力漏れ・写真不足の木が " + nm + " 本あります（一覧の［入力漏れ・写真不足］で確かめられます）。\nこのまま書き出しますか？")) return;
   const out = {type: "nagano-res", version: 1, exported: new Date().toISOString(), pkg: pkg ? pkg.id : "", settings: S, res: R,
                photos: photoMeta.map(m => ({name: m.name, no: m.no, kind: m.kind, t: m.t, cmt: m.cmt || ""}))};
   const blob = new Blob([JSON.stringify(out)], {type: "application/json"});
@@ -2235,6 +2370,8 @@ function renderAll(){ renderWx(); updProg(); scheduleMarks(); if(selId) renderSh
   renderWx();
   await openPkg();
   // 確認用：?pkg=ファイルのURL で図面データを読み込む（事務所PCでの動作確認に使う）
+  // 天候の選び忘れ（前の日に入力した木があって天候が無い日）があれば聞く
+  setTimeout(()=>{ const d = wxMissingDays().filter(x => x !== today()); if(d.length) askWx(d[0], true); }, 800);
   const qp = new URLSearchParams(location.search).get("pkg");
   if(qp && !pkg){ try{ const b = await (await fetch(qp)).blob(); await importPkg(new File([b], "pkg.json")); }catch(e){ toast("読めません：" + e.message); } }
 })();
