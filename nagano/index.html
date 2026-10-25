@@ -256,10 +256,10 @@ tr.need td{background:var(--pur-bg)}
 .lvHan.on{background:#8a5a00;color:#fff}
 textarea.inp{resize:none;line-height:1.5;min-height:52px}
 /* 枯枝の大きさ・本数 */
-#edaBox{display:none;margin-top:6px;padding:6px 9px 8px;border:2px solid var(--warn);border-radius:10px;background:var(--warn-bg)}
-#edaBox.show{display:block}
-#edaBox .eh{font-size:12px;color:#8a4b00;font-weight:700}
-#edaBox .eh b{color:var(--tx);font-size:14px}
+.brBox{display:none;margin-top:6px;padding:6px 9px 8px;border:2px solid var(--warn);border-radius:10px;background:var(--warn-bg)}
+.brBox.show{display:block}
+.brBox .eh{font-size:12px;color:#8a4b00;font-weight:700}
+.brBox .eh b{color:var(--tx);font-size:14px}
 .edaRow{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:6px}
 .edaRow>span{font-size:13px;font-weight:700;min-width:58px}
 .edaRow input{width:64px;font-size:18px;padding:5px 6px;border:1px solid var(--line);border-radius:8px;text-align:right}
@@ -377,13 +377,9 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
     <div class="lbl">太枝や幹の枯れ・折れ・腐朽等／枯死</div>
     <div class="seg yn" id="kareSeg"><button data-v="y">あり</button><button data-v="n">なし</button></div>
     <div class="chips" id="kareChips"></div>
-    <div id="edaBox">
-      <div class="eh">枯枝の大きさ（いちばん大きい枝）と本数　→ <b id="edaTxt"></b></div>
-      <div class="edaRow"><span>太さ Φ</span><input id="edaD" inputmode="decimal" autocomplete="off"><em>cm</em><div class="chips" id="edaDc"></div></div>
-      <div class="edaRow"><span>長さ</span><input id="edaL" inputmode="decimal" autocomplete="off"><em>m</em><div class="chips" id="edaLc"></div></div>
-      <div class="edaRow"><span>本数</span><input id="edaN" inputmode="numeric" autocomplete="off"><em>本（全部で）</em><div class="chips" id="edaNc"></div></div>
-    </div>
-    <input class="inp" id="kareNote" placeholder="特記事項（例 枯枝Φ15cm×4m他2本）" style="margin-top:5px">
+    <div class="brBox" id="br_kare"></div>
+    <div class="brBox" id="br_ore"></div>
+    <input class="inp" id="kareNote" placeholder="特記事項（例 枯枝Φ15cm×4m他2本、折れ枝Φ10cm×2m）" style="margin-top:5px">
 
     <div class="bigtg">
       <button id="tkTg" class="p">要樹木点検</button>
@@ -542,7 +538,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 10;
+const APP_VER = 11;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -1294,18 +1290,18 @@ function renderSheet(){
 function renderSheetChips(){
   const r = recOf(selId);
   chipsSet("shiChips", SHI_CHIPS, r.shiNote, w => { const rr = rec(selId); rr.shiNote = toggleWord(rr.shiNote, w); if(w !== "園路離れている" && rr.shiNote.includes(w)) rr.shi = "y"; touch(rr); renderSheet(); });
-  // 枯枝の大きさを入れた木は、特記事項の「枯枝Φ…」を［枯枝あり］として点灯する
-  const kn = r.edaTxt ? String(r.kareNote || "").split("、").map(x => x === r.edaTxt ? "枯枝あり" : x).join("、") : r.kareNote;
+  // 大きさを入れた木は、特記事項の「枯枝Φ…」「折れ枝Φ…」を［枯枝あり］［枝折れあり］として点灯する
+  const kn = String(r.kareNote || "").split("、").map(x => { const b = BR.find(b => r[b.txt] && x === r[b.txt]); return b ? b.chip : x; }).join("、");
   chipsSet("kareChips", KARE_CHIPS, kn, w => {
-    const rr = rec(selId);
-    if(w === "枯枝あり" && rr.edaTxt && String(rr.kareNote || "").split("、").includes(rr.edaTxt)){
-      rr.kareNote = toggleWord(rr.kareNote, rr.edaTxt); delete rr.edaTxt; delete rr.eda;     // 枯枝ありを外す（大きさも消す）
+    const rr = rec(selId), b = BR.find(b => b.chip === w);
+    if(b && rr[b.txt] && String(rr.kareNote || "").split("、").includes(rr[b.txt])){
+      rr.kareNote = toggleWord(rr.kareNote, rr[b.txt]); delete rr[b.txt]; delete rr[b.data];     // 外す（大きさも消す）
     } else rr.kareNote = toggleWord(rr.kareNote, w);
     if(String(rr.kareNote || "").split("、").includes(w)) rr.kare = "y";
     if(!rr.st) rr.st = "done";
     touch(rr); renderSheet();
   });
-  renderEda();
+  renderBr();
   chipsSet("genChips", GEN_CHIPS, r.gennin, w => { const rr = rec(selId); rr.gennin = toggleWord(rr.gennin, w); touch(rr); renderSheet(); });
 }
 /* 数字の入力（樹高・幹周・斜度） */
@@ -1390,55 +1386,68 @@ function undoNew(t, r){
   touch(r); renderSheet();
   return true;
 }
-/* ---- 枯枝の大きさ・本数（［枯枝あり］のとき）----
+/* ---- 枯枝・折れ枝の大きさ・本数（［枯枝あり］［枝折れあり］のとき）----
    過去の台帳（河合寺 R4）と同じ書き方で、いちばん大きい枝の太さ×長さと、ほかの本数を特記事項に入れる：
-   太さ15cm・長さ4m・全部で3本 → 「枯枝Φ15cm×4m他2本」（［枯枝あり］の言葉と置き換える） */
+   太さ15cm・長さ4m・全部で3本 → 「枯枝Φ15cm×4m他2本」「折れ枝Φ15cm×4m他2本」（押した言葉と置き換える）
+   r.eda / r.edaTxt（枯枝）、r.ore / r.oreTxt（折れ枝）＝入れた値／特記事項に入れた文 */
+const BR = [
+  {k: "kare", chip: "枯枝あり", word: "枯枝", data: "eda", txt: "edaTxt"},
+  {k: "ore", chip: "枝折れあり", word: "折れ枝", data: "ore", txt: "oreTxt"}];
 const EDA_D = [3, 5, 8, 10, 15, 20, 30], EDA_L = [0.5, 1, 2, 3, 4, 5, 7, 10], EDA_N = [1, 2, 3, 4, 5, 10];
 const hanNum = v => String(v == null ? "" : v).replace(/[０-９．]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[^\d.]/g, "");
-function edaText(e){
+function brText(b, e){
   e = e || {};
   const d = hanNum(e.d), l = hanNum(e.l), n = parseInt(hanNum(e.n)) || 0;
-  if(!d && !l) return n > 1 ? "枯枝" + n + "本" : "";
-  return "枯枝" + (d ? "Φ" + d + "cm" : "") + (l ? (d ? "×" : "L") + l + "m" : "") + (n > 1 ? "他" + (n - 1) + "本" : "");
+  if(!d && !l) return n > 1 ? b.word + n + "本" : "";
+  return b.word + (d ? "Φ" + d + "cm" : "") + (l ? (d ? "×" : "L") + l + "m" : "") + (n > 1 ? "他" + (n - 1) + "本" : "");
 }
-function edaOn(r){ const ps = String(r.kareNote || "").split("、"); return ps.includes("枯枝あり") || (!!r.edaTxt && ps.includes(r.edaTxt)); }
-/* 入れた大きさを特記事項に入れる（前に入れた「枯枝Φ…」か［枯枝あり］を置き換える） */
-function edaApply(r){
-  const nt = edaText(r.eda), ps = String(r.kareNote || "").split("、").filter(Boolean);
-  let i = r.edaTxt ? ps.indexOf(r.edaTxt) : -1;
-  if(i < 0) i = ps.indexOf("枯枝あり");
-  if(i >= 0) ps[i] = nt || "枯枝あり"; else ps.push(nt || "枯枝あり");
+function brOn(r, b){ const ps = String(r.kareNote || "").split("、"); return ps.includes(b.chip) || (!!r[b.txt] && ps.includes(r[b.txt])); }
+/* 入れた大きさを特記事項に入れる（前に入れた文か、押した言葉を置き換える） */
+function brApply(r, b){
+  const nt = brText(b, r[b.data]), ps = String(r.kareNote || "").split("、").filter(Boolean);
+  let i = r[b.txt] ? ps.indexOf(r[b.txt]) : -1;
+  if(i < 0) i = ps.indexOf(b.chip);
+  if(i >= 0) ps[i] = nt || b.chip; else ps.push(nt || b.chip);
   r.kareNote = ps.join("、");
-  if(nt) r.edaTxt = nt; else delete r.edaTxt;
+  if(nt) r[b.txt] = nt; else delete r[b.txt];
   r.kare = "y"; if(!r.st) r.st = "done";
 }
-function renderEda(){
-  const r = recOf(selId), on = edaOn(r), e = r.eda || {};
-  $("edaBox").classList.toggle("show", on);
-  if(!on) return;
-  if(document.activeElement !== $("edaD")) $("edaD").value = e.d || "";
-  if(document.activeElement !== $("edaL")) $("edaL").value = e.l || "";
-  if(document.activeElement !== $("edaN")) $("edaN").value = e.n || "";
-  $("edaTxt").textContent = edaText(e) || "（太さ・長さ・本数を入れてください）";
-  [["edaDc", EDA_D, "d"], ["edaLc", EDA_L, "l"], ["edaNc", EDA_N, "n"]].forEach(([id, list, k]) => {
-    $(id).innerHTML = list.map(v => '<button class="' + (String(e[k] || "") === String(v) ? "on" : "") + '">' + v + "</button>").join("");
-    $(id).querySelectorAll("button").forEach(b => b.onclick = ()=>{
-      const rr = rec(selId); rr.eda = rr.eda || {};
-      rr.eda[k] = String(rr.eda[k] || "") === b.textContent ? "" : b.textContent;
-      edaApply(rr); touch(rr); renderSheet();
+const BR_F = [["d", "太さ Φ", "cm", "decimal", EDA_D], ["l", "長さ", "m", "decimal", EDA_L], ["n", "本数", "本（全部で）", "numeric", EDA_N]];
+/* 欄は最初に1回だけ作る（入力中に作り直すと文字が打てなくなる） */
+BR.forEach(b => {
+  const box = $("br_" + b.k);
+  box.innerHTML = '<div class="eh">' + b.word + "の大きさ（いちばん大きい枝）と本数　→ <b></b></div>" +
+    BR_F.map(([f, lab, unit, im]) => '<div class="edaRow"><span>' + lab + '</span><input data-f="' + f + '" inputmode="' + im + '" autocomplete="off"><em>' + unit + '</em><div class="chips" data-f="' + f + '"></div></div>').join("");
+  box.querySelectorAll("input").forEach(inp => inp.addEventListener("input", ()=>{
+    const rr = rec(selId); rr[b.data] = rr[b.data] || {}; rr[b.data][inp.dataset.f] = hanNum(inp.value);
+    brApply(rr, b); touch(rr);
+    $("kareNote").value = rr.kareNote; segSet("kareSeg", rr.kare); renderSheetChips();
+  }));
+});
+function renderBr(){
+  const r = recOf(selId);
+  BR.forEach(b => {
+    const box = $("br_" + b.k), on = brOn(r, b), e = r[b.data] || {};
+    box.classList.toggle("show", on);
+    if(!on) return;
+    box.querySelectorAll("input").forEach(inp => { if(document.activeElement !== inp) inp.value = e[inp.dataset.f] || ""; });
+    box.querySelector(".eh b").textContent = brText(b, e) || "（太さ・長さ・本数を入れてください）";
+    BR_F.forEach(([f, , , , list]) => {
+      const c = box.querySelector('.chips[data-f="' + f + '"]');
+      c.innerHTML = list.map(v => '<button class="' + (String(e[f] || "") === String(v) ? "on" : "") + '">' + v + "</button>").join("");
+      c.querySelectorAll("button").forEach(btn => btn.onclick = ()=>{
+        const rr = rec(selId); rr[b.data] = rr[b.data] || {};
+        rr[b.data][f] = String(rr[b.data][f] || "") === btn.textContent ? "" : btn.textContent;
+        brApply(rr, b); touch(rr); renderSheet();
+      });
     });
   });
 }
-[["edaD", "d"], ["edaL", "l"], ["edaN", "n"]].forEach(([id, k]) => $(id).addEventListener("input", ()=>{
-  const rr = rec(selId); rr.eda = rr.eda || {}; rr.eda[k] = hanNum($(id).value);
-  edaApply(rr); touch(rr);
-  $("kareNote").value = rr.kareNote; segSet("kareSeg", rr.kare); renderSheetChips();
-}));
 $("shiNote").addEventListener("input", ()=>{ const r = rec(selId); r.shiNote = $("shiNote").value; touch(r); });
 $("kareNote").addEventListener("input", ()=>{
   const r = rec(selId); r.kareNote = $("kareNote").value;
-  if(r.edaTxt && !r.kareNote.split("、").includes(r.edaTxt)) delete r.edaTxt;   // 手で書き換えたら、次は後ろに足す
-  touch(r); renderEda();
+  BR.forEach(b => { if(r[b.txt] && !r.kareNote.split("、").includes(r[b.txt])) delete r[b.txt]; });   // 手で書き換えたら、次は後ろに足す
+  touch(r); renderBr();
 });
 $("gennin").addEventListener("input", ()=>{ const r = rec(selId); r.gennin = $("gennin").value; touch(r); });
 $("memo").addEventListener("input", ()=>{ const r = rec(selId); r.memo = $("memo").value; touch(r); });
