@@ -41,7 +41,7 @@ header select{font-size:15px;padding:7px 6px;border-radius:8px;border:none;backg
 #stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
 #stage img{position:absolute;display:block;pointer-events:none;-webkit-user-drag:none}
 #ovimg{background:#fff}
-#marks{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+#marks{position:absolute;inset:0;pointer-events:none;overflow:visible;transform-origin:0 0}
 .mk{position:absolute;left:0;top:0;border-radius:50%;border:3px solid var(--warn);background:rgba(224,123,0,.10)}
 .mk.lbl{border-style:dashed}
 .mk.circ{border-color:#999;border-width:2px;background:rgba(0,0,0,.05)}
@@ -538,7 +538,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 12;
+const APP_VER = 13;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -610,7 +610,13 @@ function kvSave(k, getv){
   idbPut("kv", k, getv()).catch(e => { if(lsFull) toast("保存に失敗しました：" + e.message + "（すぐに［調査結果を書き出す］をしてください）"); })
     .finally(()=>{ kvBusy[k] = false; const g = kvNext[k]; if(g){ kvNext[k] = null; kvSave(k, g); } });
 }
-function saveR(){ R.t = Date.now(); kvSave("res", ()=> R); lsQuiet("nagano_res", R); }
+/* 調査結果の保存：入力のたびに全部（2,000本で約600KB）を書き直すと、iPad ではテンキーを押すたびに遅れる。
+   入力が0.4秒止まったらまとめて保存する。アプリを閉じる・ほかのアプリに切り替える・メニューを開くときはすぐ保存 */
+let saveRT = 0;
+function saveR(){ R.t = Date.now(); clearTimeout(saveRT); saveRT = setTimeout(flushR, 400); }
+function flushR(){ clearTimeout(saveRT); saveRT = 0; kvSave("res", ()=> R); lsQuiet("nagano_res", R); }
+document.addEventListener("visibilitychange", ()=>{ if(document.hidden && saveRT) flushR(); });
+addEventListener("pagehide", ()=>{ if(saveRT) flushR(); });
 function saveS(){ lsSet("nagano_set", S); }
 function rec(id){ return R.trees[id] || (R.trees[id] = {}); }
 function recOf(id){ return R.trees[id] || {}; }
@@ -771,9 +777,17 @@ function fitView(){
   V.tx = (vs.w - r.w * V.s) / 2 - r.ox * V.s; V.ty = (vs.h - r.h * V.s) / 2 - r.oy * V.s;
 }
 let viewSaveT = 0;
+/* 地図を指で動かしている間は、印を作り直さず（全体表示だと1,000本以上で重い）、印の層を地図と同じだけ動かす。
+   指を止めて0.15秒たったら作り直す */
+let marksV = null, marksT = 0;
 function applyView(){
   $("stage").style.transform = "translate(" + V.tx + "px," + V.ty + "px) scale(" + V.s + ")";
-  scheduleMarks();
+  if(gest && (gest.mode === "pan" || gest.mode === "pinch") && marksV){
+    const k = V.s / marksV.s;
+    $("marks").style.transform = "translate(" + (V.tx - marksV.tx * k) + "px," + (V.ty - marksV.ty * k) + "px) scale(" + k + ")";
+    renderGps();
+    clearTimeout(marksT); marksT = setTimeout(scheduleMarks, 150);
+  } else scheduleMarks();
   clearTimeout(viewSaveT); viewSaveT = setTimeout(()=>{ lsSet("nagano_view", {s: V.s, tx: V.tx, ty: V.ty, pkg: pkg && pkg.id}); updateTiles(); }, 120);
 }
 const toScreen = (x, y)=> ({x: V.tx + V.s * x, y: V.ty + V.s * y});
@@ -805,10 +819,12 @@ function renderMarks(){
   const box = $("marks");
   if(!pkg){ box.innerHTML = ""; return; }
   const d = markSize(), vs = viewSize(), showTag = opt.tags && V.s > 0.55;
+  const mx = Math.max(30, vs.w * 0.25), my = Math.max(30, vs.h * 0.25);   // 少し外まで描く（動かしたときに端が空かないように）
+  clearTimeout(marksT);
   let h = "";
   for(const t of allTrees()){
     const p = posOf(t), q = toScreen(p.x, p.y);
-    if(q.x < -30 || q.y < -30 || q.x > vs.w + 30 || q.y > vs.h + 30) continue;
+    if(q.x < -mx || q.y < -my || q.x > vs.w + mx || q.y > vs.h + my) continue;
     const st = stateOf(t), r = recOf(t.id);
     const cls = "mk " + (st || (t.gone ? "pg" : t.src === "circle" ? "circ" : t.src === "label" ? "lbl" : "")) +
                 (t.added || R.renamed[t.id] ? " new" : "") + (r.kin ? " kin" : "") + (t.out && !st ? " out" : "") + (S.phase === "t" && !r.tenken ? " dim" : "") + (t.id === selId ? " sel" : "") + (st && missingOf(t).length ? " miss" : "");
@@ -820,6 +836,8 @@ function renderMarks(){
     }
   }
   box.innerHTML = h;
+  box.style.transform = "";
+  marksV = {s: V.s, tx: V.tx, ty: V.ty};
   renderLegend(); renderGps();
 }
 function renderLegend(){
@@ -2254,6 +2272,7 @@ $("sumBtn").onclick = ()=>{ if(pkg) openSum(); };
 /* ================= メニュー・書き出し ================= */
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = ()=> b.closest(".modal").classList.remove("show"));
 $("menuBtn").onclick = ()=>{
+  if(saveRT) flushR();             // 書き出し・バックアップの前に保存を済ませる
   $("setInsp").value = S.insp || ""; $("setKoji").value = S.koji || (pkg ? pkg.project.short : ""); $("setNext").value = S.nextNo || 1;
   const unsent = photoMeta.filter(m => !m.sent).length, gone = photoMeta.filter(m => m.gone).length;
   const nmi = missCount();
@@ -2348,13 +2367,13 @@ $("rsFile").onchange = async e => {
     const j = JSON.parse(await f.text());
     if(j.type !== "nagano-res") throw new Error("調査結果のファイルではありません");
     if(!confirm("このファイルの内容で、iPadの調査結果を置き換えますか？（写真はそのまま）")) return;
-    R = j.res; saveR(); reindex(); renderAll(); toast("読み戻しました");
+    R = j.res; flushR(); reindex(); renderAll(); toast("読み戻しました");
   }catch(err){ alert("読み込めませんでした：" + err.message); }
 };
 $("wipeBtn").onclick = async ()=>{
   if(!confirm("入力した調査結果と写真をすべて消します（図面データは残ります）。\n本番の調査を始める前の、練習の後片付け用です。")) return;
   if(!confirm("本当に消しますか？（元に戻せません。本番のデータなら先に「調査結果を書き出す」をしてください）")) return;
-  R = {trees: {}, added: [], moved: {}, renamed: {}, t: 0}; saveR();
+  R = {trees: {}, added: [], moved: {}, renamed: {}, t: 0}; flushR();
   await idb("photos", "readwrite", st => st.clear()); photoMeta = []; savePhotoMeta();
   S.nextNo = (pkg && pkg.project.next_no) || 1; saveS();
   reindex(); closeSheet(); renderAll(); $("menuM").classList.remove("show"); toast("消しました");
