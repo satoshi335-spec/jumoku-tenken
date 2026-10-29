@@ -538,7 +538,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 11;
+const APP_VER = 12;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -1141,7 +1141,7 @@ function stamp(r){
 /* ================= 入力漏れの防止 =================
    毎木調査で「調査済」にした木の必須の入力（台帳に要る欄）と、写真が要る木の写真：
    ・番号・プレートの確認・樹種・樹高・幹周・斜度・生育地・支障の有無（ありなら内容）・枯れ折れの有無（ありなら内容）・天候
-   ・緊急対応の木：全景か被害部の写真（毎木調査では写真を撮らないが、緊急対応の木だけは報告に要る）
+   ・緊急対応・要樹木点検の木：写真1枚以上（毎木調査でもこの木だけは撮る。監督職員への報告の写真帳に入る）
    ・樹木点検を入れた木：プレート・全景、異常ありなら被害部の写真
    入力欄の上に赤く出し、地図の印に赤い点、上の進み具合に件数。足りないまま別の木に移る・閉じるときは確かめる */
 let phIdx = null;                       // 番号 → 撮った写真の種類（写真の一覧が変わったら作り直す）
@@ -1164,7 +1164,8 @@ function missingOf(t){
   else if(r.shi === "y" && !String(r.shiNote || "").trim()) add("shiNote", "支障の内容");
   if(!r.kare) add("kare", "枯れ・折れの有無");
   else if(r.kare === "y" && !String(r.kareNote || "").trim()) add("kareNote", "枯れ・折れの内容");
-  if(r.kin && !k.has("1") && !k.has("2")) add("photo", "緊急対応の写真");
+  // 緊急対応・要樹木点検の木は写真1枚以上（監督職員への報告の写真帳に入る。2026-10-29〜）
+  if((r.kin || r.tenken) && !k.size) add("photo", (r.kin ? "緊急対応" : "要樹木点検") + "の写真（1枚以上）");
   if(r.tenken && r.tk){
     if(!k.has("P")) add("photo", "プレートの写真");
     if(!k.has("1")) add("photo", "全景の写真");
@@ -1547,7 +1548,7 @@ function renderTenken(){
   const r = recOf(selId);
   const ph = S.phase === "t";
   $("tkMsg").innerHTML = !ph && r.tenken ? "要点検（樹木点検の候補）です。樹木点検は監督職員に報告したあと、上の［樹木点検］に切り替えて入力します。" +
-      (r.kin ? "" : "写真は樹木点検のときに撮ります。") :
+      "写真を1枚以上撮ってください（全景・被害部。監督職員への報告の写真帳に入ります）。" :
     ph && !r.tenken ? "この木は要点検ではありません。点検する場合は［毎木調査の入力を見る・直す］→［要樹木点検］。" : "";
   $("tkBox").style.display = r.tenken && ph ? "" : "none";
   if(!r.tenken || !ph) return;
@@ -1726,7 +1727,7 @@ function renderPhotos(){
   $("ph2").classList.toggle("done", n2 > 0); $("ph2").textContent = "📷 被害部" + (n2 ? "（" + n2 + "枚）" : "");
   const need = [];
   // 新しい札を付けた木と、点検表を作る木（R7 の点検表は「樹木プレート」の写真が入る）はプレートの写真が要る
-  if(r.kin && !has("1") && !n2) need.push("緊急対応（全景か被害部）");
+  if((r.kin || r.tenken) && !ps.length) need.push((r.kin ? "緊急対応" : "要樹木点検") + "の写真（1枚以上）");
   if(S.phase === "t" && r.tenken){
     if(!has("P")) need.push("プレート");
     if(!has("1")) need.push("全景");
@@ -1984,7 +1985,7 @@ $("ph1").onclick = ()=> openCam("1");
 $("ph2").onclick = ()=> openCam("2");
 
 /* ================= 工程（毎木調査 → 要点検を監督職員に報告 → 樹木点検） =================
-   毎木調査：写真は緊急対応の木だけ。枯れ・折れ等から「要点検」（樹木点検の候補）を選ぶ
+   毎木調査：写真は緊急対応・要樹木点検の木だけ（1枚以上）。枯れ・折れ等から「要点検」（樹木点検の候補）を選ぶ
    樹木点検：要点検の木だけを回り、点検項目と写真（プレート・全景・被害部）を入れる */
 function applyPhase(){
   const t = S.phase === "t";
@@ -2182,7 +2183,7 @@ let lFilter = "all";
 const FILTERS = [["all", "すべて"], ["none", "未調査"], ["done", "調査済"], ["need", "要点検（未入力）"], ["insp", "点検済"], ["kin", "緊急対応"], ["gone", "消失・対象外"], ["new", "新木・番号変更"], ["miss", "入力漏れ・写真不足"]];
 function photoLack(t){
   const r = recOf(t.id), ps = photosOf(noOf(t)), has = k => ps.some(m => m.kind === k);
-  if(r.kin && !has("1") && !has("2")) return true;                        // 緊急対応：報告の写真
+  if((r.kin || r.tenken) && !ps.length) return true;                       // 緊急対応・要樹木点検：報告の写真（1枚以上）
   if(r.tenken && tkDone(r)){                                                // 樹木点検：点検表の写真
     if(!has("P") || !has("1")) return true;
     if(tkResult(r).n1 + tkResult(r).n23 > 0 && !has("2")) return true;
