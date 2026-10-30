@@ -356,7 +356,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
     <div class="nums">
       <div class="nd" data-f="h"><small>樹高 (m)</small><span id="dH"></span><em id="eH"></em></div>
       <div class="nd" data-f="c"><small>幹周 (cm)</small><span id="dC"></span><em id="eC"></em></div>
-      <div class="nd" data-f="slope"><small>斜度 (度)</small><span id="dSlope"></span><em id="eSlope"></em></div>
+      <div class="nd" data-f="slope"><small>地形傾斜 斜面(度)</small><span id="dSlope"></span><em id="eSlope"></em></div>
     </div>
     <div class="pad" id="pad">
       <button>7</button><button>8</button><button>9</button><button class="fn" data-k="bs">⌫</button><button class="fn" data-k="clr">消去</button>
@@ -364,7 +364,11 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
       <button>1</button><button>2</button><button>3</button><button>0</button><button class="fn" data-k="next">項目▶</button>
       <button>.</button>
     </div>
+    <div class="lbl">地形傾斜：木が立っている所の斜面の角度（度）<span class="r">樹木の傾きではありません</span></div>
     <div class="chips" id="slopeChips"></div>
+    <div class="lbl">地形傾斜 その他（斜面の度で表せないとき）</div>
+    <div class="chips" id="slopeOChips"></div>
+    <input class="inp" id="slopeO" placeholder="例）石積の上、谷部" style="margin-top:5px">
 
     <div class="lbl">生育地（園路等から見て）</div>
     <div class="seg" id="seiSeg"><button data-v="上">上</button><button data-v="中">中</button><button data-v="下">下</button><button data-v="その他">その他</button></div>
@@ -538,7 +542,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 13;
+const APP_VER = 14;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -547,6 +551,7 @@ const today = ()=>{ const d = new Date(); return d.getFullYear() + "-" + pad2(d.
 /* ---- 入力の候補（R7 の台帳でよく使った言い方） ---- */
 const SP_CHIPS = ["コナラ","アラカシ","コジイ","ヒノキ","スギ","クヌギ","ソメイヨシノ","ヤマザクラ","イロハモミジ","ソヨゴ","リョウブ","ヤマモモ","エノキ","クスノキ","ケヤキ","ムクノキ"];
 const SLOPE_CHIPS = [0,5,10,15,20,25,30,35,40,45,50,60];
+const SLOPE_O_CHIPS = ["平坦地","石積・擁壁の上","石積・擁壁の下","谷部","尾根","段差あり"];
 const SHI_CHIPS = ["園路に影響あり","車道に影響あり","広場に影響あり","施設に影響あり","園路離れている"];
 const KARE_CHIPS = ["枯枝あり","枝折れあり","幹折れあり","枯死している","穿孔虫痕あり","クビアカツヤカミキリのフラスあり","開口空洞あり","樹皮欠損あり","キノコあり","枝周/枝長比率大きい"];
 const GEN_CHIPS = ["根元法面の流亡あり","車道側下枝","園路側下枝","分岐部の入り皮あり","枝下高の高い樹形","腐朽進行","穿孔虫痕あり","要クビアカツヤカミキリ対策","要経過観察","傾斜あり（主幹持ち直しあり）"];
@@ -1150,6 +1155,7 @@ $("nCancel").onclick = ()=>{ mode = null; $("addBtn").classList.remove("on"); en
 /* ================= 入力パネル ================= */
 function stamp(r){
   r.t = Date.now();
+  if(!r.t0) r.t0 = r.t;                 // はじめて入力した時刻（台帳の通し番号＝調査順に使う）
   if(!r.date) r.date = today();
   const w = dayWx(r.date);
   if(w) r.wx = w;                         // 天候は1日に1つ（その日の天候をそのまま入れる）
@@ -1158,7 +1164,7 @@ function stamp(r){
 }
 /* ================= 入力漏れの防止 =================
    毎木調査で「調査済」にした木の必須の入力（台帳に要る欄）と、写真が要る木の写真：
-   ・番号・プレートの確認・樹種・樹高・幹周・斜度・生育地・支障の有無（ありなら内容）・枯れ折れの有無（ありなら内容）・天候
+   ・番号・プレートの確認・樹種・樹高・幹周・地形傾斜（斜面の度かその他）・生育地・支障の有無（ありなら内容）・枯れ折れの有無（ありなら内容）・天候
    ・緊急対応・要樹木点検の木：写真1枚以上（毎木調査でもこの木だけは撮る。監督職員への報告の写真帳に入る）
    ・樹木点検を入れた木：プレート・全景、異常ありなら被害部の写真
    入力欄の上に赤く出し、地図の印に赤い点、上の進み具合に件数。足りないまま別の木に移る・閉じるときは確かめる */
@@ -1176,7 +1182,7 @@ function missingOf(t){
   if(!String(r.sp || "").trim()) add("sp", "樹種");
   if(!String(r.h || "").trim()) add("h", "樹高");
   if(girthOf(r.c).c == null) add("c", "幹周");
-  if(String(r.slope == null ? "" : r.slope).trim() === "") add("slope", "斜度");
+  if(String(r.slope == null ? "" : r.slope).trim() === "" && !String(r.slopeO || "").trim()) add("slope", "地形傾斜");
   if(!r.sei) add("sei", "生育地");
   if(!r.shi) add("shi", "支障の有無");
   else if(r.shi === "y" && !String(r.shiNote || "").trim()) add("shiNote", "支障の内容");
@@ -1288,7 +1294,9 @@ function renderSheet(){
   $("sp").placeholder = "樹種";
   chipsSet("spChips", SP_CHIPS, r.sp, w => { const rr = rec(selId); rr.sp = w; rr.spOk = !!psp && w === psp; if(!rr.st) rr.st = "done"; touch(rr); $("sp").value = w; renderSheet(); });
   renderNums();
-  chipsSet("slopeChips", SLOPE_CHIPS.map(String), String(r.slope || ""), w => { const rr = rec(selId); rr.slope = w; touch(rr); renderNums(); renderSheetChips(); });
+  chipsSet("slopeChips", SLOPE_CHIPS.map(String), String(r.slope || ""), w => { const rr = rec(selId); rr.slope = w; if(!rr.st) rr.st = "done"; touch(rr); renderNums(); renderSheetChips(); });
+  chipsSet("slopeOChips", SLOPE_O_CHIPS, r.slopeO, w => { const rr = rec(selId); rr.slopeO = toggleWord(rr.slopeO, w); if(!rr.st) rr.st = "done"; touch(rr); renderSheet(); });
+  if(document.activeElement !== $("slopeO")) $("slopeO").value = r.slopeO || "";
   segSet("seiSeg", r.sei || "");
   segSet("shiSeg", r.shi || ""); $("shiNote").value = r.shiNote || "";
   segSet("kareSeg", r.kare || ""); $("kareNote").value = r.kareNote || "";
@@ -1323,7 +1331,7 @@ function renderSheetChips(){
   renderBr();
   chipsSet("genChips", GEN_CHIPS, r.gennin, w => { const rr = rec(selId); rr.gennin = toggleWord(rr.gennin, w); touch(rr); renderSheet(); });
 }
-/* 数字の入力（樹高・幹周・斜度） */
+/* 数字の入力（樹高・幹周・地形傾斜） */
 let curField = "h";
 const FIELDS = ["h", "c", "slope"];
 function renderNums(){
@@ -1463,6 +1471,7 @@ function renderBr(){
   });
 }
 $("shiNote").addEventListener("input", ()=>{ const r = rec(selId); r.shiNote = $("shiNote").value; touch(r); });
+$("slopeO").addEventListener("input", ()=>{ const r = rec(selId); r.slopeO = $("slopeO").value; if(!r.st) r.st = "done"; touch(r); });
 $("kareNote").addEventListener("input", ()=>{
   const r = rec(selId); r.kareNote = $("kareNote").value;
   BR.forEach(b => { if(r[b.txt] && !r.kareNote.split("、").includes(r[b.txt])) delete r[b.txt]; });   // 手で書き換えたら、次は後ろに足す
