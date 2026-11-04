@@ -27,6 +27,12 @@ header select{font-size:15px;padding:7px 6px;border-radius:8px;border:none;backg
 .hb{font-size:14px;padding:8px 11px;border-radius:8px;border:none;background:rgba(255,255,255,.18);color:#fff;white-space:nowrap;min-height:36px}
 .hb:active{background:rgba(255,255,255,.32)}
 .hb.on{background:#fff;color:var(--g);font-weight:700}
+.hb.due{background:#FFD400;color:#222;font-weight:700}
+#jkList h4{margin:14px 0 4px;font-size:14px}
+#jkList .jk{display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:6px 0}
+#jkList .jk img{width:128px;height:96px;object-fit:cover;border-radius:6px;background:#ddd;flex-shrink:0}
+#jkList .jk div{flex:1;font-size:13px;line-height:1.5}
+#jkList .jk button{font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--ng);background:#fff;color:var(--ng)}
 #wx{display:flex;gap:3px}
 #wx button{padding:8px 9px}
 #search{width:92px;font-size:15px;padding:7px 8px;border-radius:8px;border:none}
@@ -231,6 +237,9 @@ tr.need td{background:var(--pur-bg)}
 #camFlash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .15s}
 #camDraw{position:absolute;inset:0;touch-action:none}
 #camMarkBox{position:absolute;border:3px dashed #ff2a2a;border-radius:50%;display:none;pointer-events:none}
+#camFrame.land #camBoard{width:34.5%;left:2.25%;bottom:4%}
+#camFrame.land #camBoard.right{left:auto;right:2.25%}
+#markHint.rot{background:#FFD400;color:#222;font-size:14px;font-weight:700}
 #markHint{position:absolute;left:8px;top:8px;color:#fff;background:rgba(0,0,0,.45);font-size:12px;padding:4px 9px;border-radius:10px;pointer-events:none}
 #camBot #markClr{background:#5c2020}
 #camBoard.right{left:auto;right:3%}
@@ -294,6 +303,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
   <select id="distSel" aria-label="地区"></select>
   <div id="wx"></div>
   <input id="search" inputmode="numeric" placeholder="番号検索" autocomplete="off">
+  <button class="hb" id="jkBtn">📷 状況</button>
   <button class="hb" id="listBtn">一覧</button>
   <button class="hb" id="sumBtn">集計</button>
   <button class="hb" id="menuBtn">メニュー</button>
@@ -477,6 +487,18 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
     <div class="tblWrap"><table id="lTbl"></table></div>
   </div>
 </div>
+<!-- 調査状況の写真 -->
+<div class="modal" id="jkM">
+  <div class="mh"><h2>調査状況の写真</h2><button class="hb" data-close>閉じる</button></div>
+  <div class="mb">
+    <p class="note">作業の様子（毎木調査・樹木点検・計測など）を1日に1〜2枚撮ります。樹木の写真とは別に、
+      成果品の「調査状況写真帳」に撮影日順にまとめます。黒板には業務名・内容・地区・日付が入ります。<br>
+      <b>iPad を横向きにして撮ります（横長の写真）。</b><br>
+      その日に入力した木があって、まだ撮っていない日は、上の［📷 状況］が黄色になります。</p>
+    <button class="btn" id="jkShot">📷 調査状況を撮る</button>
+    <div id="jkList"></div>
+  </div>
+</div>
 <!-- 集計 -->
 <div class="modal" id="sumM">
   <div class="mh"><h2>集計</h2><button class="hb" data-close>閉じる</button></div>
@@ -555,7 +577,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 17;
+const APP_VER = 19;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -569,6 +591,7 @@ const SHI_CHIPS = ["園路に影響あり","車道に影響あり","広場に影
 const KARE_CHIPS = ["枯枝あり","枝折れあり","幹折れあり","枯死している","穿孔虫痕あり","クビアカツヤカミキリのフラスあり","開口空洞あり","樹皮欠損あり","キノコあり","枝周/枝長比率大きい"];
 const GEN_CHIPS = ["根元法面の流亡あり","車道側下枝","園路側下枝","分岐部の入り皮あり","枝下高の高い樹形","腐朽進行","穿孔虫痕あり","要クビアカツヤカミキリ対策","要経過観察","傾斜あり（主幹持ち直しあり）"];
 const TK_CHIPS = ["開口空洞あり","根元腐朽","幹腐朽","キノコ発生","穿孔虫痕・フラス","樹皮欠損","枯枝落下のおそれ","園路側に傾斜","要経過観察"];
+const JK_CMTS = ["毎木調査状況","樹木点検状況","樹高計測状況","幹周計測状況","樹木プレート取付状況","現地確認状況"];
 const CAM_CMTS = ["全景","主要部","開口空洞","腐朽","キノコ","穿孔虫痕","フラス","樹皮欠損","枯枝","入り皮","根元","分岐部"];
 
 /* ================= 保存 ================= */
@@ -1855,7 +1878,11 @@ let cam = {stream: null, kind: "1", no: "", sp: "", cmts: [], z: 1, track: null,
 function photoName(no, kind){
   if(kind === "P") return no + "_P.jpg";
   if(kind === "1") return no + "_1.jpg";
-  if(kind === "S"){ const n = photoMeta.filter(m => m.kind === "S").length + 1; return "状況_" + today().replace(/-/g, "") + "_" + n + ".jpg"; }
+  if(kind === "S"){                       // 状況_日付_その日の何枚目.jpg（消した番号は使い直す）
+    const d = today().replace(/-/g, ""); let n = 1;
+    while(photoMeta.some(m => m.name === "状況_" + d + "_" + n + ".jpg")) n++;
+    return "状況_" + d + "_" + n + ".jpg";
+  }
   let k = 2; while(photoMeta.some(m => m.name === no + "_" + k + ".jpg")) k++;
   return no + "_" + k + ".jpg";
 }
@@ -1865,7 +1892,7 @@ async function openCam(kind){
   if(kind !== "S" && !no){ toast("先に番号を付けてください"); return; }
   const r = recOf(selId);
   cam.kind = kind; cam.no = no; cam.sp = kind === "S" ? "" : (r.sp || (t.past && t.past.sp) || "");
-  cam.cmts = kind === "1" ? ["全景"] : [];
+  cam.cmts = kind === "1" ? ["全景"] : kind === "S" ? [S.phase === "t" ? "樹木点検状況" : "毎木調査状況"] : [];
   camMark = null; updateMarkUI();
   if(kind === "P" && photosOf(no).some(m => m.kind === "P") && !confirm("プレートの写真は撮影済みです。撮り直しますか？")) return;
   if(kind === "1" && photosOf(no).some(m => m.kind === "1") && !confirm("全景の写真は撮影済みです。撮り直しますか？")) return;
@@ -1986,25 +2013,33 @@ $("camSide").onclick = ()=>{
 };
 function boardLines(){
   const L = [];
-  if(cam.kind === "S") L.push("調査状況");
+  if(cam.kind === "S"){ L.push(cam.cmts.length ? cam.cmts.join("・") : "調査状況"); if(S.dist) L.push(S.dist); L.push(today().replace(/-/g, ".")); }
   else { L.push(cam.no); if(cam.sp) L.push(cam.sp); if(cam.kind === "P") L.push("樹木プレート"); else if(cam.cmts.length) L.push(cam.cmts.join("・")); }
   return L;
 }
 function renderCamCmts(){
   $("camBText").innerHTML = boardLines().map(esc).join("<br>");
-  const list = cam.kind === "P" || cam.kind === "S" ? [] : (lsGet("nagano_cmts", null) || CAM_CMTS);
+  const list = cam.kind === "P" ? [] : cam.kind === "S" ? (lsGet("nagano_jkcmts", null) || JK_CMTS) : (lsGet("nagano_cmts", null) || CAM_CMTS);
   $("camCmts").innerHTML = list.map(c => '<button class="' + (cam.cmts.includes(c) ? "on" : "") + '">' + esc(c) + "</button>").join("");
-  $("camCmts").querySelectorAll("button").forEach(b => b.onclick = ()=>{ const c = b.textContent; cam.cmts = cam.cmts.includes(c) ? cam.cmts.filter(x => x !== c) : cam.cmts.concat(c); renderCamCmts(); });
+  $("camCmts").querySelectorAll("button").forEach(b => b.onclick = ()=>{
+    const c = b.textContent;
+    if(cam.kind === "S") cam.cmts = cam.cmts.includes(c) ? [] : [c];          // 調査状況は内容を1つ選ぶ
+    else cam.cmts = cam.cmts.includes(c) ? cam.cmts.filter(x => x !== c) : cam.cmts.concat(c);
+    renderCamCmts();
+  });
 }
 $("camEdit").onclick = ()=>{
-  const cur = (lsGet("nagano_cmts", null) || CAM_CMTS).join("、");
-  const v = prompt("黒板に入れる言葉（「、」で区切る）", cur);
-  if(v != null){ lsSet("nagano_cmts", v.split(/[、,]/).map(s => s.trim()).filter(Boolean)); renderCamCmts(); }
+  const jk = cam.kind === "S", key = jk ? "nagano_jkcmts" : "nagano_cmts";
+  const cur = (lsGet(key, null) || (jk ? JK_CMTS : CAM_CMTS)).join("、");
+  const v = prompt(jk ? "調査状況の内容（「、」で区切る）" : "黒板に入れる言葉（「、」で区切る）", cur);
+  if(v != null){ lsSet(key, v.split(/[、,]/).map(s => s.trim()).filter(Boolean)); renderCamCmts(); }
 };
-const CAM_AR = 3 / 4;
+/* 写真の縦横：樹木の写真は縦長（3:4）、調査状況は横長（4:3。iPad を横向きにして撮る） */
+const camAR = ()=> cam.kind === "S" ? 4 / 3 : 3 / 4;
 function fitCam(){
-  const w = $("camWrap").clientWidth, h = $("camWrap").clientHeight;
-  const fh = Math.min(h, w / CAM_AR), fw = fh * CAM_AR, f = $("camFrame");
+  const w = $("camWrap").clientWidth, h = $("camWrap").clientHeight, AR = camAR();
+  const fh = Math.min(h, w / AR), fw = fh * AR, f = $("camFrame");
+  f.classList.toggle("land", AR > 1);
   f.style.width = fw + "px"; f.style.height = fh + "px"; f.style.left = (w - fw) / 2 + "px"; f.style.top = (h - fh) / 2 + "px";
 }
 window.addEventListener("resize", ()=>{ if($("cam").classList.contains("show")){ fitCam(); updateMarkUI(); } scheduleMarks(); });
@@ -2044,8 +2079,55 @@ function endReview(close){
   $("camRevImg").removeAttribute("src");
   if(revUrl){ URL.revokeObjectURL(revUrl); revUrl = ""; }
   revKey = "";
-  if(close && was){ closeCam(); if(selId) renderPhotos(); }
+  if(close && was){
+    const jk = cam.kind === "S";
+    closeCam(); if(selId) renderPhotos();
+    if(jk){ updJk(); openJk(); }                 // 調査状況は一覧に戻る
+  }
 }
+/* ---- 調査状況の写真（樹木に付かない写真。1日1〜2枚。成果品では別の写真帳） ---- */
+let jkUrls = [];
+function jkToday(){ const d = today(); return photoMeta.filter(m => m.kind === "S" && m.name.indexOf("状況_" + d.replace(/-/g, "") + "_") === 0).length; }
+/* ヘッダーの［📷 状況］：今日の枚数。今日入力した木があるのにまだ撮っていなければ黄色 */
+function updJk(){
+  const n = jkToday(), d = today();
+  $("jkBtn").textContent = "📷 状況" + (n ? " " + n : "");
+  $("jkBtn").classList.toggle("due", !n && Object.values(R.trees).some(r => r.date === d));
+}
+async function openJk(){
+  jkUrls.forEach(u => URL.revokeObjectURL(u)); jkUrls = [];
+  const ps = photoMeta.filter(m => m.kind === "S").sort((a, b) => b.name.localeCompare(a.name, "ja", {numeric: true}));
+  const box = $("jkList");
+  if(!ps.length){ box.innerHTML = '<p class="note">まだ撮っていません</p>'; }
+  else {
+    let h = "", day = "";
+    ps.forEach((m, i) => {
+      const dd = m.name.replace(/^状況_(\d{4})(\d\d)(\d\d)_.*$/, "$1.$2.$3");
+      if(dd !== day){ day = dd; h += "<h4>" + dd + "</h4>"; }
+      h += '<div class="jk" data-i="' + i + '"><img alt=""><div><b>' + esc(m.name.replace(/\.jpg$/, "")) + "</b><br>" + esc(m.cmt || "調査状況") +
+           (m.dist ? "　" + esc(m.dist) : "") + (m.gone ? '<br><span style="color:#888">事務所PCに送って iPad から消した写真</span>' : m.sent ? '<br><span style="color:#888">送信済</span>' : "") +
+           "</div><button>削除</button></div>";
+    });
+    box.innerHTML = h;
+    box.querySelectorAll(".jk").forEach(async d => {
+      const m = ps[+d.dataset.i];
+      d.querySelector("button").onclick = async ()=>{
+        if(!confirm(m.name + " を削除しますか？" + (m.sent ? "\n（事務所PCに送った写真も、事務所PCの「写真」フォルダから消してください）" : ""))) return;
+        if(!m.gone){ try{ await idbDel("photos", m.key); }catch(_){} }
+        photoMeta = photoMeta.filter(x => x.key !== m.key); savePhotoMeta(); updJk(); openJk();
+      };
+      const b = m.gone ? null : await idbGet("photos", m.key);
+      if(b){ const u = URL.createObjectURL(b); jkUrls.push(u); d.querySelector("img").src = u;
+             d.querySelector("img").onclick = ()=> window.open(u); }
+    });
+  }
+  $("jkM").classList.add("show");
+}
+$("jkBtn").onclick = ()=>{ if(!pkg){ toast("先に図面データを取り込んでください"); return; } openJk(); };
+$("jkShot").onclick = ()=>{
+  if(jkToday() >= 2 && !confirm("今日の調査状況はもう " + jkToday() + " 枚撮っています。もう1枚撮りますか？")) return;
+  $("jkM").classList.remove("show"); openCam("S");
+};
 $("camRetake").onclick = async e => {
   e.stopPropagation();
   const key = revKey;
@@ -2057,9 +2139,10 @@ $("camRevOk").onclick = e => { e.stopPropagation(); endReview(true); };
 $("camRevImg").onclick = ()=> endReview(true);
 $("camClose").onclick = closeCam;
 function drawBoard(ctx, W, H){
-  const bw = W * 0.46, lines = boardLines(), bx = S.boardRight ? W - bw - W * 0.03 : W * 0.03;   // 黒板の位置（左下／右下）
-  const rowH = W * 0.055, lh = W * 0.06, bh = rowH + lh * lines.length + W * 0.02, by = H - bh - H * 0.03;
-  const bd = Math.max(2, W * 0.004);
+  const U = Math.min(W, H);                 // 黒板の大きさは短い辺に合わせる（横長の調査状況の写真でも大きくなりすぎない）
+  const bw = U * 0.46, lines = boardLines(), bx = S.boardRight ? W - bw - U * 0.03 : U * 0.03;   // 黒板の位置（左下／右下）
+  const rowH = U * 0.055, lh = U * 0.06, bh = rowH + lh * lines.length + U * 0.02, by = H - bh - H * 0.03;
+  const bd = Math.max(2, U * 0.004);
   ctx.fillStyle = "#1b6b5f"; ctx.fillRect(bx, by, bw, bh);
   ctx.strokeStyle = "#fff"; ctx.lineWidth = bd * 2; ctx.strokeRect(bx, by, bw, bh);
   ctx.lineWidth = bd; ctx.beginPath(); ctx.moveTo(bx, by + rowH); ctx.lineTo(bx + bw, by + rowH); ctx.stroke();
@@ -2079,7 +2162,7 @@ function drawBoard(ctx, W, H){
   lines.forEach((s, i) => {
     let f = lh * 0.72; ctx.font = "600 " + f + "px sans-serif";
     while(f > 8 && ctx.measureText(s).width > bw * 0.92){ f -= 1; ctx.font = "600 " + f + "px sans-serif"; }
-    ctx.fillText(s, bx + bw / 2, by + rowH + W * 0.01 + lh * (i + 0.5));
+    ctx.fillText(s, bx + bw / 2, by + rowH + U * 0.01 + lh * (i + 0.5));
   });
   ctx.textAlign = "left";
 }
@@ -2094,7 +2177,10 @@ function updateMarkUI(){
     box.style.width = camMark.w * f.clientWidth + "px"; box.style.height = camMark.h * f.clientHeight + "px";
   } else box.style.display = "none";
   $("markClr").style.display = camMark ? "" : "none";
-  $("markHint").style.display = markOk() && !camMark ? "" : "none";
+  const rot = cam.kind === "S" && innerHeight > innerWidth;
+  $("markHint").textContent = rot ? "iPad を横向きにして撮ってください（調査状況は横長の写真）" : "指でなぞると赤い破線で囲めます";
+  $("markHint").classList.toggle("rot", rot);
+  $("markHint").style.display = (markOk() && !camMark) || rot ? "" : "none";
 }
 $("markClr").onclick = ()=>{ camMark = null; updateMarkUI(); };
 $("camDraw").addEventListener("pointerdown", e => {
@@ -2138,13 +2224,15 @@ $("camShutter").onclick = async ()=>{
     const c = document.createElement("canvas");
     if(cam.stream && v.videoWidth){
       const vw = v.videoWidth, vh = v.videoHeight;
-      let cw, ch; if(vw / vh > CAM_AR){ ch = vh; cw = vh * CAM_AR; } else { cw = vw; ch = vw / CAM_AR; }
+      const AR = camAR();
+      let cw, ch; if(vw / vh > AR){ ch = vh; cw = vh * AR; } else { cw = vw; ch = vw / AR; }
       const dz = cam.hw ? 1 : cam.z; cw /= dz; ch /= dz;
-      const Hh = Math.min(1600, Math.round(ch)), Ww = Math.round(Hh * CAM_AR);
+      const k = Math.min(1, 1600 / Math.max(cw, ch)), Ww = Math.round(cw * k), Hh = Math.round(ch * k);   // 長い辺 1600 まで
       c.width = Ww; c.height = Hh;
       c.getContext("2d").drawImage(v, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, Ww, Hh);
     } else {                // カメラの無い PC での試験用（iPad では撮れない）
-      c.width = 960; c.height = 1280; const x = c.getContext("2d"); x.fillStyle = "#666"; x.fillRect(0, 0, 960, 1280);
+      if(camAR() > 1){ c.width = 1280; c.height = 960; } else { c.width = 960; c.height = 1280; }
+      const x = c.getContext("2d"); x.fillStyle = "#666"; x.fillRect(0, 0, c.width, c.height);
     }
     drawMark(c.getContext("2d"), c.width, c.height);
     drawBoard(c.getContext("2d"), c.width, c.height);
@@ -2156,7 +2244,8 @@ $("camShutter").onclick = async ()=>{
     if(old){ await idbDel("photos", old.key); photoMeta = photoMeta.filter(m => m !== old); }
     const key = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     await idbPut("photos", key, blob);
-    photoMeta.push({key, name, no: cam.no, kind: cam.kind, t: Date.now(), sent: false, cmt: cam.cmts.join("・")});
+    photoMeta.push(Object.assign({key, name, no: cam.no, kind: cam.kind, t: Date.now(), sent: false, cmt: cam.cmts.join("・")},
+                                 cam.kind === "S" ? {dist: S.dist || ""} : {}));
     savePhotoMeta();
     $("camFlash").style.opacity = "0.9"; setTimeout(()=> $("camFlash").style.opacity = "0", 120);
     if(cam.kind !== "S"){ const r = rec(selId); if(!r.st) r.st = "done"; touch(r); }
@@ -2240,6 +2329,7 @@ $("distSel").onchange = ()=>{
   S.dist = $("distSel").value; saveS(); closeSheet(); fitView(); applyView(); updProg(); toast(S.dist + "の図面を表示しました"); };
 function updProg(){
   if(!pkg){ $("prog").textContent = ""; return; }
+  updJk();
   let done = 0, tot = 0, need = 0, insp = 0, newP = 0;
   for(const t of allTrees()){
     const st = stateOf(t), r = recOf(t.id);
@@ -2504,7 +2594,7 @@ $("bkBtn").onclick = async ()=>{
   const nm = missCount();
   if(nm && !confirm("⚠ 入力漏れ・写真不足の木が " + nm + " 本あります（一覧の［入力漏れ・写真不足］で確かめられます）。\nこのまま書き出しますか？")) return;
   const out = {type: "nagano-res", version: 1, exported: new Date().toISOString(), pkg: pkg ? pkg.id : "", settings: S, res: R,
-               photos: photoMeta.map(m => ({name: m.name, no: m.no, kind: m.kind, t: m.t, cmt: m.cmt || ""}))};
+               photos: photoMeta.map(m => ({name: m.name, no: m.no, kind: m.kind, t: m.t, cmt: m.cmt || "", dist: m.dist || ""}))};
   const blob = new Blob([JSON.stringify(out)], {type: "application/json"});
   if(await share(blob, "長野公園_調査結果_" + stampName() + ".json")){ S.lastBk = new Date().toLocaleString("ja-JP"); saveS(); toast("書き出しました"); }
 };
