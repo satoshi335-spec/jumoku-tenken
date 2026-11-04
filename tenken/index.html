@@ -172,7 +172,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 #camWide{display:none;position:absolute;left:50%;top:56px;transform:translateX(-50%);z-index:6;background:#000b;color:#FFE08A;
   font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;white-space:nowrap;pointer-events:none}
 #camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:center center}
-#camNoCam{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#888;font-size:13px;text-align:center}
+#camNoCam{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#ccc;font-size:13px;text-align:center;padding:16px;line-height:1.7}
 #camBoard{position:absolute;left:3%;bottom:3%;width:46%;background:#1b6b5f;border:3px solid #fff;color:#fff}
 #camBoard .krow{display:flex;border-bottom:2px solid #fff;font-size:10px}
 #camBoard .klab{padding:3px 4px;border-right:2px solid #fff;white-space:nowrap}
@@ -519,7 +519,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
   <div id="camWrap">
     <div id="camFrame">
       <video id="camVideo" autoplay playsinline muted></video>
-      <div id="camNoCam">カメラを利用できません<br>（テストモード：グレー画像で撮影されます）</div>
+      <div id="camNoCam"></div>
       <div id="camMarkBox"></div>
       <div id="camBoard">
         <div class="krow"><span class="klab">業務名</span><span class="kval" id="camKoji"></span></div>
@@ -2056,7 +2056,8 @@ function getCam(){
   const make = v => navigator.mediaDevices.getUserMedia({ video: v, audio: false });
   if(settings.camId){
     return make(Object.assign({deviceId:{exact:settings.camId}}, base))
-      .catch(()=>{ settings.camId = null; store("gj_settings", settings);
+      .catch(e=>{
+        if(e && (e.name === "OverconstrainedError" || e.name === "NotFoundError")){ settings.camId = null; store("gj_settings", settings); }
         return make(Object.assign({facingMode:"environment"}, base)); });
   }
   return make(Object.assign({facingMode:"environment"}, base));
@@ -2066,7 +2067,16 @@ function getCam(){
    次から真っ暗になる（iPadを再起動するまで直らない）ことがあった（2026-10-22）。
    取った映像は全部 camLive に入れて、閉じる・取り直すときは全部止める。待っている間に古くなった映像はすぐ止める */
 const camLive = new Set();
-let camGen = 0, camWatch = 0, camRetried = false, camBroken = false;
+let camGen = 0, camWatch = 0, camRetried = false, camBroken = false, camTest = false;
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const camWait = ms => new Promise(r => setTimeout(r, ms));
+const camShown = () => $("camModal").style.display === "flex";
+/* カメラを開けなかった記録（原因を調べるため。gj_camlog に新しい順で10件） */
+function camLog(e){
+  let L = []; try{ L = JSON.parse(localStorage.getItem("gj_camlog")) || []; }catch(_){}
+  L.unshift({t: new Date().toLocaleString("ja-JP"), name: (e && e.name) || "?", msg: ((e && e.message) || "").slice(0, 120), vis: document.visibilityState});
+  try{ localStorage.setItem("gj_camlog", JSON.stringify(L.slice(0, 10))); }catch(_){}
+}
 function stopAllCams(){
   clearTimeout(camWatch);
   camLive.forEach(s => s.getTracks().forEach(t => { try{ t.stop(); }catch(_){} }));
@@ -2074,11 +2084,20 @@ function stopAllCams(){
 }
 async function restartCamStream(){
   const gen = ++camGen;
+  const had = camLive.size > 0;
   stopAllCams();
-  $("camVideo").srcObject = null;
-  let s;
-  try { s = await getCam(); }
-  catch(e){ if(gen === camGen) $("camNoCam").style.display = "flex"; return; }    // カメラが無い（PCで試すとき）
+  $("camVideo").srcObject = null; camTest = false; $("camNoCam").style.display = "none";
+  if(had) await camWait(300);              // 止めた直後はカメラがまだ放されていないことがある
+  let s = null, err = null;
+  // 失敗しても少し待って取り直す（アプリの切り替え直後などは、カメラの準備ができるまで失敗することがある）
+  for(let k = 0; k < 4 && !s; k++){
+    if(gen !== camGen || !camShown()) return;
+    if(document.hidden){ await camWait(500); continue; }
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ err = {name: "NoMediaDevices"}; break; }
+    try { s = await getCam(); }
+    catch(e){ err = e; camLog(e); if(!IS_IOS && e.name === "NotFoundError") break; await camWait([400, 900, 1600, 0][k]); }
+  }
+  if(!s){ if(gen === camGen && camShown()) camFail(err); return; }
   camLive.add(s);
   if(gen !== camGen || $("camModal").style.display !== "flex"){       // 待っている間に閉じた・取り直した
     s.getTracks().forEach(t => t.stop()); camLive.delete(s); return;
@@ -2106,6 +2125,24 @@ function watchCam(gen){
     else camBlack();
   }, 4000);
 }
+/* カメラを開けなかったとき。iPad ではグレーの写真を撮らせず、原因と直し方を出す（グレーはカメラの無い PC での試験用だけ） */
+function camFail(e){
+  const n = (e && e.name) || "";
+  if(!IS_IOS && (n === "NotFoundError" || n === "NoMediaDevices")){
+    camTest = true;
+    $("camNoCam").innerHTML = "カメラがありません<br>（PC での試験用：グレー画像で撮影されます）";
+    $("camNoCam").style.display = "flex"; return;
+  }
+  const why = n === "NotAllowedError" ?
+      "カメラの使用が許可されていないか、アプリを切り替えた直後でカメラを使えませんでした。<br>上の［映像を取り直す］を押してください。<br>何度も出るときは iPad の 設定 → アプリ → Safari → カメラ を「許可」にしてください。" :
+    n === "NotReadableError" || n === "AbortError" ?
+      "ほかのアプリ（カメラ・FaceTime・長野公園の調査アプリなど）がカメラを使っている可能性があります。<br>そのアプリを上にスワイプして終了してから、上の［映像を取り直す］を押してください。" :
+      "上の［映像を取り直す］を押してください。";
+  $("camNoCam").innerHTML = "<div>カメラを開けませんでした（" + esc(n || "不明") + "）<br><br>" + why +
+    "<br><br>直らないときは：アプリを上にスワイプして終了 → 開き直す → それでもだめなら iPad を再起動</div>";
+  $("camNoCam").style.display = "flex";
+  setCamBroken(true);
+}
 function camBlack(){
   if(!camRetried){ camRetried = true; toast("カメラの映像を取り直しています…"); restartCamStream(); return; }
   stopAllCams();
@@ -2118,11 +2155,14 @@ function setCamBroken(on){
   $("camShutter").style.opacity = on ? ".35" : "";
 }
 $("camReset").onclick = () => { camRetried = false; setCamBroken(false); restartCamStream(); };
-/* 別のアプリに切り替えたらカメラを放し、戻ってきたら取り直す（そのままだとiPadでは映像が止まることがある） */
+/* 別のアプリに切り替えたらカメラを放し、戻ってきたら取り直す（そのままだとiPadでは映像が止まることがある）。
+   戻った直後はまだカメラを使えないことがあるので、少し待ってから開く */
+let camVisT = 0;
 document.addEventListener("visibilitychange", () => {
-  if($("camModal").style.display !== "flex") return;
+  clearTimeout(camVisT);
+  if(!camShown()) return;
   if(document.hidden){ camGen++; stopAllCams(); }
-  else { camRetried = false; restartCamStream(); }
+  else { camGen++; camVisT = setTimeout(() => { if(camShown() && !document.hidden){ camRetried = false; setCamBroken(false); restartCamStream(); } }, 600); }
 });
 
 // ---- ズーム（対応機種はレンズズーム / 非対応はデジタル1〜3×） ----
@@ -2261,7 +2301,8 @@ function closeCam(){
   $("cmtPicker").classList.remove("show");
   camGen++; stopAllCams();                 // 取りかけの映像も含めて全部止める
   $("camVideo").srcObject = null;
-  $("camNoCam").style.display = "none";
+  $("camNoCam").style.display = "none"; camTest = false;
+  clearTimeout(camVisT);
 }
 /* 黒板の位置（左下／右下）。写真に描く位置もこれに合わせる */
 function applyBoardSide(){
@@ -2464,7 +2505,9 @@ function drawCamBoard(ctx, W, H, num){
 let camShooting = false;
 $("camShutter").onclick = async ()=>{
   if(camShooting) return;
-  if(camBroken){ toast("カメラの映像が届いていません。上の［映像を取り直す］を押してください"); return; }
+  const v0 = $("camVideo");
+  // 映像が届いていないのに撮るとグレーの写真になる（グレーはカメラの無い PC での試験用だけ）
+  if(camBroken || (camStream && !v0.videoWidth) || (!camStream && !camTest)){ toast("カメラの映像が届いていません。少し待つか、上の［映像を取り直す］を押してください"); return; }
   camShooting = true; $("camShutter").disabled = true;
   try {
     const v = $("camVideo");
