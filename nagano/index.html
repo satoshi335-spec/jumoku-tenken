@@ -245,6 +245,7 @@ tr.need td{background:var(--pur-bg)}
 #camBoard.right{left:auto;right:3%}
 #camTop #camReset{background:var(--ng)}
 #camTop #camSide{background:#1b6b5f;border:1px solid #fff}
+#camTop #camDate.off{background:rgba(255,255,255,.08);color:#aaa;text-decoration:line-through}
 /* 撮った写真の確認（1.5秒） */
 #camReview{display:none;position:absolute;inset:0;z-index:5;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px}
 #camReview.show{display:flex}
@@ -549,7 +550,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 
 <!-- カメラ -->
 <div id="cam">
-  <div id="camTop"><b id="camNo"></b><span id="camKind"></span><span style="margin-left:auto"></span><button id="camReset" style="display:none">映像を取り直す</button><button id="camSide">黒板を右へ</button><button id="camClose">閉じる</button></div>
+  <div id="camTop"><b id="camNo"></b><span id="camKind"></span><span style="margin-left:auto"></span><button id="camReset" style="display:none">映像を取り直す</button><button id="camDate" style="display:none">日付あり</button><button id="camSide">黒板を右へ</button><button id="camClose">閉じる</button></div>
   <div id="camWrap">
     <div id="camFrame">
       <video id="camVideo" autoplay playsinline muted></video>
@@ -577,7 +578,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 19;
+const APP_VER = 20;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -2006,14 +2007,22 @@ function applyBoardSide(){
   const r = !!S.boardRight;
   $("camBoard").classList.toggle("right", r);
   $("camSide").textContent = r ? "黒板を左へ" : "黒板を右へ";
+  // 調査状況の黒板の日付（あり／なし）。押すたびに切り替え、次からもその設定
+  $("camDate").style.display = cam.kind === "S" ? "" : "none";
+  $("camDate").textContent = S.jkNoDate ? "日付なし" : "日付あり";
+  $("camDate").classList.toggle("off", !!S.jkNoDate);
 }
+$("camDate").onclick = ()=>{
+  S.jkNoDate = !S.jkNoDate; saveS(); applyBoardSide(); renderCamCmts();
+  toast("黒板の日付を" + (S.jkNoDate ? "入れない" : "入れる") + "ようにしました（次からもこの設定）");
+};
 $("camSide").onclick = ()=>{
   S.boardRight = !S.boardRight; saveS(); applyBoardSide();
   toast("黒板を" + (S.boardRight ? "右下" : "左下") + "にしました（次からもこの位置）");
 };
 function boardLines(){
   const L = [];
-  if(cam.kind === "S"){ L.push(cam.cmts.length ? cam.cmts.join("・") : "調査状況"); if(S.dist) L.push(S.dist); L.push(today().replace(/-/g, ".")); }
+  if(cam.kind === "S"){ L.push(cam.cmts.length ? cam.cmts.join("・") : "調査状況"); if(S.dist) L.push(S.dist); if(!S.jkNoDate) L.push(today().replace(/-/g, ".")); }
   else { L.push(cam.no); if(cam.sp) L.push(cam.sp); if(cam.kind === "P") L.push("樹木プレート"); else if(cam.cmts.length) L.push(cam.cmts.join("・")); }
   return L;
 }
