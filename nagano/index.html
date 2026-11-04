@@ -130,6 +130,11 @@ body.selOpen #sheet{display:block}
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
 .chips button{font-size:13px;padding:6px 10px;border-radius:15px;border:1px solid var(--line);background:#fff;color:var(--tx)}
 .chips button.on{background:var(--acc-bg);border-color:var(--acc);color:var(--acc);font-weight:700}
+.chips button.my{border-style:dashed}
+.chips button.del{background:#fff0f0;border-color:var(--ng);color:var(--ng)}
+.chips button.org{background:#f2f2f2;color:#555;border-color:#bbb}
+.chips button.org.del{background:var(--ng);color:#fff}
+#undoBtn{display:none;margin:6px 0 2px auto;font-size:13px;padding:6px 12px;border-radius:9px;border:1px solid var(--ng);background:#fff;color:var(--ng);font-weight:600}
 .nums{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}
 .nd{border:2px solid var(--line);border-radius:10px;padding:4px 8px;background:#fff;min-height:54px}
 .nd small{display:block;font-size:11px;color:var(--tx2)}
@@ -224,6 +229,10 @@ tr.need td{background:var(--pur-bg)}
 #camCmts button.on{background:#FFD400;font-weight:700}
 #camNoCam{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#ccc;text-align:center;padding:20px;line-height:1.8}
 #camFlash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .15s}
+#camDraw{position:absolute;inset:0;touch-action:none}
+#camMarkBox{position:absolute;border:3px dashed #ff2a2a;border-radius:50%;display:none;pointer-events:none}
+#markHint{position:absolute;left:8px;top:8px;color:#fff;background:rgba(0,0,0,.45);font-size:12px;padding:4px 9px;border-radius:10px;pointer-events:none}
+#camBot #markClr{background:#5c2020}
 #camBoard.right{left:auto;right:3%}
 #camTop #camReset{background:var(--ng)}
 #camTop #camSide{background:#1b6b5f;border:1px solid #fff}
@@ -334,6 +343,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
     </div>
     <div id="missBar"></div>
     <div class="info" id="sInfo"></div>
+    <button id="undoBtn">↺ 未調査に戻す</button>
 
     <a href="#" id="mmTgl">毎木調査の入力を見る・直す</a>
     <div id="mmBox">
@@ -521,18 +531,21 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
   <div id="camWrap">
     <div id="camFrame">
       <video id="camVideo" autoplay playsinline muted></video>
+      <div id="camDraw"></div>
+      <div id="camMarkBox"></div>
+      <div id="markHint">指でなぞると赤い破線で囲めます</div>
       <div id="camBoard"><div class="k"><span>業務名</span><em id="camKoji"></em></div><div class="b" id="camBText"></div></div>
       <div id="camCmts"></div>
       <div id="camFlash"></div>
     </div>
-    <div id="camNoCam">カメラを使えません。<br>（テスト用に灰色の画像で記録できます）</div>
+    <div id="camNoCam"></div>
     <div id="camReview">
       <img id="camRevImg" alt="">
       <div id="camRevBar"><span id="camRevTxt"></span><button id="camRetake">撮り直す</button><button id="camRevOk">OK</button></div>
       <div id="camRevTime"><i></i></div>
     </div>
   </div>
-  <div id="camBot"><button class="s" id="zOut">－</button><span id="zVal" style="color:#fff">×1.0</span><button class="s" id="zIn">＋</button><button id="camShutter" aria-label="撮影"></button><button class="s" id="camEdit">コメント編集</button></div>
+  <div id="camBot"><button class="s" id="zOut">－</button><span id="zVal" style="color:#fff">×1.0</span><button class="s" id="zIn">＋</button><button id="camShutter" aria-label="撮影"></button><button class="s" id="camEdit">コメント編集</button><button class="s" id="markClr" style="display:none">囲み消去</button></div>
 </div>
 
 <div id="busy"><div id="busyMsg">処理中…</div></div>
@@ -542,7 +555,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 14;
+const APP_VER = 16;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -1242,10 +1255,52 @@ function closeSheet(){ selId = null; document.body.classList.remove("selOpen"); 
 $("sClose").onclick = ()=>{ if(leaveOk()) closeSheet(); else renderMiss(); };
 
 function segSet(id, v){ $(id).querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === v)); }
-function chipsSet(id, list, text, onClick){
-  const parts = String(text || "").split(/[、。]/);
-  $(id).innerHTML = list.map(c => '<button class="' + (parts.includes(String(c)) ? "on" : "") + '">' + esc(c) + '</button>').join("");
-  $(id).querySelectorAll("button").forEach(b => b.onclick = ()=> onClick(b.textContent));
+/* 候補の札。fld（欄の名前）を付けると、その欄に手で書いた言葉（点線の札）も並べ、［整理］で要らない札を消せる */
+function chipsSet(id, list, text, onClick, fld){
+  const parts = String(text || "").split(/[、。]/), hid = fld ? (hideWords[fld] || []) : [];
+  const ws = list.map(String).filter(w => !hid.includes(w));
+  const mine = fld ? (myWords[fld] || []).filter(w => !list.map(String).includes(w)) : [];
+  const all = ws.concat(mine), del = !!fld && wordDel === fld;
+  let h = all.map((c, i) => '<button data-i="' + i + '" class="' + (i >= ws.length ? "my " : "") + (del ? "del" : parts.includes(c) ? "on" : "") + '">' + (del ? "✕ " : "") + esc(c) + "</button>").join("");
+  if(fld){
+    h += '<button class="org' + (del ? " del" : "") + '" data-a="org">' + (del ? "整理を終わる" : "整理") + "</button>";
+    if(del && hid.length) h += '<button class="org" data-a="back">消した候補を戻す（' + hid.length + "）</button>";
+  }
+  $(id).innerHTML = h;
+  $(id).querySelectorAll("button[data-i]").forEach(b => b.onclick = ()=>{
+    const w = all[+b.dataset.i];
+    if(del) dropWord(fld, w); else onClick(w);
+  });
+  $(id).querySelectorAll("button[data-a]").forEach(b => b.onclick = ()=>{
+    if(b.dataset.a === "org"){
+      wordDel = del ? "" : fld;
+      if(!del) toast("消したい札を押してください（入力済みの文は消えません）");
+    } else { delete hideWords[fld]; lsSet("nagano_hide", hideWords); toast("はじめからの候補を元に戻しました"); }
+    renderSheet();
+  });
+}
+/* ---- 特記事項などに手で書いた言葉を覚えて、次の樹木から候補（点線の札）として使う ----
+   書き終えて欄から離れたとき（change）に、「、」「。」で区切った言葉を覚える（新しい順・欄ごとに WORD_MAX まで）。
+   はじめからある候補・点検項目の自動の文・枯枝／折れ枝の大きさの文は覚えない。
+   nagano_words＝{欄: [覚えた言葉…]}、nagano_hide＝{欄: [［整理］で隠したはじめからの候補…]} */
+const WORD_MAX = 40;
+let myWords = lsGet("nagano_words", {}), hideWords = lsGet("nagano_hide", {}), wordDel = "";
+const WORD_PRESET = {shiNote: SHI_CHIPS, kareNote: KARE_CHIPS, gennin: GEN_CHIPS, slopeO: SLOPE_O_CHIPS, tkNote: TK_CHIPS};
+function rememberWords(fld, text, skip){
+  let t = String(text || "");
+  (skip || []).forEach(x => { if(x) t = t.split(x).join("。"); });
+  const pre = WORD_PRESET[fld] || [];
+  const ws = [...new Set(t.split(/[、。\n]/).map(x => x.trim()))].filter(w => w.length >= 2 && w.length <= 60 && !pre.includes(w) &&
+    !/^(枯枝|折れ枝)(Φ|L|\d)/.test(w) && !/^[\d.\s]+$/.test(w));
+  if(!ws.length) return;
+  myWords[fld] = ws.concat((myWords[fld] || []).filter(x => !ws.includes(x))).slice(0, WORD_MAX);
+  lsSet("nagano_words", myWords);
+}
+function dropWord(fld, w){
+  if((myWords[fld] || []).includes(w)){ myWords[fld] = myWords[fld].filter(x => x !== w); lsSet("nagano_words", myWords); }
+  else { hideWords[fld] = (hideWords[fld] || []).concat(w); lsSet("nagano_hide", hideWords); }
+  toast("「" + w + "」を候補から消しました");
+  renderSheet();
 }
 function toggleWord(text, w){
   let parts = String(text || "").split("、").filter(Boolean);
@@ -1295,7 +1350,7 @@ function renderSheet(){
   chipsSet("spChips", SP_CHIPS, r.sp, w => { const rr = rec(selId); rr.sp = w; rr.spOk = !!psp && w === psp; if(!rr.st) rr.st = "done"; touch(rr); $("sp").value = w; renderSheet(); });
   renderNums();
   chipsSet("slopeChips", SLOPE_CHIPS.map(String), String(r.slope || ""), w => { const rr = rec(selId); rr.slope = w; if(!rr.st) rr.st = "done"; touch(rr); renderNums(); renderSheetChips(); });
-  chipsSet("slopeOChips", SLOPE_O_CHIPS, r.slopeO, w => { const rr = rec(selId); rr.slopeO = toggleWord(rr.slopeO, w); if(!rr.st) rr.st = "done"; touch(rr); renderSheet(); });
+  chipsSet("slopeOChips", SLOPE_O_CHIPS, r.slopeO, w => { const rr = rec(selId); rr.slopeO = toggleWord(rr.slopeO, w); if(!rr.st) rr.st = "done"; touch(rr); renderSheet(); }, "slopeO");
   if(document.activeElement !== $("slopeO")) $("slopeO").value = r.slopeO || "";
   segSet("seiSeg", r.sei || "");
   segSet("shiSeg", r.shi || ""); $("shiNote").value = r.shiNote || "";
@@ -1311,12 +1366,13 @@ function renderSheet(){
   renderMiss();
   $("delLink").style.display = t.added ? "" : "none";
   $("undoLink").textContent = S.phase === "t" ? "未点検に戻す" : "未調査に戻す";
+  updUndo();
   $("renoLink").textContent = t.src === "circle" && !R.renamed[t.id] ? "番号を付ける" : "番号を変える（プレート付替え）";
   $("calLink").style.display = gps && !regionOf(distOf(t)).geo ? "" : "none";
 }
 function renderSheetChips(){
   const r = recOf(selId);
-  chipsSet("shiChips", SHI_CHIPS, r.shiNote, w => { const rr = rec(selId); rr.shiNote = toggleWord(rr.shiNote, w); if(w !== "園路離れている" && rr.shiNote.includes(w)) rr.shi = "y"; touch(rr); renderSheet(); });
+  chipsSet("shiChips", SHI_CHIPS, r.shiNote, w => { const rr = rec(selId); rr.shiNote = toggleWord(rr.shiNote, w); if(w !== "園路離れている" && rr.shiNote.includes(w)) rr.shi = "y"; touch(rr); renderSheet(); }, "shiNote");
   // 大きさを入れた木は、特記事項の「枯枝Φ…」「折れ枝Φ…」を［枯枝あり］［枝折れあり］として点灯する
   const kn = String(r.kareNote || "").split("、").map(x => { const b = BR.find(b => r[b.txt] && x === r[b.txt]); return b ? b.chip : x; }).join("、");
   chipsSet("kareChips", KARE_CHIPS, kn, w => {
@@ -1327,9 +1383,9 @@ function renderSheetChips(){
     if(String(rr.kareNote || "").split("、").includes(w)) rr.kare = "y";
     if(!rr.st) rr.st = "done";
     touch(rr); renderSheet();
-  });
+  }, "kareNote");
   renderBr();
-  chipsSet("genChips", GEN_CHIPS, r.gennin, w => { const rr = rec(selId); rr.gennin = toggleWord(rr.gennin, w); touch(rr); renderSheet(); });
+  chipsSet("genChips", GEN_CHIPS, r.gennin, w => { const rr = rec(selId); rr.gennin = toggleWord(rr.gennin, w); touch(rr); renderSheet(); }, "gennin");
 }
 /* 数字の入力（樹高・幹周・地形傾斜） */
 let curField = "h";
@@ -1363,7 +1419,14 @@ $("pad").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   touch(r); renderNums(); segSet("stSeg", r.st || "");
   if(curField === "slope") renderSheetChips();
 });
-function touch(r){ stamp(r); saveR(); scheduleMarks(); updProg(); renderMiss(); }
+function touch(r){ stamp(r); saveR(); scheduleMarks(); updProg(); renderMiss(); updUndo(); }
+/* ［未調査に戻す］／［未点検に戻す］は、入力のある木だけに出す */
+function updUndo(){
+  if(!selId) return;
+  const r = R.trees[selId], t = S.phase === "t";
+  $("undoBtn").textContent = t ? "↺ 未点検に戻す（点検の入力を消す）" : "↺ 未調査に戻す（入力を消す）";
+  $("undoBtn").style.display = (t ? !!(r && r.tk) : !!r) ? "block" : "none";
+}
 
 $("stSeg").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   const r = rec(selId); r.st = r.st === b.dataset.v ? "" : b.dataset.v; touch(r); renderSheet();
@@ -1479,6 +1542,7 @@ $("kareNote").addEventListener("input", ()=>{
 });
 $("gennin").addEventListener("input", ()=>{ const r = rec(selId); r.gennin = $("gennin").value; touch(r); });
 $("memo").addEventListener("input", ()=>{ const r = rec(selId); r.memo = $("memo").value; touch(r); });
+["shiNote", "kareNote", "gennin", "slopeO"].forEach(f => $(f).addEventListener("change", ()=> rememberWords(f, $(f).value)));
 $("tkTg").onclick = ()=>{ const r = rec(selId); r.tenken = !r.tenken; if(!r.tenken) r.tkOff = true; if(!r.st) r.st = "done"; touch(r); renderSheet(); if(r.tenken && S.phase === "t") setTimeout(()=> $("tkBox").scrollIntoView({behavior: "smooth", block: "nearest"}), 50); };
 $("kinTg").onclick = ()=>{ const r = rec(selId); r.kin = !r.kin; if(r.kin) r.tenken = true; if(!r.st) r.st = "done"; touch(r); renderSheet(); if(r.kin) toast("緊急対応：写真を撮って、監督職員へ速やかに報告してください"); };
 $("kanri").querySelectorAll("button").forEach(b => b.onclick = ()=>{
@@ -1598,13 +1662,17 @@ function renderTenken(){
   renderLv(r);
   $("tkNote").value = (r.tk && r.tk.note) || "";
   noteFit();
-  chipsSet("tkChips", TK_CHIPS, r.tk && r.tk.note, w => { const rr = rec(selId), tk = tkOf(rr); noteToggle(tk, w); tkSync(rr); touch(rr); renderTenken(); });
+  chipsSet("tkChips", TK_CHIPS, r.tk && r.tk.note, w => { const rr = rec(selId), tk = tkOf(rr); noteToggle(tk, w); tkSync(rr); touch(rr); renderTenken(); }, "tkNote");
   const res = tkResult(r);
   $("tkRes").innerHTML = "点検結果：" + esc(res.txt) + "　（①の異常 " + res.n1 + "　②＋③ " + res.n23 + "）" +
     (res.cut && !(r.tk && r.tk.cutSet) ? '<br><span style="font-weight:400">毎木調査で「要伐採」にした木です（伐採は維持管理の処置。外観診断はしません）</span>' : "") +
     (tkDone(r) ? "" : '<br><span style="color:var(--ng)">項目にひとつも該当が無ければ下の［異常なしで点検済］を押してください</span> <button id="tkOk" style="margin-top:4px;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--pur);background:#fff;color:var(--pur)">異常なしで点検済</button>');
   const ok = $("tkOk"); if(ok) ok.onclick = ()=>{ const rr = rec(selId); rr.tk = rr.tk || {items: []}; rr.tk.t = Date.now(); rr.tk.date = rr.tk.date || today(); touch(rr); renderTenken(); };
 }
+$("tkNote").addEventListener("change", ()=>{
+  const tk = recOf(selId).tk || {};
+  rememberWords("tkNote", $("tkNote").value, Object.values(tk.auto || {}).concat(OBS_MEMO, HANGARE_TXT, BASSAI_TXT));
+});
 $("tkNote").addEventListener("input", ()=>{ const r = rec(selId), tk = tkOf(r); tk.note = $("tkNote").value; tk.t = Date.now(); tk.date = tk.date || today(); touch(r); noteFit(); });
 function noteFit(){ const m = $("tkNote"); m.style.height = "auto"; m.style.height = Math.max(m.scrollHeight + 2, 52) + "px"; }
 /* ○にした項目の程度の欄 */
@@ -1693,16 +1761,19 @@ async function revertTenken(){
   if(drop) await dropPhotos(no);
   renderSheet(); toast(no + " を未点検に戻しました");
 }
-$("undoLink").onclick = async e => {
-  e.preventDefault();
+/* 調査済み（入力した木）を未調査に戻す。樹木点検の画面では点検の入力だけを消して未点検に戻す */
+async function undoTree(){
   if(S.phase === "t"){ revertTenken(); return; }
   const no = noOf(treeById(selId));
-  if(!confirm("この樹木の入力を消して未調査に戻しますか？")) return;
+  if(!R.trees[selId]){ toast("この木はまだ入力していません"); return; }
+  if(!confirm((no || "この樹木") + " の入力（毎木調査・樹木点検）をすべて消して、未調査に戻しますか？")) return;
   const drop = askDropPhotos(no);
   delete R.trees[selId]; saveR();
   if(drop) await dropPhotos(no);
-  renderSheet(); scheduleMarks(); updProg();
-};
+  renderSheet(); scheduleMarks(); updProg(); toast((no || "この樹木") + " を未調査に戻しました");
+}
+$("undoLink").onclick = e => { e.preventDefault(); undoTree(); };
+$("undoBtn").onclick = ()=> undoTree();
 $("delLink").onclick = async e => {
   e.preventDefault();
   const no = noOf(treeById(selId));
@@ -1794,6 +1865,7 @@ async function openCam(kind){
   const r = recOf(selId);
   cam.kind = kind; cam.no = no; cam.sp = kind === "S" ? "" : (r.sp || (t.past && t.past.sp) || "");
   cam.cmts = kind === "1" ? ["全景"] : [];
+  camMark = null; updateMarkUI();
   if(kind === "P" && photosOf(no).some(m => m.kind === "P") && !confirm("プレートの写真は撮影済みです。撮り直しますか？")) return;
   if(kind === "1" && photosOf(no).some(m => m.kind === "1") && !confirm("全景の写真は撮影済みです。撮り直しますか？")) return;
   $("camNo").textContent = no || "調査状況";
@@ -1811,7 +1883,15 @@ async function openCam(kind){
    つかんだままになり、iPad を再起動するまで真っ暗になったことがある：2026-10-22）。
    取った映像は全部 camLive に入れて、閉じる・取り直すときは全部止める。待っている間に古くなった映像はすぐ止める */
 const camLive = new Set();
-let camGen = 0, camWatch = 0, camRetried = false, camBroken = false;
+let camGen = 0, camWatch = 0, camRetried = false, camBroken = false, camTest = false;
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+/* カメラの失敗を覚えておく（原因を調べるため。メニューの版の表示の下に出す） */
+function camLog(e){
+  const L = lsGet("nagano_camlog", []);
+  L.unshift({t: new Date().toLocaleString("ja-JP"), name: (e && e.name) || "?", msg: ((e && e.message) || "").slice(0, 120), vis: document.visibilityState});
+  lsSet("nagano_camlog", L.slice(0, 10));
+}
 const camShown = ()=> $("cam").classList.contains("show");
 function stopAllCams(){
   clearTimeout(camWatch);
@@ -1820,11 +1900,20 @@ function stopAllCams(){
 }
 async function restartCam(){
   const gen = ++camGen;
+  const had = camLive.size > 0;
   stopAllCams();
-  $("camVideo").srcObject = null;
-  let s;
-  try{ s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment", width: {ideal: 1920}, height: {ideal: 1440}}, audio: false}); }
-  catch(e){ if(gen === camGen) $("camNoCam").style.display = "flex"; return; }    // カメラが無い（PCで試すとき）
+  $("camVideo").srcObject = null; camTest = false; $("camNoCam").style.display = "none";
+  if(had) await wait(300);                 // 止めた直後はカメラがまだ放されていないことがある
+  let s = null, err = null;
+  // 失敗しても少し待って取り直す（アプリの切り替え直後などは、カメラの準備ができるまで失敗することがある）
+  for(let k = 0; k < 4 && !s; k++){
+    if(gen !== camGen || !camShown()) return;
+    if(document.hidden){ await wait(500); continue; }
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ err = {name: "NoMediaDevices"}; break; }
+    try{ s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment", width: {ideal: 1920}, height: {ideal: 1440}}, audio: false}); }
+    catch(e){ err = e; camLog(e); if(!IS_IOS && e.name === "NotFoundError") break; await wait([400, 900, 1600, 0][k]); }
+  }
+  if(!s){ if(gen === camGen && camShown()) camFail(err); return; }
   camLive.add(s);
   if(gen !== camGen || !camShown()){ s.getTracks().forEach(t => t.stop()); camLive.delete(s); return; }   // 待っている間に閉じた・取り直した
   cam.stream = s;
@@ -1846,6 +1935,24 @@ function watchCam(gen){
     else camBlack();
   }, 4000);
 }
+/* カメラを開けなかったとき。iPad では灰色の写真を撮らせず、原因と直し方を出す（灰色はカメラの無い PC での試験用だけ） */
+function camFail(e){
+  const n = (e && e.name) || "";
+  if(!IS_IOS && (n === "NotFoundError" || n === "NoMediaDevices")){
+    camTest = true;
+    $("camNoCam").innerHTML = "カメラがありません。<br>（PC での試験用に、灰色の画像で記録できます）";
+    $("camNoCam").style.display = "flex"; return;
+  }
+  const why = n === "NotAllowedError" ?
+      "カメラの使用が許可されていないか、アプリを切り替えた直後でカメラを使えませんでした。<br>［映像を取り直す］を押してください。<br>何度も出るときは iPad の 設定 → アプリ → Safari → カメラ を「許可」にしてください。" :
+    n === "NotReadableError" || n === "AbortError" ?
+      "ほかのアプリ（カメラ・FaceTime・街路樹の樹木点検アプリなど）がカメラを使っている可能性があります。<br>そのアプリを上にスワイプして終了してから、［映像を取り直す］を押してください。" :
+      "［映像を取り直す］を押してください。";
+  $("camNoCam").innerHTML = "<div>カメラを開けませんでした（" + esc(n || "不明") + "）<br><br>" + why +
+    "<br><br>直らないときは：アプリを上にスワイプして終了 → 開き直す → それでもだめなら iPad を再起動</div>";
+  $("camNoCam").style.display = "flex";
+  setCamBroken(true);
+}
 function camBlack(){
   if(!camRetried){ camRetried = true; toast("カメラの映像を取り直しています…"); restartCam(); return; }
   stopAllCams(); setCamBroken(true);
@@ -1857,11 +1964,14 @@ function setCamBroken(on){
   $("camShutter").style.opacity = on ? ".35" : "";
 }
 $("camReset").onclick = ()=>{ camRetried = false; setCamBroken(false); restartCam(); };
-/* 別のアプリに切り替えたらカメラを放し、戻ってきたら取り直す（そのままだと iPad では映像が止まることがある） */
+/* 別のアプリに切り替えたらカメラを放し、戻ってきたら取り直す（そのままだと iPad では映像が止まることがある）。
+   戻った直後はまだカメラを使えないことがあるので、少し待ってから開く */
+let visTimer = 0;
 document.addEventListener("visibilitychange", ()=>{
+  clearTimeout(visTimer);
   if(!camShown()) return;
   if(document.hidden){ camGen++; stopAllCams(); }
-  else { camRetried = false; restartCam(); }
+  else { camGen++; visTimer = setTimeout(()=>{ if(camShown() && !document.hidden){ camRetried = false; setCamBroken(false); restartCam(); } }, 600); }
 });
 /* 黒板の位置（左下／右下）。写真に描く位置もこれに合わせる */
 function applyBoardSide(){
@@ -1896,7 +2006,7 @@ function fitCam(){
   const fh = Math.min(h, w / CAM_AR), fw = fh * CAM_AR, f = $("camFrame");
   f.style.width = fw + "px"; f.style.height = fh + "px"; f.style.left = (w - fw) / 2 + "px"; f.style.top = (h - fh) / 2 + "px";
 }
-window.addEventListener("resize", ()=>{ if($("cam").classList.contains("show")) fitCam(); scheduleMarks(); });
+window.addEventListener("resize", ()=>{ if($("cam").classList.contains("show")){ fitCam(); updateMarkUI(); } scheduleMarks(); });
 function applyZoom(z){
   if(cam.hw){ z = Math.min(cam.hw.max, Math.max(cam.hw.min, z)); cam.track.applyConstraints({advanced: [{zoom: z}]}).catch(()=>{}); $("camVideo").style.transform = ""; }
   else { z = Math.min(3, Math.max(1, z)); $("camVideo").style.transform = z === 1 ? "" : "scale(" + z + ")"; }
@@ -1908,7 +2018,8 @@ function closeCam(){
   endReview(false);
   $("cam").classList.remove("show");
   camGen++; stopAllCams();                 // 取りかけの映像も含めて全部止める
-  $("camVideo").srcObject = null; $("camNoCam").style.display = "none";
+  $("camVideo").srcObject = null; $("camNoCam").style.display = "none"; camTest = false;
+  clearTimeout(visTimer);
 }
 /* 撮った写真の確認：1.5秒表示して閉じる。［撮り直す］はいま撮った写真を消してカメラに戻る */
 const REVIEW_MS = 1500;
@@ -1971,12 +2082,56 @@ function drawBoard(ctx, W, H){
   });
   ctx.textAlign = "left";
 }
+/* ---- 赤い破線の囲み（街路樹診断の樹木点検アプリと同じ）：全景・被害部の写真で、指でなぞった所を楕円で囲む ---- */
+let camMark = null, drawStart = null;
+const markOk = ()=> cam.kind === "1" || cam.kind === "2";
+function updateMarkUI(){
+  const box = $("camMarkBox"), f = $("camFrame");
+  if(camMark){
+    box.style.display = "block";
+    box.style.left = camMark.x * f.clientWidth + "px"; box.style.top = camMark.y * f.clientHeight + "px";
+    box.style.width = camMark.w * f.clientWidth + "px"; box.style.height = camMark.h * f.clientHeight + "px";
+  } else box.style.display = "none";
+  $("markClr").style.display = camMark ? "" : "none";
+  $("markHint").style.display = markOk() && !camMark ? "" : "none";
+}
+$("markClr").onclick = ()=>{ camMark = null; updateMarkUI(); };
+$("camDraw").addEventListener("pointerdown", e => {
+  if(!markOk() || drawStart) return;
+  try{ $("camDraw").setPointerCapture(e.pointerId); }catch(_){}
+  const r = $("camDraw").getBoundingClientRect();
+  drawStart = {id: e.pointerId, x: e.clientX - r.left, y: e.clientY - r.top};
+  e.preventDefault();
+});
+$("camDraw").addEventListener("pointermove", e => {
+  if(!drawStart || e.pointerId !== drawStart.id) return;
+  const r = $("camDraw").getBoundingClientRect();
+  const x2 = Math.max(0, Math.min(e.clientX - r.left, r.width)), y2 = Math.max(0, Math.min(e.clientY - r.top, r.height));
+  camMark = {x: Math.min(drawStart.x, x2) / r.width, y: Math.min(drawStart.y, y2) / r.height,
+             w: Math.abs(x2 - drawStart.x) / r.width, h: Math.abs(y2 - drawStart.y) / r.height};
+  updateMarkUI();
+});
+["pointerup", "pointercancel"].forEach(ev => $("camDraw").addEventListener(ev, e => {
+  if(!drawStart || e.pointerId !== drawStart.id) return;
+  drawStart = null;
+  if(camMark && (camMark.w < 0.04 || camMark.h < 0.04)) camMark = null;   // 誤タップは無視
+  updateMarkUI();
+}));
+function drawMark(ctx, W, H){
+  if(!camMark || !markOk()) return;
+  ctx.save();
+  ctx.setLineDash([W * 0.025, W * 0.015]);
+  ctx.strokeStyle = "#ff2a2a"; ctx.lineWidth = Math.max(3, W * 0.008);
+  ctx.beginPath();
+  ctx.ellipse((camMark.x + camMark.w / 2) * W, (camMark.y + camMark.h / 2) * H, camMark.w / 2 * W, camMark.h / 2 * H, 0, 0, Math.PI * 2);
+  ctx.stroke(); ctx.restore();
+}
 let shooting = false;
 $("camShutter").onclick = async ()=>{
   if(shooting || $("camReview").classList.contains("show")) return;
   const v = $("camVideo");
   // 映像が届いていないのに撮ると灰色の写真になる（灰色はカメラの無いPCでの試験用だけ）
-  if(camBroken || (cam.stream && !v.videoWidth) || (!cam.stream && $("camNoCam").style.display !== "flex")){ toast("映像が届いていません。少し待つか［映像を取り直す］を押してください"); return; }
+  if(camBroken || (cam.stream && !v.videoWidth) || (!cam.stream && !camTest)){ toast("映像が届いていません。少し待つか［映像を取り直す］を押してください"); return; }
   shooting = true;
   try{
     const c = document.createElement("canvas");
@@ -1987,9 +2142,10 @@ $("camShutter").onclick = async ()=>{
       const Hh = Math.min(1600, Math.round(ch)), Ww = Math.round(Hh * CAM_AR);
       c.width = Ww; c.height = Hh;
       c.getContext("2d").drawImage(v, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, Ww, Hh);
-    } else {
+    } else {                // カメラの無い PC での試験用（iPad では撮れない）
       c.width = 960; c.height = 1280; const x = c.getContext("2d"); x.fillStyle = "#666"; x.fillRect(0, 0, 960, 1280);
     }
+    drawMark(c.getContext("2d"), c.width, c.height);
     drawBoard(c.getContext("2d"), c.width, c.height);
     const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.86));
     c.width = c.height = 0;   // Safari は画像用のメモリの上限が低いので、使い終わった画像はすぐ返す
@@ -2190,7 +2346,8 @@ $("gpsBtn").onclick = ()=>{
   if(!navigator.geolocation){ toast("位置情報を使えません"); return; }
   if(gpsWatch != null){ navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; gps = null; $("gpsBtn").classList.remove("on"); renderGps(); return; }
   $("gpsBtn").classList.add("on");
-  let first = true;
+  toast("現在地を探しています…（空の開けた所の方が早く取れます）");
+  let first = true, warned = false;
   gpsWatch = navigator.geolocation.watchPosition(pos => {
     const c = ll2xy(pos.coords.latitude, pos.coords.longitude);
     gps = {east: c.east, north: c.north, acc: pos.coords.accuracy};
@@ -2201,8 +2358,27 @@ $("gpsBtn").onclick = ()=>{
       else toast("この地区の図面は GPS の座標と違うので「現在地合わせ」が要ります。番号の分かる木の所で木を選び、［この木の所にいる］を押してください");
       if(selId) renderSheet();
     }
+    // 誤差が100m以上：GPS ではなく、ネット（Wi-Fi・テザリング）の情報から大まかに推定している
+    if(pos.coords.accuracy > 100 && !warned){
+      warned = true;
+      alert("現在地の誤差が約 " + Math.round(pos.coords.accuracy) + "m あります。\n\n" +
+            "GPS で測れておらず、ネットの情報から大まかに推定しています。\n" +
+            "・Wi-Fi モデルの iPad には GPS がありません。テザリングでつないでも、iPad の位置は測れません\n" +
+            "　（GPS 付きの iPad〔Wi-Fi＋Cellular モデル〕か、Bluetooth の GPS 受信機が要ります）\n" +
+            "・GPS 付きの iPad なら：設定 → プライバシーとセキュリティ → 位置情報サービス → 「Safari のWebサイト」を「使用中」にし、「正確な位置情報」をオンにしてください");
+    }
     renderGps();
-  }, err => { toast("現在地を取れません：" + err.message); }, {enableHighAccuracy: true, maximumAge: 5000, timeout: 20000});
+  }, err => {
+    if(warned) return;
+    warned = true;
+    const why = err.code === 1 ?
+        "位置情報の使用が許可されていません。\n設定 → プライバシーとセキュリティ → 位置情報サービス をオンにし、「Safari のWebサイト」を「使用中」、「正確な位置情報」をオンにしてください。" :
+      err.code === 2 ?
+        "位置が分かりません。\nWi-Fi モデルの iPad には GPS が無いため、テザリングや電波の無い所では現在地を取れません。\n（GPS 付きの iPad〔Wi-Fi＋Cellular モデル〕か、Bluetooth の GPS 受信機が要ります）" :
+        "時間内に現在地を取れませんでした。空の開けた所で、もう一度［現在地］を押してください。\n（Wi-Fi モデルの iPad には GPS がありません）";
+    alert("現在地を取れません\n\n" + why);
+    navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; gps = null; $("gpsBtn").classList.remove("on"); renderGps();
+  }, {enableHighAccuracy: true, maximumAge: 5000, timeout: 30000});
 };
 
 /* ================= 一覧 ================= */
@@ -2304,7 +2480,9 @@ $("menuBtn").onclick = ()=>{
   });
   $("calInfo").innerHTML = pkg ? "現在地合わせ：" + regions().filter(r => r.district).map(r => esc(r.district) + " " + (r.geo ? "不要" : calOf(r.district).length + "点")).join("　") +
     "<br>GPS の点が図面に出ない・ずれるときは、番号の分かる木の所で木を選び、［この木の所にいる］を押します（2点以上・20m以上離すと向きも合います）。" : "";
-  $("verInfo").textContent = "画面 v" + APP_VER + (pkg ? "　図面データ " + pkg.created + "（樹木 " + pkg.trees.length + " 本）" : "");
+  const cl = lsGet("nagano_camlog", [])[0];
+  $("verInfo").textContent = "画面 v" + APP_VER + (pkg ? "　図面データ " + pkg.created + "（樹木 " + pkg.trees.length + " 本）" : "") +
+    (cl ? "　／カメラの失敗の記録：" + cl.t + " " + cl.name : "");
   $("menuM").classList.add("show");
 };
 $("setInsp").onchange = ()=>{ S.insp = $("setInsp").value.trim(); saveS(); };
