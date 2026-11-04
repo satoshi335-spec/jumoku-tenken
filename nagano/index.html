@@ -555,7 +555,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 16;
+const APP_VER = 17;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -1285,7 +1285,7 @@ function chipsSet(id, list, text, onClick, fld){
    nagano_words＝{欄: [覚えた言葉…]}、nagano_hide＝{欄: [［整理］で隠したはじめからの候補…]} */
 const WORD_MAX = 40;
 let myWords = lsGet("nagano_words", {}), hideWords = lsGet("nagano_hide", {}), wordDel = "";
-const WORD_PRESET = {shiNote: SHI_CHIPS, kareNote: KARE_CHIPS, gennin: GEN_CHIPS, slopeO: SLOPE_O_CHIPS, tkNote: TK_CHIPS};
+const WORD_PRESET = {sp: SP_CHIPS, shiNote: SHI_CHIPS, kareNote: KARE_CHIPS, gennin: GEN_CHIPS, slopeO: SLOPE_O_CHIPS, tkNote: TK_CHIPS};
 function rememberWords(fld, text, skip){
   let t = String(text || "");
   (skip || []).forEach(x => { if(x) t = t.split(x).join("。"); });
@@ -1347,7 +1347,7 @@ function renderSheet(){
   $("spOkTxt").innerHTML = r.spOk ? "" : (r.sp && psp && r.sp !== psp ? '<b style="color:var(--warn)">樹種訂正：' + esc(psp) + " → " + esc(r.sp) + "</b>（台帳の備考に入ります）" : (psp ? "違うときは下で選ぶ" : ""));
   $("sp").value = r.sp != null ? r.sp : "";
   $("sp").placeholder = "樹種";
-  chipsSet("spChips", SP_CHIPS, r.sp, w => { const rr = rec(selId); rr.sp = w; rr.spOk = !!psp && w === psp; if(!rr.st) rr.st = "done"; touch(rr); $("sp").value = w; renderSheet(); });
+  chipsSet("spChips", SP_CHIPS, r.sp, w => { const rr = rec(selId); rr.sp = w; rr.spOk = !!psp && w === psp; if(!rr.st) rr.st = "done"; touch(rr); $("sp").value = w; renderSheet(); }, "sp");
   renderNums();
   chipsSet("slopeChips", SLOPE_CHIPS.map(String), String(r.slope || ""), w => { const rr = rec(selId); rr.slope = w; if(!rr.st) rr.st = "done"; touch(rr); renderNums(); renderSheetChips(); });
   chipsSet("slopeOChips", SLOPE_O_CHIPS, r.slopeO, w => { const rr = rec(selId); rr.slopeO = toggleWord(rr.slopeO, w); if(!rr.st) rr.st = "done"; touch(rr); renderSheet(); }, "slopeO");
@@ -1432,7 +1432,8 @@ $("stSeg").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   const r = rec(selId); r.st = r.st === b.dataset.v ? "" : b.dataset.v; touch(r); renderSheet();
 });
 $("sp").addEventListener("input", ()=>{ const r = rec(selId), p = (treeById(selId) || {}).past; r.sp = $("sp").value.trim(); r.spOk = !!(p && p.sp) && r.sp === p.sp; if(!r.st) r.st = "done"; touch(r); });
-$("sp").addEventListener("change", ()=> renderSheet());
+$("sp").addEventListener("change", ()=>{ rememberWords("sp", $("sp").value); renderSheet(); });   // 手で入れた樹種は次の木から札で選べる
+$("noSp").addEventListener("change", ()=> rememberWords("sp", $("noSp").value));
 $("spOk").onclick = ()=>{
   const r = rec(selId), p = (treeById(selId) || {}).past; if(!p || !p.sp) return;
   if(r.spOk){ r.spOk = false; if(r.sp === p.sp) r.sp = ""; } else { r.spOk = true; r.sp = p.sp; }
