@@ -57,6 +57,7 @@
   const heightOf = (d, top, base) => d * (Math.tan(rad(top)) - Math.tan(rad(base)));
   const spreadOf = (d, delta) => 2 * d * Math.tan(rad(Math.abs(delta)) / 2);
   const wrap = d => ((d + 540) % 360) - 180;
+  const whole = H => Math.max(1, Math.round(+H.toFixed(1)));      // 樹高は四捨五入して整数で入れる（画面に出す小数1桁の値から。12.4999… が 12 にならないように）
 
   /* ---- 画面 ---- */
   const CSS = `
@@ -352,7 +353,7 @@
     const dh = S.slope ? S.d * Math.cos(rad(a.el)) : S.d;
     const H = heightOf(dh, b.el, a.el);
     S.res = !(H > 0) ? {err: "根元を先に、頂点をあとにタップしてください"} :
-      {value: +H.toFixed(1), label: "樹高 " + H.toFixed(1) + " m", note: "水平距離 " + dh.toFixed(1) + "m・根元 " + sg(a.el) + "・頂点 " + sg(b.el),
+      {value: whole(H), label: "樹高 " + whole(H) + " m", note: "測定値 " + H.toFixed(1) + "m（四捨五入して入れます）・水平距離 " + dh.toFixed(1) + "m・根元 " + sg(a.el) + "・頂点 " + sg(b.el),
        warn: b.el > 65 ? "木に近いので誤差が大きくなります。樹高と同じくらい離れると正確です" : ""};
   }
   function accept(){
