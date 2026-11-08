@@ -141,6 +141,8 @@ body.selOpen #sheet{display:block}
 .chips button.org{background:#f2f2f2;color:#555;border-color:#bbb}
 .chips button.org.del{background:var(--ng);color:#fff}
 #undoBtn{display:none;margin:6px 0 2px auto;font-size:13px;padding:6px 12px;border-radius:9px;border:1px solid var(--ng);background:#fff;color:var(--ng);font-weight:600}
+.tmRow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:5px;font-size:12px;color:#777}
+.tmRow a{color:#888;text-decoration:none;white-space:nowrap;padding:6px 0}
 .nums{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}
 .nd{border:2px solid var(--line);border-radius:10px;padding:4px 8px;background:#fff;min-height:54px}
 .nd small{display:block;font-size:11px;color:var(--tx2)}
@@ -379,6 +381,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
       <div class="nd" data-f="c"><small>幹周 (cm)</small><span id="dC"></span><em id="eC"></em></div>
       <div class="nd" data-f="slope"><small>地形傾斜 斜面(度)</small><span id="dSlope"></span><em id="eSlope"></em></div>
     </div>
+    <div class="tmRow"><a href="#" id="tmH">📐 樹高を測る</a><span id="ageTxt"></span></div>
     <div class="pad" id="pad">
       <button>7</button><button>8</button><button>9</button><button class="fn" data-k="bs">⌫</button><button class="fn" data-k="clr">消去</button>
       <button>4</button><button>5</button><button>6</button><button class="fn" data-k="plus">＋幹</button><button class="fn" data-k="prev">◀項目</button>
@@ -421,6 +424,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 
     <div id="tkBox" class="tk" style="display:none">
       <h4>樹木点検</h4>
+      <div class="tmRow"><span id="ageTxt2"></span></div>
       <div id="tkItems"></div>
       <div id="lvBox"><p class="lvHead">○にした項目の程度（A 軽度・B 処置が必要・C 緊急対応）。選ぶと特記事項に文が入ります</p><div id="lvList"></div></div>
       <div class="lbl">その他特記事項（異常の位置・内容・程度）</div>
@@ -577,11 +581,12 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <div id="busy"><div id="busyMsg">処理中…</div></div>
 <div id="toast" class="toast"></div>
 
+<script src="../common/treemeasure.js"></script>
 <script src="comments.js"></script>
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 22;
+const APP_VER = 24;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -1452,7 +1457,25 @@ function renderSheetChips(){
 /* 数字の入力（樹高・幹周・地形傾斜） */
 let curField = "h";
 const FIELDS = ["h", "c", "slope"];
+/* 樹高の測定（common/treemeasure.js）と推定樹齢。推定樹齢は画面に出すだけで、台帳・集計・点検表には入らない */
+function updAge(){
+  if(!selId || !window.TreeMeasure) return;
+  const t = treeById(selId), r = recOf(selId), p = (t && t.past) || {}, g = girthOf(r.c).c;
+  const a = TreeMeasure.ageText(r.sp || p.sp, g != null ? g : p.c);
+  $("ageTxt").textContent = a; $("ageTxt2").textContent = a;
+}
+function measureH(e){
+  e.preventDefault();
+  if(!window.TreeMeasure){ toast("測定の部品が読み込めていません。［メニュー］→［アプリを最新版に更新する］を押してください"); return; }
+  const t = treeById(selId), r = recOf(selId);
+  TreeMeasure.open({kind: "h", title: (noOf(t) || "番号なし") + "　" + (r.sp || (t.past && t.past.sp) || ""), onResult: v => {
+    const rr = rec(selId); rr.h = String(v); if(!rr.st) rr.st = "done";
+    touch(rr); renderNums(); toast("樹高 " + v + "m を入れました");
+  }});
+}
+$("tmH").onclick = measureH;
 function renderNums(){
+  updAge();
   const r = recOf(selId), p = (treeById(selId) || {}).past || {};
   const g = girthOf(r.c);
   $("dH").textContent = r.h || ""; $("eH").textContent = r.h ? "" : (p.h ? "前回 " + p.h : "");
@@ -1481,7 +1504,7 @@ $("pad").querySelectorAll("button").forEach(b => b.onclick = ()=>{
   touch(r); renderNums(); segSet("stSeg", r.st || "");
   if(curField === "slope") renderSheetChips();
 });
-function touch(r){ stamp(r); saveR(); scheduleMarks(); updProg(); renderMiss(); updUndo(); }
+function touch(r){ stamp(r); saveR(); scheduleMarks(); updProg(); renderMiss(); updUndo(); updAge(); }
 /* ［未調査に戻す］／［未点検に戻す］は、入力のある木だけに出す */
 function updUndo(){
   if(!selId) return;
