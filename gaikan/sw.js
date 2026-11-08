@@ -1,8 +1,10 @@
 // 古い版のキャッシュだけ消す（同じ場所にある他のアプリのキャッシュは残す）
-const VERSION = "gk-v10";
+const VERSION = "gj-v54";
 const ASSETS = [
   "./",
   "./index.html",
+  "./zumen.js",
+  "./comments.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -10,6 +12,7 @@ const ASSETS = [
   "../common/project.js",
   "../common/keypad.js",
   "../common/backup.js",
+  "../common/treemeasure.js",
   "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
 ];
 
@@ -28,6 +31,7 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
   if (e.request.mode === "navigate") {
+    // アプリ本体は「ネット優先」: オンラインなら常に最新版、圏外ならキャッシュ
     e.respondWith(
       fetch(e.request).then(res => {
         const clone = res.clone();
