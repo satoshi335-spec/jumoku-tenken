@@ -1,5 +1,5 @@
 // 古い版のキャッシュだけ消す（同じ場所にある他のアプリのキャッシュは残す）
-const VERSION = "gj-v52";
+const VERSION = "gj-v54";
 const ASSETS = [
   "./",
   "./index.html",
@@ -12,6 +12,7 @@ const ASSETS = [
   "../common/project.js",
   "../common/keypad.js",
   "../common/backup.js",
+  "../common/treemeasure.js",
   "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
 ];
 

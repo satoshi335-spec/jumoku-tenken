@@ -31,6 +31,9 @@ input[readonly]{background:#F1EFE8;color:var(--tx2)}
 #girth.empty{border-color:var(--ng-bd);background:var(--ng-bg)}
 #girthWarn{color:var(--ng-tx);font-weight:600}
 #tno{font-size:24px;font-weight:600;text-align:center;height:54px}
+.tmRow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:5px;font-size:12px;color:#777}
+.tmRow a{color:#888;text-decoration:none;white-space:nowrap;padding:6px 0}
+body.noTree .tmRow{display:none}
 .note{font-size:12px;color:var(--tx2);margin:5px 0 0}
 .note.manual{color:var(--acc)}
 .sug{display:none;gap:6px;flex-wrap:wrap;margin-top:6px}
@@ -372,6 +375,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
       </div>
     </div>
     <p id="girthDiff" class="note" style="margin-top:5px"></p>
+    <div class="tmRow"><span id="ageTxt"></span></div>
     <p class="note padHint" style="margin-top:2px">幹周りをタップするとテンキーが出ます。株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7）</p>
     <div class="kabuRow">
       <input type="checkbox" id="kabuChk">
@@ -568,6 +572,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 </div></div>
 <div id="toast" class="toast"></div>
 
+<script src="../common/treemeasure.js"></script>
 <script src="comments.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -1453,7 +1458,12 @@ $("parentBtn").onclick = ()=>{
   $("tno").dispatchEvent(new Event("input"));
 };
 
+/* 推定樹齢（common/treemeasure.js）。画面に出すだけで、CSV・点検表には入らない。樹木点検に樹高の測定は無い（点検表に樹高の欄が無い） */
+function tmUpd(){
+  $("ageTxt").textContent = window.TreeMeasure ? TreeMeasure.ageText($("sp").value, $("girth").value || $("girthPrev").value) : "";
+}
 function girthWarnUpd(){
+  tmUpd();
   const empty = !$("girth").value;
   $("girth").classList.toggle("empty", empty);
   $("girthWarn").textContent = empty ? "　⚠ 未入力" : "";
