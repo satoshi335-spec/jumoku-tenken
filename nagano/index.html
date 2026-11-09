@@ -474,6 +474,18 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
   </div>
 </div>
 
+<!-- 番号がほかの木に付いているとき -->
+<div class="dlg" id="dupDlg">
+  <div class="dlgBox">
+    <h3 id="dupTitle"></h3>
+    <p class="note" id="dupNote"></p>
+    <button class="btn" id="dupMove"></button>
+    <button class="btn sub" id="dupPos"></button>
+    <button class="btn sub" id="dupSame"></button>
+    <button class="btn sub" id="dupNo">やめる</button>
+  </div>
+</div>
+
 <!-- 天候（1日に1回） -->
 <div class="dlg" id="wxDlg">
   <div class="dlgBox">
@@ -586,7 +598,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 24;
+const APP_VER = 26;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -686,6 +698,10 @@ function repairNos(){
     if(r.oldNo && isNewNo(r.oldNo)){ delete r.oldNo; n++; }
     const pl = isNewNo(a.no) ? "new" : "ok";
     if(r.plate !== pl){ r.plate = pl; n++; }
+  });
+  pkg.trees.forEach(t => {
+    const r = R.trees[t.id];
+    if(r && r.oldNo && isNewNo(r.oldNo) && R.renamed[t.id]){ if(t.no) r.oldNo = t.no; else delete r.oldNo; n++; }
   });
   if(n) saveR();
 }
@@ -1050,12 +1066,13 @@ function usedNos(){
   Object.values(R.trees).forEach(r => { if(r.oldNo) u.add(r.oldNo); });   // 付け替える前の札の番号も使った番号
   return u;
 }
-function nextNoStr(){
-  const used = usedNos(), skip = new Set(S.noSkip || []);
+function firstFree(used){
+  const skip = new Set(S.noSkip || []);
   let n = noBase(), s;
   do { s = Y() + "-" + String(n).padStart(3, "0"); n++; } while(used.has(s) || skip.has(s));
   return s;
 }
+function nextNoStr(){ return firstFree(usedNos()); }
 /* いちばん大きい番号までで、使っていない番号（欠番にしたものは除く） */
 function gapNos(){
   const used = usedNos(), skip = new Set(S.noSkip || []);
@@ -1082,33 +1099,20 @@ function openNoDlg(ctx){
   $("noSpLbl").style.display = $("noSp").style.display = ctx.kind === "add" ? "" : "none";
   $("noDlg").classList.add("show");
 }
-$("noCancel").onclick = ()=> $("noDlg").classList.remove("show");
+$("noCancel").onclick = ()=>{
+  $("noDlg").classList.remove("show");
+  if(noCtx && noCtx.kind === "slide"){ slide = null; toast("番号の振り直しをやめました（何も変わっていません）"); }
+};
 $("noOk").onclick = ()=>{
   const no = $("noInp").value.trim().replace(/[ー－―]/g, "-").toUpperCase();
   if(!no){ toast("番号を入れてください"); return; }
   const c = noCtx;
+  if(c.kind === "slide"){ slideNext(no); return; }
   const cur = c.id ? treeById(c.id) : null;
   const dup = allTrees().find(t => noOf(t) === no && t.id !== c.id && (!cur || distOf(t) === distOf(cur))) ||
               allTrees().find(t => noOf(t) === no && t.id !== c.id);
-  if(dup && c.kind === "plate" && distOf(dup) === distOf(cur)){
-    // 札の番号の木が図面の別の位置にある（図面の番号の付け違い）→ その木を開く。
-    // 近く（15m以内）なら2本の位置を入れ替え、遠ければ札の番号の木をこの位置に移す
-    const here = posOf(cur), there = posOf(dup);
-    const near = Math.hypot(here.x - there.x, here.y - there.y) < 15 * pkg.map.ppm;
-    $("noDlg").classList.remove("show");
-    if(confirm(no + " は図面の " + Math.round(Math.hypot(here.x - there.x, here.y - there.y) / pkg.map.ppm) + "m 離れた所にあります。" +
-               (near ? "\n［OK］で " + no + " と " + (noOf(cur) || "この記号") + " の図面の位置を入れ替えます（番号の付け違いの直し）"
-                     : "\n［OK］で " + no + " の位置をいまの木の位置に直します") + "（［キャンセル］なら位置はそのまま）")){
-      const put = (t, p) => { const a = R.added.find(x => x.id === t.id); if(a){ a.x = p.x; a.y = p.y; } else R.moved[t.id] = {x: p.x, y: p.y}; };
-      put(dup, here);
-      if(near) put(cur, there);
-      reindex(); saveR();
-    }
-    navHist.push(c.id); select(dup.id, true, true); scheduleMarks();
-    return;
-  }
-  if(dup && c.kind === "plate" && !confirm(no + " は" + distOf(dup) + "の番号です。この木の番号にしますか？")) return;
-  if(dup && c.kind !== "plate" && !confirm(no + " は既にあります（" + (dup.added ? "新木" : "図面") + "）。それでも使いますか？")) return;
+  if(dup && c.kind === "add" && !confirm(no + " は既にあります（" + (dup.added ? "新木" : "図面") + "）。それでも使いますか？")) return;
+  if(dup && c.kind !== "add"){ openDup(c, no, cur, dup); return; }
   if(c.kind === "add"){
     const a = {id: "add-" + Date.now().toString(36), no, x: c.x, y: c.y, district: regionAt(c.x, c.y).district || S.dist};
     R.added.push(a); reindex();
@@ -1128,22 +1132,135 @@ $("noOk").onclick = ()=>{
 function renumber(t, no, kind){
   const r = rec(t.id), before = noOf(t);
   // 付け替える前の番号で撮った写真も新しい番号の名前にする（新しい札のときはプレートの写真は撮り直し）
-  if(before && before !== no){
-    photoMeta.filter(m => m.no === before && (t.added || kind === "plate" || kind === "assign" || m.kind !== "P"))
-      .forEach(m => { m.no = no; m.name = m.name.replace(before + "_", no + "_"); m.sent = false; });
-    savePhotoMeta();
-  }
-  if(kind === "assign" || kind === "plate"){ R.renamed[t.id] = no; if(kind === "plate"){ r.plate = "ok"; r.drawNo = t.no || ""; } }
-  else { r.oldNo = before; R.renamed[t.id] = no; r.plate = "new"; }
+  if(before && before !== no)
+    renamePhotos(photoMeta.filter(m => m.no === before && (t.added || kind === "plate" || kind === "assign" || m.kind !== "P")).map(m => [m, before, no]));
+  if(t.added || kind === "reno" || kind === "new" || no === t.no) setNo(t, no, before);
+  else if(kind === "assign") R.renamed[t.id] = no;
+  else { R.renamed[t.id] = no; delete r.oldNo; r.plate = "ok"; r.drawNo = t.no || ""; }   // 図面と違う番号の札が付いている
   if(!r.st) r.st = "done";
   stamp(r);
-  if(t.added){
-    // 新木の番号を直しただけ（台帳の「旧番号」には入れない）。R8 の番号なら新しい札、ほかは古い札
-    const a = R.added.find(x => x.id === t.id); a.no = no; delete R.renamed[t.id]; delete r.oldNo;
-    r.plate = isNewNo(no) ? "new" : "ok"; reindex();
-  }
-  saveR();
+  reindex(); saveR();
   renderSheet(); scheduleMarks(); updProg(); toast("番号を " + no + " にしました");
+}
+/* 番号と札の状態を決める
+   ・図面の番号に戻した → 札は付いている　・R8 の番号 → 新しい札（元の番号は台帳の備考に残す。
+     いったん出した R8 番号を別の R8 番号に直しただけなら、備考は図面の番号のまま）　・それ以外 → 古い札が付いている */
+function setNo(t, no, before){
+  const r = rec(t.id);
+  delete r.drawNo;
+  if(t.added){
+    R.added.find(x => x.id === t.id).no = no;
+    delete R.renamed[t.id]; delete r.oldNo; r.plate = isNewNo(no) ? "new" : "ok";
+  } else if(no === (t.no || "")){
+    delete R.renamed[t.id]; delete r.oldNo; r.plate = "ok";
+  } else if(isNewNo(no)){
+    const old = isNewNo(before) ? (r.oldNo || t.no || "") : before;
+    R.renamed[t.id] = no; r.plate = "new";
+    if(old) r.oldNo = old; else delete r.oldNo;
+  } else {
+    R.renamed[t.id] = no; delete r.oldNo; r.plate = "ok"; r.drawNo = t.no || "";
+  }
+  return r;
+}
+/* 写真の名前を番号に合わせて直す（list は同時に直す分 [[写真, 前の番号, 新しい番号]…]）。
+   事務所PCの写真フォルダも、次の調査結果の取り込みで同じように直す（R.photoRen） */
+function renamePhotos(list){
+  const pairs = [];
+  list.forEach(([m, before, no]) => {
+    const old = m.name;
+    m.no = no; m.name = m.name.replace(before + "_", no + "_");
+    if(m.name !== old) pairs.push([old, m.name]);
+  });
+  if(pairs.length){ (R.photoRen = R.photoRen || []).push({t: Date.now(), m: pairs}); savePhotoMeta(); thumbKey = ""; }
+  return pairs.length;
+}
+
+/* ---- 入れた番号がほかの木に付いているとき ----
+   前は「位置を入れ替える」しか無く、木の情報ごと入れ替わった。番号だけを移せるようにする */
+const treeLabel = t => (noOf(t) || "番号なし") + "（" + (recOf(t.id).sp || (t.past && t.past.sp) || "樹種なし") + "）";
+let dupCtx = null, slide = null;
+function openDup(c, no, cur, dup){
+  $("noDlg").classList.remove("show");
+  dupCtx = {c, no, cur, dup};
+  const same = distOf(dup) === distOf(cur);
+  $("dupTitle").textContent = no + " はほかの木に付いています";
+  $("dupNote").textContent = treeLabel(dup) + (same ? "" : "　" + distOf(dup)) + " の番号です。どうしますか？";
+  $("dupMove").textContent = "番号だけこの木に移す（" + treeLabel(dup) + " には別の番号を入れます）";
+  const here = posOf(cur), there = posOf(dup), m = Math.hypot(here.x - there.x, here.y - there.y) / pkg.map.ppm;
+  dupCtx.near = m < 15;
+  $("dupPos").textContent = (dupCtx.near ? "図面の位置を入れ替える（木の情報ごと）" : no + " の図面の位置をこの木の位置に直す") + "　" + Math.round(m) + "m";
+  $("dupPos").style.display = c.kind === "plate" && same ? "" : "none";
+  $("dupSame").textContent = "別の地区の番号なので、同じ番号のまま使う";
+  $("dupSame").style.display = !same && !isNewNo(no) ? "" : "none";
+  $("dupDlg").classList.add("show");
+}
+$("dupNo").onclick = ()=> $("dupDlg").classList.remove("show");
+$("dupSame").onclick = ()=>{ $("dupDlg").classList.remove("show"); renumber(dupCtx.cur, dupCtx.no, dupCtx.c.kind); };
+/* 図面の番号の付け違い：札の番号の木を開く。近く（15m以内）なら2本の位置を入れ替え、遠ければ札の番号の木をこの位置に移す */
+$("dupPos").onclick = ()=>{
+  const {c, cur, dup, near} = dupCtx, here = posOf(cur), there = posOf(dup);
+  $("dupDlg").classList.remove("show");
+  const put = (t, p) => { const a = R.added.find(x => x.id === t.id); if(a){ a.x = p.x; a.y = p.y; } else R.moved[t.id] = {x: p.x, y: p.y}; };
+  put(dup, here);
+  if(near) put(cur, there);
+  reindex(); saveR();
+  navHist.push(c.id); select(dup.id, true, true); scheduleMarks();
+};
+/* ---- 番号だけを移す（スライド） ----
+   A←R8-101（Bの番号）、B←R8-102（Cの番号）、C←元の番号 のように、番号を取られた木の番号を続けて聞く。
+   全部決まってから一度に直すので、途中で［やめる］と何も変わらない */
+$("dupMove").onclick = ()=>{
+  $("dupDlg").classList.remove("show");
+  slide = {plan: [{id: dupCtx.cur.id, no: dupCtx.no}]};
+  openSlide(dupCtx.dup.id);
+};
+function openSlide(id){
+  noCtx = {kind: "slide", id};
+  const t = treeById(id), r = recOf(id), last = slide.plan[slide.plan.length - 1], lastT = treeById(last.id);
+  const off = new Set(slide.plan.map(p => p.id).concat(id));
+  const used = new Set(slide.plan.map(p => p.no));
+  allTrees().forEach(x => { if(!off.has(x.id)) used.add(noOf(x)); });
+  Object.entries(R.trees).forEach(([i, x]) => { if(x.oldNo && !(off.has(i) && isNewNo(x.oldNo))) used.add(x.oldNo); });
+  const nn = firstFree(used), orig = r.oldNo || t.no || "";
+  $("noTitle").textContent = treeLabel(t) + " の新しい番号";
+  $("noNote").textContent = last.no + " は " + treeLabel(lastT) + " に移します。この木の番号を入れてください。" +
+    "ほかの木の番号を入れると、その木の番号も続けて聞きます。全部決まるまで何も変わりません。";
+  $("noInp").value = "";
+  // 最初の木がいま持っている番号を受け取れば、2本の入れ替えになる
+  const first = noOf(treeById(slide.plan[0].id));
+  const chips = (first && !slide.plan.some(p => p.no === first) ? [["入れ替える " + first, first]] : [])
+    .concat(orig && orig !== noOf(t) && orig !== first && !slide.plan.some(p => p.no === orig) ? [["元の番号 " + orig, orig]] : [])
+    .concat(nn !== first ? [["次の番号 " + nn, nn]] : []);
+  $("noChips").innerHTML = chips.map(([l, v]) => '<button data-v="' + esc(v) + '">' + esc(l) + "</button>").join("");
+  $("noChips").querySelectorAll("button").forEach(b => b.onclick = ()=> $("noInp").value = b.dataset.v);
+  $("noSpLbl").style.display = $("noSp").style.display = "none";
+  $("noDlg").classList.add("show");
+}
+function slideNext(no){
+  const cur = treeById(noCtx.id), inPlan = new Set(slide.plan.map(p => p.id));
+  if(slide.plan.some(p => p.no === no)){ toast(no + " はこの振り直しでほかの木に入れました。別の番号を入れてください"); return; }
+  const holder = allTrees().find(t => noOf(t) === no && t.id !== cur.id && !inPlan.has(t.id) && (isNewNo(no) || distOf(t) === distOf(cur)));
+  slide.plan.push({id: cur.id, no});
+  if(holder){ openSlide(holder.id); return; }
+  $("noDlg").classList.remove("show");
+  applySlide();
+}
+function applySlide(){
+  const mv = slide.plan.map(p => { const t = treeById(p.id), before = noOf(t); return {t, no: p.no, before}; });
+  slide = null;
+  const list = [];
+  mv.forEach(x => { if(x.before && x.before !== x.no) photoMeta.filter(m => m.no === x.before && m.kind !== "S").forEach(m => list.push([m, x.before, x.no])); });
+  const nPh = renamePhotos(list);
+  mv.forEach(x => {
+    const r = setNo(x.t, x.no, x.before);
+    if(r.st) stamp(r);
+    else r.t = Date.now();               // 番号だけの直しなので、まだ調査していない木は未調査のまま
+  });
+  reindex(); saveR();
+  renderSheet(); scheduleMarks(); updProg();
+  alert("番号を直しました。\n\n" + mv.map(x => (x.before || "番号なし") + " → " + x.no).join("\n") +
+        "\n\n次の新しい札：" + nextNoStr() +
+        (nPh ? "\n\n写真 " + nPh + " 枚の名前も直しました。写真の黒板には前の番号が写ったままです。必要なら撮り直してください。" : ""));
 }
 
 /* ================= 位置の微調整 =================
@@ -1557,7 +1674,7 @@ function plateSet(v){
 function undoNew(t, r){
   const cur = noOf(t), old = r.oldNo || "";
   if(!confirm("新しい札 " + cur + " をやめて、元の番号" + (old ? " " + old : "（番号なし）") + " に戻しますか？")) return false;
-  if(old){ photoMeta.filter(m => m.no === cur && m.kind !== "P").forEach(m => { m.no = old; m.name = m.name.replace(cur + "_", old + "_"); m.sent = false; }); savePhotoMeta(); }
+  if(old) renamePhotos(photoMeta.filter(m => m.no === cur && m.kind !== "P").map(m => [m, cur, old]));
   delete R.renamed[t.id]; delete r.oldNo; r.plate = "";
   touch(r); renderSheet();
   return true;
