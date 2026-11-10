@@ -92,6 +92,8 @@ body.ph-t #mmTgl{display:block}
 #tools{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}
 .tb{min-width:48px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.95);font-size:13px;color:var(--tx);padding:4px 8px}
 .tb.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+#northBtn{font-size:11px;line-height:1.25;border-color:var(--acc);color:var(--acc)}
+#northIc{display:inline-block;vertical-align:middle;transform-origin:50% 50%}
 .tb.add{background:var(--g);color:#fff;border-color:var(--g);font-weight:700}
 #legend{position:absolute;left:8px;top:8px;background:rgba(255,255,255,.93);border:1px solid var(--line);border-radius:10px;padding:5px 9px;font-size:12px;line-height:1.75}
 #legend i{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid;margin:0 3px -1px 7px}
@@ -323,6 +325,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
       <button class="tb add" id="addBtn">＋新木</button>
       <button class="tb" id="gpsBtn">現在地</button>
       <button class="tb" id="fitBtn">全体</button>
+      <button class="tb" id="northBtn" style="display:none"><svg id="northIc" viewBox="0 0 20 20" width="20" height="20"><path d="M10 1 L16 18 L10 14 L4 18 Z" fill="currentColor"/></svg><br>向きを戻す</button>
       <button class="tb" id="zinBtn">＋</button>
       <button class="tb" id="zoutBtn">－</button>
     </div>
@@ -609,7 +612,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 27;
+const APP_VER = 28;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -670,7 +673,7 @@ let S = lsGet("nagano_set", {});   // 設定（地区・天候・点検者…）
 let opt = lsGet("nagano_opt", {tags: true, past: true});
 let selId = null, mode = null;     // mode: "add"|"move"
 let photoMeta = [];                // [{key, name, no, kind, t, sent}]
-const V = {s: 1, tx: 0, ty: 0};
+const V = {s: 1, tx: 0, ty: 0, r: 0};
 
 /* 調査結果と写真の一覧は IndexedDB（容量が大きい）を本体にし、localStorage（約5MB・同じサイトの他のアプリと共用）は控え。
    2,000本の入力で約1.3MB、写真3,000枚の一覧で約0.7MB になるので、localStorage だけだと他のアプリと合わせて溢れるおそれがある */
@@ -798,7 +801,7 @@ async function openPkg(){
   $("spList").innerHTML = [...sps].map(s => '<option value="' + esc(s) + '">').join("");
   await buildMap();
   const last = lsGet("nagano_view", null);
-  if(last && last.pkg === pkg.id){ V.s = last.s; V.tx = last.tx; V.ty = last.ty; applyView(); } else { fitView(); applyView(); }
+  if(last && last.pkg === pkg.id){ V.s = last.s; V.tx = last.tx; V.ty = last.ty; V.r = last.r || 0; applyView(); } else { fitView(); applyView(); }
   renderAll();
 }
 function showEmpty(){
@@ -832,9 +835,11 @@ async function updateTiles(){
   const show = V.s > 0.22;
   const need = new Set();
   if(show){
-    const a = toImage(0, 0), b = toImage(vs.w, vs.h);
-    const i0 = Math.floor(Math.min(a.x, b.x) / m.tile), i1 = Math.floor(Math.max(a.x, b.x) / m.tile);
-    const j0 = Math.floor(Math.min(a.y, b.y) / m.tile), j1 = Math.floor(Math.max(a.y, b.y) / m.tile);
+    // 図面を回していると画面は図面の上で斜めの四角になるので、4つの角を囲む範囲を読む
+    const cs = [toImage(0, 0), toImage(vs.w, 0), toImage(0, vs.h), toImage(vs.w, vs.h)];
+    const xs = cs.map(c => c.x), ys = cs.map(c => c.y);
+    const i0 = Math.floor(Math.min(...xs) / m.tile), i1 = Math.floor(Math.max(...xs) / m.tile);
+    const j0 = Math.floor(Math.min(...ys) / m.tile), j1 = Math.floor(Math.max(...ys) / m.tile);
     for(let i = i0; i <= i1; i++) for(let j = j0; j <= j1; j++){ const k = i + "," + j; if(m.tileSet.includes(k)) need.add(k); }
   }
   tileBusy = true;
@@ -863,6 +868,7 @@ function viewSize(){
 function fitView(){
   if(!pkg) return;
   const vs = viewSize(), r = regionOf(S.dist);
+  V.r = 0;                                      // ［全体］は図面の向きも元に戻す
   V.s = Math.min(vs.w / r.w, vs.h / r.h) * 0.96;
   V.tx = (vs.w - r.w * V.s) / 2 - r.ox * V.s; V.ty = (vs.h - r.h * V.s) / 2 - r.oy * V.s;
 }
@@ -871,17 +877,33 @@ let viewSaveT = 0;
    指を止めて0.15秒たったら作り直す */
 let marksV = null, marksT = 0;
 function applyView(){
-  $("stage").style.transform = "translate(" + V.tx + "px," + V.ty + "px) scale(" + V.s + ")";
-  if(gest && (gest.mode === "pan" || gest.mode === "pinch") && marksV){
+  $("stage").style.transform = "translate(" + V.tx + "px," + V.ty + "px) rotate(" + V.r + "rad) scale(" + V.s + ")";
+  $("northBtn").style.display = Math.abs(V.r) > 0.001 ? "" : "none";
+  $("northIc").style.transform = "rotate(" + V.r + "rad)";      // ▲＝図面の上の向き
+  if(gest && (gest.mode === "pan" || gest.mode === "pinch" || gest.mode === "rot") && marksV){
     const k = V.s / marksV.s;
-    $("marks").style.transform = "translate(" + (V.tx - marksV.tx * k) + "px," + (V.ty - marksV.ty * k) + "px) scale(" + k + ")";
+    $("marks").style.transform = "translate(" + V.tx + "px," + V.ty + "px) rotate(" + (V.r - marksV.r) + "rad) scale(" + k + ") translate(" + (-marksV.tx) + "px," + (-marksV.ty) + "px)";
     renderGps();
     clearTimeout(marksT); marksT = setTimeout(scheduleMarks, 150);
   } else scheduleMarks();
-  clearTimeout(viewSaveT); viewSaveT = setTimeout(()=>{ lsSet("nagano_view", {s: V.s, tx: V.tx, ty: V.ty, pkg: pkg && pkg.id}); updateTiles(); }, 120);
+  clearTimeout(viewSaveT); viewSaveT = setTimeout(()=>{ lsSet("nagano_view", {s: V.s, tx: V.tx, ty: V.ty, r: V.r, pkg: pkg && pkg.id}); updateTiles(); }, 120);
 }
-const toScreen = (x, y)=> ({x: V.tx + V.s * x, y: V.ty + V.s * y});
-const toImage = (sx, sy)=> ({x: (sx - V.tx) / V.s, y: (sy - V.ty) / V.s});
+const toScreen = (x, y)=>{ const c = Math.cos(V.r), s = Math.sin(V.r); return {x: V.tx + V.s * (x * c - y * s), y: V.ty + V.s * (x * s + y * c)}; };
+const toImage = (sx, sy)=>{ const c = Math.cos(V.r), s = Math.sin(V.r), dx = (sx - V.tx) / V.s, dy = (sy - V.ty) / V.s; return {x: dx * c + dy * s, y: -dx * s + dy * c}; };
+/* 画面の向きの動き（px）→ 図面の向きの動き（図面の画素）。図面を回しているときも、指・矢印の向きに木が動くように */
+const scrVec = (dx, dy)=>{ const c = Math.cos(V.r), s = Math.sin(V.r); return {x: (dx * c + dy * s) / V.s, y: (-dx * s + dy * c) / V.s}; };
+/* 画面の点 (sx, sy) を中心に図面を d ラジアン回す（v28：3本指で回す） */
+function rotateAt(sx, sy, d){
+  const c = Math.cos(d), s = Math.sin(d), x = V.tx - sx, y = V.ty - sy;
+  V.tx = sx + x * c - y * s; V.ty = sy + x * s + y * c;
+  V.r = Math.atan2(Math.sin(V.r + d), Math.cos(V.r + d));
+}
+/* 指を離したとき、図面の向き（0°・90°・180°・270°）に近ければ、ぴったり合わせる */
+function snapTurn(){
+  const q = Math.PI / 2, near = Math.round(V.r / q) * q, d = near - V.r;
+  if(Math.abs(d) < 1e-6 || Math.abs(d) > 0.07) return;
+  const vs = viewSize(); rotateAt(vs.w / 2, vs.h / 2, d); applyView();
+}
 function zoomAt(sx, sy, f){
   const ns = Math.max(0.03, Math.min(6, V.s * f)), k = ns / V.s;
   V.tx = sx - (sx - V.tx) * k; V.ty = sy - (sy - V.ty) * k; V.s = ns; applyView();
@@ -927,7 +949,7 @@ function renderMarks(){
   }
   box.innerHTML = h;
   box.style.transform = "";
-  marksV = {s: V.s, tx: V.tx, ty: V.ty};
+  marksV = {s: V.s, tx: V.tx, ty: V.ty, r: V.r};
   renderLegend(); renderGps();
 }
 function renderLegend(){
@@ -954,12 +976,29 @@ function vpos(e){ const r = view.getBoundingClientRect(); return {x: e.clientX -
 /* iPad では2本指の操作のあと「指が離れた」知らせが来ないことがある。残った指の記録があると、
    1本指で動かしても拡大・縮小になり、タップも効かなくなる → 新しく触れ始めたときと、全部の指が離れたときに記録を消す */
 function resetPtrs(){ ptrs.clear(); gest = null; clearTimeout(lpTimer); }
+/* 触れている指の数に合わせて操作を決め直す（指が増えた・減ったとき）。
+   1本＝動かす／2本＝拡大・縮小／3本＝回す（v28）。回したあとは、指を全部離すまで拡大・縮小にしない
+   （3本の指はばらばらに離れるので、離すときに図面が動いたり大きさが変わったりしないように） */
+function regest(){
+  const was = gest && gest.mode, n = ptrs.size;
+  if(was === "rot" && n < 3) snapTurn();
+  if(!n){ gest = null; return; }
+  if(n >= 3){ gest = {mode: "rot", prev: new Map(ptrs), acc: 0, turning: false, multi: true, moved: true}; return; }
+  if(was === "rot" || was === "idle"){ gest = {mode: "idle", multi: true, moved: true}; return; }
+  if(n === 2){
+    const [a, b] = [...ptrs.values()];
+    gest = {mode: "pinch", d0: Math.hypot(a.x - b.x, a.y - b.y), s0: V.s, m0: {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}, t0x: V.tx, t0y: V.ty, multi: true, moved: true};
+  } else {
+    const p = [...ptrs.values()][0];
+    gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: true, multi: true};
+  }
+}
 view.addEventListener("pointerdown", e => {
   if(e.target.closest("#tools,#hint,#legend,#nudge")) return;
   if(!pkg) return;
   if(e.isPrimary) resetPtrs();                  // 1本目の指（前の指は全部離れている）
   try{ view.setPointerCapture(e.pointerId); }catch(err){}
-  if(ptrs.size >= 2) resetPtrs();               // 3本目が来たら数え直し
+  if(ptrs.size >= 3) resetPtrs();               // 4本目が来たら数え直し
   ptrs.set(e.pointerId, vpos(e));
   if(ptrs.size === 1){
     const p = vpos(e);
@@ -977,6 +1016,9 @@ view.addEventListener("pointerdown", e => {
     clearTimeout(lpTimer);
     const [a, b] = [...ptrs.values()];
     gest = {mode: "pinch", d0: Math.hypot(a.x - b.x, a.y - b.y), s0: V.s, m0: {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}, t0x: V.tx, t0y: V.ty, multi: true, moved: true};
+  } else if(ptrs.size === 3){
+    clearTimeout(lpTimer);
+    regest();                                   // 3本指＝図面を回す
   }
 });
 view.addEventListener("pointermove", e => {
@@ -984,7 +1026,8 @@ view.addEventListener("pointermove", e => {
   ptrs.set(e.pointerId, vpos(e));
   if(gest.mode === "drag"){
     const p = vpos(e), t = treeById(selId), q = posOf(t);
-    setPos(t, {x: q.x + (p.x - gest.lx) / V.s, y: q.y + (p.y - gest.ly) / V.s}, true);
+    const dv = scrVec(p.x - gest.lx, p.y - gest.ly);
+    setPos(t, {x: q.x + dv.x, y: q.y + dv.y}, true);
     gest.lx = p.x; gest.ly = p.y;
     return;
   }
@@ -999,17 +1042,31 @@ view.addEventListener("pointermove", e => {
     const ns = Math.max(0.03, Math.min(6, gest.s0 * d / gest.d0));
     const px = (gest.m0.x - gest.t0x) / gest.s0, py = (gest.m0.y - gest.t0y) / gest.s0;
     V.s = ns; V.tx = m.x - ns * px; V.ty = m.y - ns * py; applyView();
+  } else if(gest.mode === "rot" && ptrs.size === 3){
+    /* 3本の指の真ん中を中心に、指がねじれた分だけ回す。真ん中が動いた分は図面も動かす。大きさは変えない */
+    const cen = m => { let x = 0, y = 0; for(const p of m.values()){ x += p.x; y += p.y; } return {x: x / m.size, y: y / m.size}; };
+    const c0 = cen(gest.prev), c1 = cen(ptrs);
+    let da = 0, n = 0;
+    for(const [id, p] of ptrs){
+      const o = gest.prev.get(id); if(!o) continue;
+      if(Math.hypot(p.x - c1.x, p.y - c1.y) < 12 || Math.hypot(o.x - c0.x, o.y - c0.y) < 12) continue;   // 真ん中に近い指は角度が暴れる
+      const d = Math.atan2(p.y - c1.y, p.x - c1.x) - Math.atan2(o.y - c0.y, o.x - c0.x);
+      da += Math.atan2(Math.sin(d), Math.cos(d)); n++;
+    }
+    da = n ? da / n : 0;
+    gest.prev = new Map(ptrs);
+    V.tx += c1.x - c0.x; V.ty += c1.y - c0.y;
+    // 3本指で触れただけ・動かしただけでは回さない（約3°ねじってから回り始める）
+    if(!gest.turning){ gest.acc += da; da = 0; if(Math.abs(gest.acc) > 0.05) gest.turning = true; }
+    if(da) rotateAt(c1.x, c1.y, da);
+    applyView();
   }
 });
 function ptrEnd(e){
   if(!ptrs.has(e.pointerId)) return;
   ptrs.delete(e.pointerId); clearTimeout(lpTimer);
   if(!gest) return;
-  if(gest.mode === "pinch"){
-    if(ptrs.size === 1){ const p = [...ptrs.values()][0]; gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: true, multi: true}; }
-    else if(!ptrs.size) gest = null;
-    return;
-  }
+  if(gest.mode === "pinch" || gest.mode === "rot" || gest.mode === "idle"){ regest(); return; }
   if(ptrs.size) return;
   const g = gest; gest = null;
   if(g.mode === "drag"){ nudgeInfo(); return; }
@@ -1024,8 +1081,24 @@ view.addEventListener("pointercancel", ptrEnd);
 view.addEventListener("lostpointercapture", ptrEnd);
 // 画面から指が全部離れたのに記録が残っていたら消す（pointerup の後に来るので、タップの処理はそのまま）
 ["touchend", "touchcancel"].forEach(t => view.addEventListener(t, e => {
-  if(e.touches.length === 0) setTimeout(()=>{ if(ptrs.size) resetPtrs(); }, 0);
+  if(e.touches.length === 0){ setTimeout(()=>{ if(ptrs.size) resetPtrs(); }, 0); return; }
+  // 指が減ったのに記録が多いまま（離れた知らせが来なかった）なら、残っている指に近い記録だけ残す
+  const r = view.getBoundingClientRect(), ts = [...e.touches].map(t => ({x: t.clientX - r.left, y: t.clientY - r.top}));
+  setTimeout(()=>{
+    if(ptrs.size <= ts.length || !gest || !gest.multi) return;
+    const keep = new Map();
+    for(const q of ts){
+      let best = null, bd = 1e9;
+      for(const [id, p] of ptrs){ if(keep.has(id)) continue; const d = Math.hypot(p.x - q.x, p.y - q.y); if(d < bd){ bd = d; best = id; } }
+      if(best != null) keep.set(best, ptrs.get(best));
+    }
+    ptrs.clear(); keep.forEach((p, id) => ptrs.set(id, p));
+    regest();
+  }, 0);
 }, {passive: true}));
+// 3本指で触れたとき、iPad の「取り消す・コピー」などの3本指の操作が出にくいようにする
+view.addEventListener("touchstart", e => { if(e.touches.length >= 3 && e.cancelable) e.preventDefault(); }, {passive: false});
+$("northBtn").onclick = ()=>{ const vs = viewSize(); rotateAt(vs.w / 2, vs.h / 2, -V.r); V.r = 0; applyView(); toast("図面の向きを元に戻しました"); };
 addEventListener("blur", resetPtrs);
 document.addEventListener("visibilitychange", resetPtrs);
 view.addEventListener("wheel", e => { if(!pkg) return; e.preventDefault(); const p = vpos(e); zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015)); }, {passive: false});
@@ -1345,7 +1418,8 @@ let nudgeRep = 0;
 $("nudge").querySelectorAll(".ar button[data-d]").forEach(b => {
   const step = ()=>{
     const t = treeById(selId); if(!t) return;
-    const [dx, dy] = b.dataset.d.split(",").map(Number), m = (S.nStep || 0.5) * pkg.map.ppm, p = posOf(t);
+    const [ax, ay] = b.dataset.d.split(",").map(Number), m = (S.nStep || 0.5) * pkg.map.ppm, p = posOf(t);
+    const c = Math.cos(V.r), s = Math.sin(V.r), dx = ax * c + ay * s, dy = -ax * s + ay * c;
     setPos(t, {x: p.x + dx * m, y: p.y + dy * m});
     nudgeVisible(false);
   };
