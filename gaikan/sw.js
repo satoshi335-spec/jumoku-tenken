@@ -1,5 +1,5 @@
 // 古い版のキャッシュだけ消す（同じ場所にある他のアプリのキャッシュは残す）
-const VERSION = "gk-v11";
+const VERSION = "gk-v12";
 const ASSETS = [
   "./",
   "./index.html",

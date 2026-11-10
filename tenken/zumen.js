@@ -279,7 +279,8 @@ async function showDrawing(z, fit){
 
 /* ================= 拡大・移動 ================= */
 function vsize(){ const r = $z("zView").getBoundingClientRect(); return {w: r.width, h: r.height}; }
-function rdim(){ return (V.rot % 180) ? {w: V.h, h: V.w} : {w: V.w, h: V.h}; }
+/* 回した図面を囲む大きさ（斜めに回しているときも全体が入るように） */
+function rdim(){ const a = V.rot * Math.PI / 180, c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a)); return {w: V.w * c + V.h * s, h: V.w * s + V.h * c}; }
 function fitView(){
   const vs = vsize(), rd = rdim();
   if(!rd.w || !vs.w) return;
@@ -288,6 +289,7 @@ function fitView(){
 }
 function applyView(){
   $z("zStage").style.transform = "translate(" + V.tx + "px," + V.ty + "px) scale(" + V.s + ") rotate(" + V.rot + "deg) translate(" + (-V.w / 2) + "px," + (-V.h / 2) + "px)";
+  const rb = $z("zRot"); if(rb){ const f = rotFree(); rb.textContent = f ? "向きを戻す" : "回転"; rb.classList.toggle("on", f); }
   schedule();
 }
 function toScreen(x, y){
@@ -691,15 +693,67 @@ async function sync(){
   else schedule();
 }
 
-/* ================= 指の操作（1本指で移動、2本指で拡大、タップで選択） ================= */
+/* ================= 指の操作（1本指で移動、2本指で拡大、3本指で回す、タップで選択） ================= */
 const view = $z("zView");
 const ptrs = new Map();
 let gest = null, lastTap = {t: 0, x: 0, y: 0};
+/* ---- 3本指で回す（長野公園アプリと同じ操作）。画面の点 (sx, sy) を中心に d 度回す ---- */
+function rotateAt(sx, sy, d){
+  const a = d * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), x = V.tx - sx, y = V.ty - sy;
+  V.tx = sx + x * c - y * s; V.ty = sy + x * s + y * c;
+  V.rot = ((V.rot + d) % 360 + 360) % 360;
+}
+/* 指を離したとき、0°・90°・180°・270° の近く（±4°）なら、ぴったり合わせる */
+function snapRot(){
+  const near = Math.round(V.rot / 90) * 90, d = near - V.rot;
+  if(Math.abs(d) < 1e-6 || Math.abs(d) > 4) return;
+  const vs = vsize(); rotateAt(vs.w / 2, vs.h / 2, d); V.rot = ((near % 360) + 360) % 360;
+}
+const rotFree = ()=> Math.abs(V.rot - Math.round(V.rot / 90) * 90) > 0.01;
+/* 指の数に合わせて操作を決め直す。1本＝動かす／2本＝拡大・縮小／3本＝回す。
+   回したあとは指を全部離すまで何もしない（3本の指はばらばらに離れるので、図面が動かないように） */
+function regest(){
+  const was = gest && gest.mode, n = ptrs.size;
+  if(was === "rot" && n < 3){ snapRot(); applyView(); }
+  if(!n){ gest = null; return; }
+  if(n >= 3){ gest = {mode: "rot", prev: new Map(ptrs), acc: 0, turning: false, multi: true, moved: true}; return; }
+  if(was === "rot" || was === "idle"){ gest = {mode: "idle", multi: true, moved: true}; return; }
+  if(n === 2){
+    const [a, b] = [...ptrs.values()];
+    gest = {mode: "pinch", d0: Math.hypot(a.x - b.x, a.y - b.y), s0: V.s, m0: {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}, t0x: V.tx, t0y: V.ty, multi: true, moved: true};
+  } else {
+    const p = [...ptrs.values()][0];
+    gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, t0: Date.now(), moved: true, multi: true};
+  }
+}
+function rotMove(){
+  const cen = m => { let x = 0, y = 0; for(const p of m.values()){ x += p.x; y += p.y; } return {x: x / m.size, y: y / m.size}; };
+  const c0 = cen(gest.prev), c1 = cen(ptrs);
+  let da = 0, n = 0;
+  for(const [id, p] of ptrs){
+    const o = gest.prev.get(id); if(!o) continue;
+    if(Math.hypot(p.x - c1.x, p.y - c1.y) < 12 || Math.hypot(o.x - c0.x, o.y - c0.y) < 12) continue;
+    const d = Math.atan2(p.y - c1.y, p.x - c1.x) - Math.atan2(o.y - c0.y, o.x - c0.x);
+    da += Math.atan2(Math.sin(d), Math.cos(d)); n++;
+  }
+  da = n ? da / n * 180 / Math.PI : 0;
+  gest.prev = new Map(ptrs);
+  V.tx += c1.x - c0.x; V.ty += c1.y - c0.y;
+  if(!gest.turning){ gest.acc += da; da = 0; if(Math.abs(gest.acc) > 3) gest.turning = true; }   // 約3°ねじってから回り始める
+  if(da) rotateAt(c1.x, c1.y, da);
+  applyView();
+}
+/* ［回転］：90°ずつ回す。指で斜めに回してあるときは［向きを戻す］になり、元の向き（0°）に戻す */
+function rotBtnTap(){
+  if(rotFree()){ const vs = vsize(); rotateAt(vs.w / 2, vs.h / 2, -V.rot); V.rot = 0; applyView(); return; }
+  V.rot = ((Math.round(V.rot / 90) * 90 + 90) % 360 + 360) % 360; fitView(); applyView();
+}
 function vpos(e){ const r = view.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
 view.addEventListener("pointerdown", e => {
   if(e.target.closest("#zChoose")) return;
   if(e.isPrimary) ptrs.clear();           // 離した通知が抜けて残った指を消す
   try{ view.setPointerCapture(e.pointerId); }catch(_){}
+  if(ptrs.size >= 3){ ptrs.clear(); gest = null; }   // 4本目が来たら数え直し
   ptrs.set(e.pointerId, vpos(e));
   if(ptrs.size === 1){
     const p = vpos(e);
@@ -708,7 +762,7 @@ view.addEventListener("pointerdown", e => {
     const [a, b] = [...ptrs.values()];
     gest = {mode: "pinch", d0: Math.hypot(a.x - b.x, a.y - b.y), s0: V.s,
             m0: {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}, t0x: V.tx, t0y: V.ty, multi: true, moved: true};
-  }
+  } else if(ptrs.size === 3) regest();       // 3本指＝図面を回す
 });
 view.addEventListener("pointermove", e => {
   if(!ptrs.has(e.pointerId) || !gest) return;
@@ -725,17 +779,13 @@ view.addEventListener("pointermove", e => {
     const px = (gest.m0.x - gest.t0x) / gest.s0, py = (gest.m0.y - gest.t0y) / gest.s0;
     V.s = ns; V.tx = m.x - ns * px; V.ty = m.y - ns * py;
     applyView();
-  }
+  } else if(gest.mode === "rot" && ptrs.size === 3) rotMove();
 });
 function ptrEnd(e){
   if(!ptrs.has(e.pointerId)) return;
   ptrs.delete(e.pointerId);
   if(!gest) return;
-  if(gest.mode === "pinch"){
-    if(ptrs.size === 1){ const p = [...ptrs.values()][0]; gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: true, multi: true}; }
-    else if(!ptrs.size) gest = null;
-    return;
-  }
+  if(gest.mode === "pinch" || gest.mode === "rot" || gest.mode === "idle"){ regest(); return; }
   if(ptrs.size) return;
   const g = gest; gest = null;
   if(g.moved || g.multi || e.type === "pointercancel") return;
@@ -753,6 +803,8 @@ let touchN = 0;
   if(t !== "touchstart" && !touchN) setTimeout(()=>{ if(!touchN && ptrs.size){ ptrs.clear(); gest = null; } }, 120);
 }, {capture: true, passive: true}));
 view.addEventListener("wheel", e => { e.preventDefault(); const p = vpos(e); zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015)); }, {passive: false});
+// 3本指で触れたとき、iPad の「取り消す・コピー」などの3本指の操作が出にくいようにする
+view.addEventListener("touchstart", e => { if(e.touches.length >= 3 && e.cancelable) e.preventDefault(); }, {passive: false});
 
 /* ================= ボタン ================= */
 $z("zSel").onchange = ()=> showDrawing($z("zSel").value, true);
@@ -765,7 +817,7 @@ function stepDrawing(k){
 $z("zPrev").onclick = ()=> stepDrawing(-1);
 $z("zNext").onclick = ()=> stepDrawing(1);
 $z("zFit").onclick = ()=>{ fitView(); applyView(); };
-$z("zRot").onclick = ()=>{ V.rot = (V.rot + 90) % 360; fitView(); applyView(); };
+$z("zRot").onclick = rotBtnTap;
 $z("zFixBtn").onclick = ()=> setFixing(!fixing);
 $z("zAddBtn").onclick = ()=>{
   if(!listState()){ toast("先に点検データを取り込んでください"); return; }

@@ -376,7 +376,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
     </div>
     <p id="girthDiff" class="note" style="margin-top:5px"></p>
     <div class="tmRow"><span id="ageTxt"></span></div>
-    <p class="note padHint" style="margin-top:2px">幹周りをタップするとテンキーが出ます。株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7）</p>
+    <p class="note padHint" style="margin-top:2px">幹周りをタップするとテンキーが出ます。株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7）。直径しか測れないときはテンキーの［⌀直径］</p>
     <div class="kabuRow">
       <input type="checkbox" id="kabuChk">
       <label for="kabuChk">株立ち（各幹の周長から自動計算）</label>
@@ -2719,7 +2719,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
   const g = document.getElementById("girth"), chk = document.getElementById("kabuChk");
   document.body.classList.add("padGirth");
   SysKeypad.attach(g, {
-    label: "今回の幹周り", unit: "cm", kabu: true,
+    label: "今回の幹周り", unit: "cm", kabu: true, dia: true,   // ［⌀直径］直径から幹周（フォレストスキャナー用）
     canEdit: () => !document.body.classList.contains("noTree"),
     get: () => chk.checked ? stemVals().join("+") : g.value,
     set: (raw, info) => {

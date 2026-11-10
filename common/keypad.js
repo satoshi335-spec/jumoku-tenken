@@ -9,13 +9,15 @@
        get: () => "45+30",          // 開いたときの入力値（省略時は input.value）
        set: raw => {...},           // キーを押すたびに呼ばれる（省略時は input.value に入れて input イベント）
        canEdit: () => true,         // false のときは開かない
-       next: otherInput             // 決定キーを「次へ」にする
+       next: otherInput,            // 決定キーを「次へ」にする
+       dia: true                    // ［⌀直径］を出す：直径（cm）を入れると幹周（直径×π）を入れる。
+                                    //   unit が "m" なら m（小数2桁）、それ以外は cm（整数）
      });
 */
 (function (global) {
   "use strict";
 
-  var VERSION = 1;
+  var VERSION = 2;
   var CSS =
     "#sysPad{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#F1F0EA;border-top:1px solid #C9C7BD;" +
     "box-shadow:0 -4px 16px rgba(0,0,0,.12);padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);display:none;" +
@@ -35,10 +37,15 @@
     "#sysPad .ks button.fn{font-size:15px;background:#F7F6F1}" +
     "#sysPad .ks button.ok{grid-column:span 2;background:#0F6E56;color:#fff;border:none;font-size:17px;font-weight:600}" +
     "#sysPad .ks button.hid{visibility:hidden}" +
+    "#sysPad .dz{font-size:13px;border:1px solid #C9C7BD;background:#fff;border-radius:8px;padding:8px 9px;color:#6b6a64;white-space:nowrap;" +
+    "font-family:inherit;align-self:center;touch-action:manipulation}" +
+    "#sysPad .dz.on{background:#185FA5;color:#fff;border-color:#185FA5}" +
+    "#sysPad .dz.hid{display:none}" +
     "input.sysPadField{caret-color:transparent;cursor:pointer}" +
     "input.sysPadField.padOn{outline:3px solid #185FA5;outline-offset:1px}";
 
-  var pad, dp, nt, lb, okBtn, plusBtn, cur = null, raw = "";
+  var pad, dp, nt, lb, okBtn, plusBtn, diaBtn, cur = null, raw = "";
+  var diaOn = false, draw = "";      // ［⌀直径］：直径の入力中（draw＝入れた直径）
 
   function el(tag, cls, txt) {
     var e = document.createElement(tag);
@@ -58,7 +65,10 @@
     var hd = el("div", "hd");
     lb = el("span", "lb");
     dp = el("div", "dp");
-    hd.appendChild(lb); hd.appendChild(dp);
+    diaBtn = el("button", "dz", "⌀直径");
+    diaBtn.type = "button";
+    diaBtn.addEventListener("pointerdown", function (e) { e.preventDefault(); toggleDia(); });
+    hd.appendChild(lb); hd.appendChild(dp); hd.appendChild(diaBtn);
     nt = el("div", "nt");
     var ks = el("div", "ks");
     [["7"], ["8"], ["9"], ["⌫", "bs", "fn"],
@@ -103,9 +113,33 @@
              note: "株立ち" + p.length + "本立ち　幹周り＝(" + p.join("＋") + ")×0.7＝" + c + "cm" };
   }
 
+  /* 直径（cm）→ 幹周。株立ちは幹ごと。単位 m の欄（外観診断の幹周C）は m で小数2桁 */
+  function diaToGirth(s) {
+    var p = parts(s);
+    if (!p.length) return null;
+    var m = cur && cur.opts.unit === "m";
+    return p.map(function (d) { var c = Math.round(d * Math.PI); return m ? String(c / 100) : String(c); }).join("+");
+  }
+  function toggleDia() {
+    if (!cur || !cur.opts.dia) return;
+    if (cur.opts.canEdit && !cur.opts.canEdit()) return;
+    diaOn = !diaOn; draw = "";
+    diaBtn.classList.toggle("on", diaOn);
+    render();
+  }
+
   function render() {
     var o = cur.opts;
     var unit = o.unit ? "<small>" + o.unit + "</small>" : "";
+    lb.textContent = diaOn ? "直径 (cm)" : (o.label || "");
+    if (diaOn) {
+      dp.innerHTML = draw ? "⌀ " + esc(draw.replace(/\+/g, " ＋ ")) + "<small>cm</small>" : "<small>直径を入力（cm）</small>";
+      var gg = diaToGirth(draw), gk = o.kabu && gg ? girthOf(gg) : null;
+      nt.textContent = gg ? (o.label || "幹周") + " ＝ 直径×π ＝ " + gg.replace(/\+/g, "＋") + " " + (o.unit || "") +
+                            (gk && gk.kabu ? "（株立ち → " + gk.c + " " + (o.unit || "") + "）" : "") + "　を入れます"
+                          : "直径を入れると、幹周（直径×π）を入れます";
+      return;
+    }
     if (!raw) { dp.innerHTML = '<small>数字を入力</small>'; nt.textContent = ""; return; }
     var txt = raw.replace(/\+/g, " ＋ ");
     if (o.kabu) {
@@ -135,15 +169,22 @@
     var o = cur.opts;
     if (k === "ok") { var nx = o.next; close(); if (nx) open(nx); return; }
     if (o.canEdit && !o.canEdit()) { close(); return; }
-    if (k === "bs") raw = raw.slice(0, -1);
-    else if (k === "clr") raw = "";
-    else if (k === "plus") { if (!o.kabu) return; if (raw && raw.slice(-1) !== "+" && parts(raw).length < 8) raw += "+"; }
+    var s = diaOn ? draw : raw;
+    if (k === "bs") s = s.slice(0, -1);
+    else if (k === "clr") s = "";
+    else if (k === "plus") { if (!o.kabu) return; if (s && s.slice(-1) !== "+" && parts(s).length < 8) s += "+"; }
     else if (/^[0-9.]$/.test(k)) {
-      var last = raw.split("+").pop();
+      var last = s.split("+").pop();
       if (k === "." && (last.indexOf(".") > -1 || !last)) return;
       if (last.replace(".", "").length >= (o.maxDigits || 4)) return;
-      raw += k;
+      s += k;
     } else return;
+    if (diaOn) {
+      draw = s;
+      var g = diaToGirth(draw);
+      if (g == null) { render(); return; }      // 直径が空のあいだは、入っている幹周をそのままにする
+      raw = g;
+    } else raw = s;
     apply();
   }
 
@@ -157,6 +198,9 @@
     raw = String(f.opts.get ? f.opts.get() : input.value || "");
     lb.textContent = f.opts.label || "";
     plusBtn.classList.toggle("hid", !f.opts.kabu);
+    diaOn = false; draw = "";
+    diaBtn.classList.remove("on");
+    diaBtn.classList.toggle("hid", !f.opts.dia);
     okBtn.textContent = f.opts.next ? "次へ ▶" : "決定";
     input.classList.add("padOn");
     pad.classList.add("show");
@@ -170,6 +214,7 @@
   function close() {
     if (!cur) return;
     cur.input.classList.remove("padOn");
+    diaOn = false; draw = "";
     if (cur.opts.onClose) cur.opts.onClose();
     cur = null;
     if (pad) pad.classList.remove("show");

@@ -7,7 +7,7 @@
 (function (global) {
   "use strict";
 
-  var VERSION = 10;   // project.js を直したら1つ増やす（画面下に表示される）
+  var VERSION = 11;   // project.js を直したら1つ増やす（画面下に表示される）
   var KEY_P = "sys_projects", KEY_C = "sys_current";
 
   var TERM_PRESETS = {
@@ -80,6 +80,22 @@
   /* ===== 現場アプリ側に差し込む案件バー =====
      app: "tenken" | "gaikan"
      opts.apply(project) : そのアプリ固有の値流し込み処理 */
+  /* アプリを最新版に更新する（そのアプリのキャッシュと Service Worker だけ消して読み直す。入力した結果は消えない） */
+  var CACHE_PRE = { tenken: "gj-", gaikan: "gk-", jizen: "jizen-" };
+  function updateApp(app) {
+    var pre = CACHE_PRE[app];
+    var go = function (ver) {
+      if (!confirm("アプリを最新版に更新します" + (ver ? "（いまの版：" + ver + "）" : "") + "。\n入力した結果・写真・図面は消えません。")) return;
+      var p1 = ("caches" in window && pre) ? caches.keys().then(function (ks) {
+        return Promise.all(ks.filter(function (k) { return k.indexOf(pre) === 0; }).map(function (k) { return caches.delete(k); }));
+      }) : Promise.resolve();
+      var p2 = ("serviceWorker" in navigator) ? navigator.serviceWorker.getRegistration().then(function (r) { if (r) return r.unregister(); }) : Promise.resolve();
+      Promise.all([p1, p2]).catch(function () {}).then(function () { location.reload(); });
+    };
+    if ("caches" in window && pre) caches.keys().then(function (ks) { go(ks.filter(function (k) { return k.indexOf(pre) === 0; }).sort().pop() || ""); }, function () { go(""); });
+    else go("");
+  }
+
   function attachBar(app, opts) {
     opts = opts || {};
     var p = current();
@@ -107,8 +123,11 @@
 
     bar.innerHTML =
       '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nameHtml + "</span>" +
+      '<button type="button" id="sysUpd" style="color:#fff;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.35);border-radius:7px;' +
+      'padding:5px 10px;font:inherit;white-space:nowrap" title="アプリを最新版に更新する">⟳ 更新</button>' +
       '<a href="../" style="color:#fff;background:rgba(255,255,255,.16);border-radius:7px;' +
       'padding:6px 12px;text-decoration:none;white-space:nowrap">案件切替</a>';
+    bar.querySelector("#sysUpd").onclick = function () { updateApp(app); };
 
     function insert() {
       document.body.insertBefore(bar, document.body.firstChild);
@@ -137,7 +156,7 @@
   }
 
   global.SysProject = {
-    VERSION: VERSION,
+    VERSION: VERSION, updateApp: updateApp,
     TERM_PRESETS: TERM_PRESETS,
     all: all, current: current, setCurrent: setCurrent, upsert: upsert, remove: remove,
     terms: terms, exportJson: exportJson, importJson: importJson,

@@ -110,6 +110,10 @@ body.selOpen #sheet{display:block}
 #gDisp.act{border-color:var(--acc)}
 #gDisp small{font-size:14px;color:var(--tx2);font-weight:400}
 #gNote{font-size:12px;color:var(--acc);margin:4px 2px 0;min-height:16px;font-weight:600}
+.diaLink{display:inline-block;font-size:12px;color:#888;text-decoration:none;padding:4px 2px}
+body.noTree .diaLink{opacity:.35;pointer-events:none}
+.diaKeys{display:flex;gap:6px;margin-top:6px}
+.diaKeys button{flex:1;min-height:40px;border-radius:9px;border:1px solid var(--line);background:#F3F3EE;font-size:15px}
 #clsRow{font-size:13px;margin-top:4px}
 .cls{display:inline-block;padding:2px 8px;border-radius:6px;font-weight:600;font-size:12px}
 .cls.lt{background:var(--acc-bg);color:var(--acc)}
@@ -225,6 +229,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
       <button class="gb" id="gPaste">貼付</button>
     </div>
     <div id="gNote"></div>
+    <a href="#" id="gDiaLink" class="diaLink">⌀ 直径から幹周</a>
     <div id="clsRow"></div>
     <div class="pad" id="pad">
       <button>7</button><button>8</button><button>9</button><button class="fn" data-k="bs">⌫</button>
@@ -254,6 +259,18 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 </div>
 
 <!-- 台帳に無い樹木（新植・実生など）の追加 -->
+<div class="dlg" id="diaDlg">
+  <div class="dlgBox">
+    <h3 id="diaTitle">直径から幹周を出す</h3>
+    <p class="note">フォレストスキャナーなどで測った胸高直径（cm）を入れます。幹周＝直径×π（整数に四捨五入）。<br>株立ちは「32+20」のように＋でつなぎます（幹ごとに幹周にします）。</p>
+    <input class="inp" id="diaIn" inputmode="decimal" autocomplete="off" placeholder="直径（cm）例）32.5　株立ち 32+20" style="font-size:20px">
+    <div class="diaKeys"><button data-k="+">＋幹</button><button data-k="bs">⌫</button></div>
+    <p id="diaOut" style="font-size:16px;font-weight:700;color:var(--acc);min-height:1.5em;margin:10px 0 4px"></p>
+    <button class="btn" id="diaOk">幹周に入れる</button>
+    <button class="btn sub" id="diaNo">やめる</button>
+  </div>
+</div>
+
 <div class="dlg" id="addDlg">
   <div class="dlgBox">
     <h3 id="addTitle">台帳に無い樹木を追加</h3>
@@ -323,7 +340,12 @@ td.chg{background:#FFF3A0!important;font-weight:600}
     <div class="card">
       <h3>表示</h3>
       <div class="fl" id="optTags"></div>
-      <p class="note" id="verInfo"></p>
+    </div>
+    <div class="card">
+      <h3>アプリの更新</h3>
+      <p class="note" id="verInfo" style="margin-top:0"></p>
+      <button class="btn sub" id="updBtn">アプリを最新版に更新する</button>
+      <p class="note">画面がおかしいとき、新しい機能が出ないときに押してください。入力した調査結果・図面は消えません。</p>
     </div>
   </div>
 </div>
@@ -334,7 +356,7 @@ td.chg{background:#FFF3A0!important;font-weight:600}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");   // 古いiOSは display-mode が効かないため
-const APP_VER = 15;   // このファイルを直したら1つ増やす
+const APP_VER = 16;   // このファイルを直したら1つ増やす
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MEMO_CHIPS = ["新植", "植替え", "枯死", "衰弱", "傾斜", "根上がり", "支障物あり", "工事中", "番号違い"];
@@ -605,7 +627,8 @@ function renderNoDraw(key){
 
 /* ================= 図面の拡大・移動 ================= */
 function viewSize(){ const r = $("view").getBoundingClientRect(); return {w: r.width, h: r.height}; }
-function rotDims(){ return (V.rot % 180) ? {w: V.h, h: V.w} : {w: V.w, h: V.h}; }
+/* 回した図面を囲む大きさ（斜めに回しているときも全体が入るように） */
+function rotDims(){ const a = V.rot * Math.PI / 180, c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a)); return {w: V.w * c + V.h * s, h: V.w * s + V.h * c}; }
 function fitView(){
   const vs = viewSize(), rd = rotDims();
   if(!rd.w) return;
@@ -614,6 +637,7 @@ function fitView(){
 }
 function applyView(){
   $("stage").style.transform = "translate(" + V.tx + "px," + V.ty + "px) scale(" + V.s + ") rotate(" + V.rot + "deg) translate(" + (-V.w / 2) + "px," + (-V.h / 2) + "px)";
+  const f = rotFree(); $("rotBtn").textContent = f ? "向きを戻す" : "回転"; $("rotBtn").classList.toggle("on", f);
   scheduleMarks();
 }
 /* 図面の画素座標 → 画面座標 */
@@ -707,10 +731,61 @@ function renderNoPos(){
   box.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); select(b.dataset.id, false); });
 }
 
-/* ---- 指の操作（1本指で移動、2本指で拡大、タップで選択、長押しで追加） ---- */
+/* ---- 指の操作（1本指で移動、2本指で拡大、3本指で回す、タップで選択、長押しで追加） ---- */
 const ptrs = new Map();
 let gest = null, lastTap = {t: 0, x: 0, y: 0}, lpTimer = 0;
 const view = $("view");
+/* ---- 3本指で回す（長野公園アプリと同じ操作）。画面の点 (sx, sy) を中心に d 度回す ---- */
+function rotateAt(sx, sy, d){
+  const a = d * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), x = V.tx - sx, y = V.ty - sy;
+  V.tx = sx + x * c - y * s; V.ty = sy + x * s + y * c;
+  V.rot = ((V.rot + d) % 360 + 360) % 360;
+}
+/* 指を離したとき、0°・90°・180°・270° の近く（±4°）なら、ぴったり合わせる */
+function snapRot(){
+  const near = Math.round(V.rot / 90) * 90, d = near - V.rot;
+  if(Math.abs(d) < 1e-6 || Math.abs(d) > 4) return;
+  const vs = viewSize(); rotateAt(vs.w / 2, vs.h / 2, d); V.rot = ((near % 360) + 360) % 360;
+}
+const rotFree = ()=> Math.abs(V.rot - Math.round(V.rot / 90) * 90) > 0.01;
+/* 指の数に合わせて操作を決め直す。1本＝動かす／2本＝拡大・縮小／3本＝回す。
+   回したあとは指を全部離すまで何もしない（3本の指はばらばらに離れるので、図面が動かないように） */
+function regest(){
+  const was = gest && gest.mode, n = ptrs.size;
+  if(was === "rot" && n < 3){ snapRot(); applyView(); }
+  if(!n){ gest = null; return; }
+  if(n >= 3){ gest = {mode: "rot", prev: new Map(ptrs), acc: 0, turning: false, multi: true, moved: true}; return; }
+  if(was === "rot" || was === "idle"){ gest = {mode: "idle", multi: true, moved: true}; return; }
+  if(n === 2){
+    const [a, b] = [...ptrs.values()];
+    gest = {mode: "pinch", d0: Math.hypot(a.x - b.x, a.y - b.y), s0: V.s, m0: {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}, t0x: V.tx, t0y: V.ty, multi: true, moved: true};
+  } else {
+    const p = [...ptrs.values()][0];
+    gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, t0: Date.now(), moved: true, multi: true};
+  }
+}
+function rotMove(){
+  const cen = m => { let x = 0, y = 0; for(const p of m.values()){ x += p.x; y += p.y; } return {x: x / m.size, y: y / m.size}; };
+  const c0 = cen(gest.prev), c1 = cen(ptrs);
+  let da = 0, n = 0;
+  for(const [id, p] of ptrs){
+    const o = gest.prev.get(id); if(!o) continue;
+    if(Math.hypot(p.x - c1.x, p.y - c1.y) < 12 || Math.hypot(o.x - c0.x, o.y - c0.y) < 12) continue;
+    const d = Math.atan2(p.y - c1.y, p.x - c1.x) - Math.atan2(o.y - c0.y, o.x - c0.x);
+    da += Math.atan2(Math.sin(d), Math.cos(d)); n++;
+  }
+  da = n ? da / n * 180 / Math.PI : 0;
+  gest.prev = new Map(ptrs);
+  V.tx += c1.x - c0.x; V.ty += c1.y - c0.y;
+  if(!gest.turning){ gest.acc += da; da = 0; if(Math.abs(gest.acc) > 3) gest.turning = true; }   // 約3°ねじってから回り始める
+  if(da) rotateAt(c1.x, c1.y, da);
+  applyView();
+}
+/* ［回転］：90°ずつ回す。指で斜めに回してあるときは［向きを戻す］になり、元の向き（0°）に戻す */
+function rotBtnTap(){
+  if(rotFree()){ const vs = viewSize(); rotateAt(vs.w / 2, vs.h / 2, -V.rot); V.rot = 0; applyView(); return; }
+  V.rot = ((Math.round(V.rot / 90) * 90 + 90) % 360 + 360) % 360; fitView(); applyView();
+}
 function vpos(e){ const r = view.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
 view.addEventListener("pointerdown", e => {
   if(e.target.closest("#tools,#nopos,#pinBar,#nodraw,#legend")) return;
@@ -719,6 +794,7 @@ view.addEventListener("pointerdown", e => {
   // （残っていると1本指でも2本指と見なされ、移動が拡大縮小になってしまう）
   if(e.isPrimary) ptrs.clear();
   try{ view.setPointerCapture(e.pointerId); }catch(_){}
+  if(ptrs.size >= 3){ ptrs.clear(); gest = null; }   // 4本目が来たら数え直し
   ptrs.set(e.pointerId, vpos(e));
   if(ptrs.size === 1){
     const p = vpos(e);
@@ -730,7 +806,7 @@ view.addEventListener("pointerdown", e => {
     const [a, b] = [...ptrs.values()];
     gest = {mode: "pinch", d0: Math.hypot(a.x - b.x, a.y - b.y), s0: V.s,
             m0: {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}, t0x: V.tx, t0y: V.ty, multi: true, moved: true};
-  }
+  } else if(ptrs.size === 3){ clearTimeout(lpTimer); regest(); }   // 3本指＝図面を回す
 });
 view.addEventListener("pointermove", e => {
   if(!ptrs.has(e.pointerId) || !gest) return;
@@ -747,20 +823,14 @@ view.addEventListener("pointermove", e => {
     const px = (gest.m0.x - gest.t0x) / gest.s0, py = (gest.m0.y - gest.t0y) / gest.s0;
     V.s = ns; V.tx = m.x - ns * px; V.ty = m.y - ns * py;
     applyView();
-  }
+  } else if(gest.mode === "rot" && ptrs.size === 3) rotMove();
 });
 function ptrEnd(e){
   if(!ptrs.has(e.pointerId)) return;
   ptrs.delete(e.pointerId);
   clearTimeout(lpTimer);
   if(!gest) return;
-  if(gest.mode === "pinch"){
-    if(ptrs.size === 1){   // 1本指に戻ったら移動を続ける
-      const p = [...ptrs.values()][0];
-      gest = {mode: "pan", sx: p.x, sy: p.y, lx: p.x, ly: p.y, t0: Date.now(), moved: true, multi: true};
-    } else if(!ptrs.size) gest = null;
-    return;
-  }
+  if(gest.mode === "pinch" || gest.mode === "rot" || gest.mode === "idle"){ regest(); return; }   // 1本指に戻ったら移動を続ける（回したあとは除く）
   if(ptrs.size) return;
   const g = gest; gest = null;
   if(g.moved || g.multi || g.long || e.type === "pointercancel") return;
@@ -790,6 +860,8 @@ view.addEventListener("wheel", e => {
   zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015));
 }, {passive: false});
 document.addEventListener("gesturestart", e => e.preventDefault());
+// 3本指で触れたとき、iPad の「取り消す・コピー」などの3本指の操作が出にくいようにする
+view.addEventListener("touchstart", e => { if(e.touches.length >= 3 && e.cancelable) e.preventDefault(); }, {passive: false});
 
 function nearestTree(sx, sy, lim){
   let best = null, bd = lim;
@@ -1117,11 +1189,52 @@ $("pad").querySelectorAll("button").forEach(b => b.onclick = ()=>{
     if(last.replace(".", "").length >= 4) return;
     g += ch;
   }
-  r.g = g;
+  r.g = g; delete r.gDia;       // テンキーで直したら直径の控えは消す
   if(g && !r.st) r.st = "ok";
   touch(r); renderGirth();
   $("seg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.st === r.st));
 });
+/* 直径から幹周（v16）。立ち入りにくい所の木をフォレストスキャナー（iPhone）で直径だけ測ったとき用 */
+function diaCalc(s){
+  const ds = String(s || "").replace(/[＋]/g, "+").replace(/[０-９．]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .split("+").map(x => x.trim()).filter(x => x !== "");
+  if(!ds.length || ds.some(x => !(parseFloat(x) > 0) || !/^\d+(\.\d*)?$/.test(x))) return null;
+  return ds.map(x => Math.round(parseFloat(x) * Math.PI));
+}
+function diaShow(){
+  const cs = diaCalc($("diaIn").value), g = cs ? girthOf(cs.join("+")) : null;
+  $("diaOut").textContent = !cs ? ($("diaIn").value.trim() ? "数字を入れてください" : "") :
+    "幹周 " + cs.join("＋") + " cm" + (cs.length > 1 ? "（→ " + g.c + "cm）" : "");
+  $("diaOk").disabled = !cs;
+}
+$("gDiaLink").onclick = e => {
+  e.preventDefault();
+  const t = treeById(selId); if(!t) return;
+  const r = recOf(selId);
+  if(r.st === "gone" || r.st === "nomasu"){ toast("樹木が無い記録には幹周を入れません"); return; }
+  $("diaTitle").textContent = dispNo(t) + "：直径から幹周を出す";
+  $("diaIn").value = r.gDia || ""; diaShow();
+  $("diaDlg").classList.add("show");
+  setTimeout(()=> $("diaIn").focus(), 50);
+};
+$("diaIn").oninput = diaShow;
+$("diaDlg").querySelectorAll(".diaKeys button").forEach(b => b.onclick = ()=>{
+  const el = $("diaIn");
+  if(b.dataset.k === "bs") el.value = el.value.slice(0, -1);
+  else if(el.value && !/\+\s*$/.test(el.value)) el.value += "+";
+  diaShow(); el.focus();
+});
+$("diaNo").onclick = ()=> $("diaDlg").classList.remove("show");
+$("diaOk").onclick = ()=>{
+  const cs = diaCalc($("diaIn").value); if(!cs || !treeById(selId)) return;
+  const r = rec(selId);
+  r.g = cs.join("+"); r.gDia = $("diaIn").value.replace(/\s/g, "");   // 入れた直径の控え（集計・図面には出ない）
+  if(!r.st) r.st = "ok";
+  $("diaDlg").classList.remove("show");
+  touch(r); renderGirth();
+  $("seg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.st === r.st));
+  toast("直径 " + r.gDia + "cm → 幹周 " + cs.join("＋") + "cm を入れました");
+};
 /* 幹周のコピー・貼り付け（株立ちの内訳ごと）。iPadのクリップボードにも幹周の数字を入れる */
 $("gCopy").onclick = ()=>{
   const r = recOf(selId), g = girthOf(r.g);
@@ -1201,7 +1314,7 @@ function stepDw(dir){
 $("prevDw").onclick = ()=> stepDw(-1);
 $("nextDw").onclick = ()=> stepDw(1);
 $("fitBtn").onclick = ()=>{ fitView(); applyView(); };
-$("rotBtn").onclick = ()=>{ V.rot = (V.rot + 90) % 360; fitView(); applyView(); };
+$("rotBtn").onclick = rotBtnTap;
 $("zinBtn").onclick = ()=>{ const v = viewSize(); zoomAt(v.w / 2, v.h / 2, 1.6); };
 $("zoutBtn").onclick = ()=>{ const v = viewSize(); zoomAt(v.w / 2, v.h / 2, 1 / 1.6); };
 window.addEventListener("resize", ()=>{ scheduleMarks(); });
@@ -1370,6 +1483,14 @@ async function openMenu(){
   $("menuM").classList.add("show");
 }
 $("menuBtn").onclick = openMenu;
+$("updBtn").onclick = async ()=>{
+  if(!confirm("アプリを最新版に更新します（入力した調査結果・図面は消えません）")) return;
+  try{
+    const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith("jizen-")).map(k => caches.delete(k)));
+    const r = await navigator.serviceWorker.getRegistration(); if(r) await r.unregister();   // 事前調査アプリの分だけ（ほかのアプリはそのまま）
+  }catch(e){}
+  location.reload();
+};
 $("impBtn").onclick = ()=> $("impFile").click();
 $("impFile").addEventListener("change", async e => {
   const f = e.target.files[0]; e.target.value = "";
