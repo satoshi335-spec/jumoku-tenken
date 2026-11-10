@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0F6E56">
-<title>樹木点検 現場入力</title>
+<meta name="theme-color" content="#9E4A0E">
+<title>外観診断 現場入力</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
-:root{--g:#0F6E56;--g-dark:#085041;--bg:#F4F4F0;--card:#fff;--line:#D8D6CC;--tx:#1c1c1a;--tx2:#6b6a64;
+:root{--g:#9E4A0E;--g-dark:#6E3308;--bg:#F4F4F0;--card:#fff;--line:#D8D6CC;--tx:#1c1c1a;--tx2:#6b6a64;
 --ok-bg:#EAF3DE;--ok-tx:#3B6D11;--warn-bg:#FAEEDA;--warn-tx:#854F0B;--ng-bg:#FCEBEB;--ng-tx:#A32D2D;--ng-bd:#E24B4A;--acc:#185FA5;--acc-bg:#E6F1FB}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;background:var(--bg);color:var(--tx);padding-bottom:40px}
@@ -27,47 +27,42 @@ label.lbl{display:block;font-size:12px;color:var(--tx2);margin:12px 0 5px}
 label.lbl:first-child{margin-top:0}
 input,textarea,select{width:100%;font-size:16px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--tx);font-family:inherit}
 input:focus,textarea:focus{outline:2px solid var(--g);border-color:var(--g)}
-input[readonly]{background:#F1EFE8;color:var(--tx2)}
-#girth.empty{border-color:var(--ng-bd);background:var(--ng-bg)}
-#girthWarn{color:var(--ng-tx);font-weight:600}
 #tno{font-size:24px;font-weight:600;text-align:center;height:54px}
 .tmRow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:5px;font-size:12px;color:#777}
 .tmRow a{color:#888;text-decoration:none;white-space:nowrap;padding:6px 0}
-body.noTree .tmRow{display:none}
 .note{font-size:12px;color:var(--tx2);margin:5px 0 0}
 .note.manual{color:var(--acc)}
 .sug{display:none;gap:6px;flex-wrap:wrap;margin-top:6px}
 .sug.show{display:flex}
 .chip{font-size:14px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--tx);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sec{font-size:14px;font-weight:600;margin:16px 0 8px}
+.sec:first-child{margin-top:0}
 .sec small{font-weight:400;color:var(--tx2)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-#saveRow{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:8px;margin-top:10px}
-#saveRow .btn{margin-top:0;font-size:15px}
-#saveRow .btn.nav{background:var(--g-dark)}
-#saveRow .btn:disabled{opacity:.4}
-#listInfo{display:none;margin-top:8px;padding:9px 11px;background:var(--acc-bg);border-radius:9px;
-  font-size:13px;line-height:1.7;color:var(--tx)}
-#listInfo.show{display:block}
-#listInfo b{font-weight:600}
-#listInfo .bikou{color:var(--ng-tx);font-weight:600}
-.emptyBtn{border-color:var(--tx2);color:var(--tx2)}
-.emptyBtn.on{background:var(--tx2);color:#fff;border-color:var(--tx2);font-weight:600}
-body.noTree .itm,body.noTree #girth,body.noTree .kabuRow,body.noTree #kabuBox{opacity:.35;pointer-events:none}
-#listBody tr.picked{background:var(--acc-bg)}
-#listBody td.chk{text-align:center;font-size:17px;cursor:pointer;user-select:none;width:34px}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.itm{font-size:14px;min-height:52px;padding:8px 6px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--tx);line-height:1.35;font-family:inherit}
+.itm{font-size:14px;min-height:48px;padding:8px 6px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--tx);line-height:1.35;font-family:inherit;width:100%;text-align:left}
 .itm.on{background:var(--ng-bg);color:var(--ng-tx);border-color:var(--ng-bd);font-weight:600}
+.itmRow{margin-bottom:8px}
+.itmRow input.nt{display:none;margin-top:4px;font-size:14px;padding:8px}
+.itmRow.on input.nt{display:block}
+.seg{display:flex;border:1px solid var(--g);border-radius:10px;overflow:hidden;margin:4px 0}
+.segBtn{flex:1;padding:11px 2px;font-size:13px;font-weight:600;background:#fff;color:var(--g);border:none;font-family:inherit;border-left:1px solid var(--line)}
+.segBtn:first-child{border-left:none}
+.segBtn.on{background:var(--g);color:#fff}
+.seg.h4 .segBtn{font-size:11px;line-height:1.2}
+.ratioBox{background:#F8F8F4;border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px}
+.ratioBox .row{display:flex;gap:6px;align-items:center}
+.ratioBox input{font-size:15px;padding:8px 4px;text-align:center}
+.ratioVal{font-size:14px;font-weight:600;color:var(--g);white-space:nowrap}
 .badge{font-size:13px;padding:5px 12px;border-radius:8px;font-weight:600}
-#statusRow{display:flex;gap:10px;align-items:center;margin:14px 0;flex-wrap:wrap}
-#photoHint{font-size:13px;color:var(--tx2)}
+#photoRow{display:flex;gap:8px;margin-top:10px}
+.pbtn{flex:1;min-height:52px;font-size:15px;font-weight:600;border-radius:12px;border:1px solid var(--g);background:#fff;color:var(--g);font-family:inherit}
+.pbtn.done{background:var(--ok-bg);color:var(--ok-tx);border-color:var(--ok-tx)}
 .btn{display:block;width:100%;min-height:52px;font-size:17px;font-weight:600;border:none;border-radius:12px;font-family:inherit}
-#saveRow .btn{background:var(--g);color:#fff}
-#saveRow .btn:active{background:var(--g-dark)}
+#saveBtn{background:var(--g);color:#fff;margin-top:10px}
+#saveBtn:active{background:var(--g-dark)}
 #cancelEdit{background:#fff;border:1px solid var(--line);color:var(--tx2);margin-top:8px;display:none;min-height:44px;font-size:15px}
-#editBanner,#insertBanner{display:none;background:var(--acc-bg);color:var(--acc);font-size:13px;font-weight:600;padding:8px 12px;border-radius:8px;margin-bottom:10px}
+#editBanner{display:none;background:var(--acc-bg);color:var(--acc);font-size:13px;font-weight:600;padding:8px 12px;border-radius:8px;margin-bottom:10px}
 .rowFlex{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .miniBtn{font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--tx);font-family:inherit;white-space:nowrap}
 .miniBtn.del{color:var(--ng-tx)}
@@ -77,74 +72,26 @@ summary{font-size:14px;font-weight:600;padding:12px 14px;background:var(--card);
 summary::-webkit-details-marker{display:none}
 details[open] summary{border-radius:14px 14px 0 0;border-bottom:none}
 details .card{border-radius:0 0 14px 14px;margin-bottom:0}
-.seg{display:flex;border:1px solid var(--g);border-radius:10px;overflow:hidden;margin-bottom:12px}
-.segBtn{flex:1;padding:11px 0;font-size:14px;font-weight:600;background:#fff;color:var(--g);border:none;font-family:inherit}
-.segBtn.on{background:var(--g);color:#fff}
-.kabuRow{display:flex;align-items:center;gap:8px;margin-top:8px}
-.kabuRow label{font-size:14px;font-weight:600}
-.kabuRow input[type=checkbox]{width:22px;height:22px;accent-color:var(--g)}
-#kabuBox{display:none;margin-top:8px;padding:10px;background:#F8F8F4;border:1px solid var(--line);border-radius:10px}
-#kabuBox.show{display:block}
-#kabuBox input{font-size:15px;padding:8px 4px;text-align:center}
-#kabuNote{font-size:12px;color:var(--acc);margin:8px 0 0;font-weight:600;word-break:break-all}
-/* テンキー入力のとき（common/keypad.js）は株立ちのチェック欄・幹ごとの入力欄は使わない */
-body.padGirth .kabuRow,body.padGirth #stems,body.padGirth #kabuBox > p.note{display:none}
-body.padGirth #kabuBox{padding:6px 10px;margin-top:6px}
-.padHint{display:none}
-body.padGirth .padHint{display:block}
 #sumChips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.sumChip{flex:1;min-width:90px;text-align:center;padding:10px 4px;border-radius:10px;font-size:12px}
+.sumChip{flex:1;min-width:80px;text-align:center;padding:10px 4px;border-radius:10px;font-size:12px}
 .sumChip b{display:block;font-size:20px}
 .tblWrap{overflow-x:auto;margin-top:4px}
 table.sum{border-collapse:collapse;width:100%;font-size:13px;min-width:520px}
 table.sum th{font-size:11px;color:var(--tx2);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 table.sum td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
-table.sum td.memoCell{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 .rjudge{font-size:11px;padding:3px 8px;border-radius:6px;white-space:nowrap;font-weight:600}
 #listPanel{display:none}
 #listPanel.show{display:block}
-#listProg{font-size:13px;color:var(--tx2);margin:8px 0 0}
-#listProg b{color:var(--g)}
-/* 程度（A軽度・B処置が必要・C緊急対応）と点検コメント集 */
-#lvBox{display:none;margin-top:12px;padding:8px 10px;background:#F8F8F4;border:1px solid var(--line);border-radius:10px}
-#lvBox.show{display:block}
-#lvBox .lvHead{font-size:12px;color:var(--tx2);margin:0 0 4px}
-.lvRow{display:flex;align-items:center;gap:6px;padding:7px 0;border-top:1px dashed var(--line);flex-wrap:wrap}
-.lvRow:first-of-type{border-top:none}
-.lvName{flex:1;min-width:130px;font-size:13px;font-weight:600}
-.lvBtn{min-width:64px;min-height:40px;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:600;font-family:inherit;color:var(--tx);line-height:1.15}
-.lvBtn small{display:block;font-size:10px;font-weight:400}
-.lvBtn.on[data-lv=A]{background:#E3F1E0;border-color:#4C8C3F;color:#2D5E24}
-.lvBtn.on[data-lv=B]{background:var(--warn-bg);border-color:#C98A00;color:var(--warn-tx)}
-.lvBtn.on[data-lv=C]{background:var(--ng-bg);border-color:var(--ng-tx);color:var(--ng-tx)}
-.lvTool{min-height:40px;padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:12px;font-family:inherit;color:var(--acc)}
-#urgent{display:none;background:var(--ng-tx);color:#fff}
-/* 伐採（程度B・Cの項目に出るボタン。押した樹木は「要伐採」） */
-.lvCut{min-height:40px;padding:4px 10px;border-radius:8px;border:1px solid var(--ng-tx);background:#fff;font-size:13px;font-weight:700;font-family:inherit;color:var(--ng-tx)}
-.lvCut.on{background:var(--ng-tx);color:#fff}
-/* 半枯れ（枯死・著しい衰弱がBのときに出るボタン。処置は維持管理） */
-.lvHan{min-height:40px;padding:4px 10px;border-radius:8px;border:1px solid #8a5a00;background:#fff;font-size:13px;font-weight:700;font-family:inherit;color:#8a5a00}
-.lvHan.on{background:#8a5a00;color:#fff}
-#cutBadge{display:none;background:#fff;color:var(--ng-tx);border:2px solid var(--ng-tx)}
-/* 要経過観察（②活力点検・③樹木の異常の項目が全部A＝軽度） */
-:root{--obs-bg:#EFE6F7;--obs-tx:#6A3D9A}
-table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
-.tcItem{padding:10px 0;border-top:1px solid var(--line)}
-.tcItem b{font-size:14px}
-.tcL{display:block;font-size:12px;font-weight:600;margin:6px 0 2px}
-.tcL[data-l=A]{color:#2D5E24}.tcL[data-l=B]{color:var(--warn-tx)}.tcL[data-l=C]{color:var(--ng-tx)}
-.tcItem textarea{font-size:14px}
-.tcMod{color:var(--acc);font-weight:400}
-/* 要確認（幹周り未入力・写真不足・写真だけで点検が未保存） */
+#progWrap{display:none;margin-bottom:12px}
+.toast{position:fixed;bottom:16px;left:12px;right:12px;max-width:640px;margin:0 auto;background:var(--g-dark);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
+.toast.show{opacity:1}
+#view-sum{display:none}
+@media(min-width:700px){ main{padding:16px 24px} }
+/* 要確認（写真だけで未保存・写真不足・総合判定なし） */
 #issueBar{display:none;background:var(--ng-bg);color:var(--ng-tx);border:1px solid var(--ng-bd);border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:13px;font-weight:600}
 #issueBar.show{display:block}
 #issueBar button,#issueList button{font-size:13px;padding:6px 10px;margin:4px 6px 0 0;border-radius:8px;border:1px solid var(--ng-bd);background:#fff;color:var(--ng-tx);font-family:inherit;font-weight:600}
-#issueList button small{font-weight:400;color:var(--tx2)}
-/* 要確認の樹木ごとの［未点検に戻す］ */
-.issueItem{display:inline-flex;align-items:stretch;margin:4px 6px 0 0}
-.issueItem button{margin:0 !important}
-.issueItem button[data-k]{border-radius:8px 0 0 8px !important}
-#issueBar .issueItem button.issueRev,#issueList .issueItem button.issueRev{border-radius:0 8px 8px 0 !important;border-left:none !important;background:#FFF7F7;color:var(--tx2);font-weight:400;font-size:12px;padding:6px 8px}
+#issueList button small,#issueBar button small{font-weight:400;color:var(--tx2)}
 /* 写真ZIPの書き出し（iPadは1個ずつボタンを押して保存） */
 #zipDlg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:45;align-items:center;justify-content:center;padding:16px}
 #zipDlg.show{display:flex}
@@ -157,14 +104,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 .zipRow button.ready{background:var(--g);color:#fff}
 .zipRow button.done{border-color:var(--ok-tx);color:var(--ok-tx);background:var(--ok-bg)}
 .zipRow button:disabled{opacity:.55}
-.toast{position:fixed;bottom:16px;left:12px;right:12px;max-width:640px;margin:0 auto;background:var(--g-dark);color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
-.toast.show{opacity:1}
-#view-sum{display:none}
-@media(min-width:700px){ .grid2{grid-template-columns:repeat(3,1fr)} main{padding:16px 24px} }
-/* ===== 小黒板カメラ ===== */
-#photoRow{display:flex;gap:8px;margin-top:10px}
-.pbtn{flex:1;min-height:52px;font-size:15px;font-weight:600;border-radius:12px;border:1px solid var(--g);background:#fff;color:var(--g);font-family:inherit}
-.pbtn.done{background:var(--ok-bg);color:var(--ok-tx);border-color:var(--ok-tx)}
+/* ===== カメラ ===== */
 #camModal{display:none;position:fixed;inset:0;background:#000;z-index:40;flex-direction:column}
 #camTop{display:flex;gap:8px;align-items:center;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;color:#fff}
 #camNo{background:#1b6b5f;border:2px solid #fff;border-radius:8px;padding:6px 12px;font-size:20px;font-weight:700}
@@ -172,10 +112,8 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 #camClose{margin-left:auto;background:#333;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:14px;font-family:inherit}
 #camWrap{position:relative;flex:1;overflow:hidden;background:#000}
 #camFrame{position:absolute;overflow:hidden;background:#111}
-#camWide{display:none;position:absolute;left:50%;top:56px;transform:translateX(-50%);z-index:6;background:#000b;color:#FFE08A;
-  font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;white-space:nowrap;pointer-events:none}
 #camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:center center}
-#camNoCam{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#ccc;font-size:13px;text-align:center;padding:16px;line-height:1.7}
+#camNoCam{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#888;font-size:13px;text-align:center}
 #camBoard{position:absolute;left:3%;bottom:3%;width:46%;background:#1b6b5f;border:3px solid #fff;color:#fff}
 #camBoard .krow{display:flex;border-bottom:2px solid #fff;font-size:10px}
 #camBoard .klab{padding:3px 4px;border-right:2px solid #fff;white-space:nowrap}
@@ -210,6 +148,11 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 #camBottom{display:flex;align-items:center;justify-content:center;padding:14px 0 calc(env(safe-area-inset-bottom) + 14px);background:#000}
 #camShutter{width:74px;height:74px;border-radius:50%;background:#fff;border:5px solid #999}
 #camShutter:disabled{opacity:.4}
+#camFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
+/* 黒板は左下／右下を切り替えられる（右にしたらズームのボタンは左へ） */
+#camBoard.right{left:auto;right:3%}
+#zoomCtl.left{right:auto;left:8px}
+#camSide{background:#1b6b5f;color:#fff;border:1px solid #fff;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;white-space:nowrap}
 /* 撮った写真の確認（少しの間そのまま表示。撮り直しもできる） */
 #camReview{display:none;position:absolute;inset:0;z-index:60;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px}
 #camReview.show{display:flex}
@@ -220,17 +163,12 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 #camRevOk{background:#1b6b5f;color:#fff}
 #camRevTime{width:220px;height:4px;background:#444;border-radius:2px;overflow:hidden}
 #camRevTime i{display:block;height:100%;width:100%;background:#7fd3b8}
-#camFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
-/* 黒板は左下／右下を切り替えられる（右にしたらズームのボタンは左へ） */
-#camBoard.right{left:auto;right:3%}
-#zoomCtl.left{right:auto;left:8px}
-#camSide{background:#1b6b5f;color:#fff;border:1px solid #fff;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;white-space:nowrap}
 </style>
 </head>
 <body>
 <header>
   <div class="hdTop">
-    <h1>樹木点検 <span style="font-size:11px;opacity:.7;font-weight:400">v42</span></h1>
+    <h1>外観診断 <span style="font-size:11px;opacity:.7;font-weight:400">v8</span></h1>
     <div id="hdInfo"></div>
   </div>
   <div class="tabs">
@@ -242,212 +180,192 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 <main>
 <div id="view-input">
   <details id="setPanel">
-    <summary>基本設定（点検者・事務所・路線）</summary>
+    <summary>基本設定（樹木医・ブロック・黒板）</summary>
     <div class="card">
-      <label class="lbl">点検者（固定）</label>
+      <label class="lbl">樹木医（固定）</label>
       <input id="inspector" placeholder="例）三宅 智（樹木医番号1105）">
-      <label class="lbl">点検事務所</label>
-      <input id="office" data-key="office" placeholder="例）茨木土木事務所">
-      <div id="sug-office" class="sug"></div>
-      <label class="lbl">路線名</label>
-      <input id="route" data-key="route" placeholder="例）423号">
-      <div id="sug-route" class="sug"></div>
+      <label class="lbl">ブロック名</label>
+      <input id="block" data-key="block" placeholder="例）杉本キャンパス本館地区">
+      <div id="sug-block" class="sug"></div>
       <label class="lbl">黒板の業務名（写真の小黒板に表示）</label>
-      <input id="koji" placeholder="例）令和8年度 街路樹診断業務（未入力なら事務所+路線名）">
-      <p class="note">一度入力すれば記憶されます。変えるときだけ開いてください</p>
-    </div>
-  </details>
-
-  <details id="tcPanel">
-    <summary>点検コメント集（特記事項に自動で入る文）</summary>
-    <div class="card">
-      <p class="note" style="margin-top:0">点検項目と程度（A＝軽度／B＝処置が必要／C＝緊急対応が必要）ごとの文です。
-        1行に1つの文。複数行にすると、入力画面の［候補］で切り替えられます（1行目が既定）。
-        ここで直した文はこのiPadに保存されます。［書き出し］したファイルを事務所PCに送れば、全員の初期値に取り込めます。</p>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
-        <button type="button" class="miniBtn pri" id="tcExport">書き出し</button>
-        <button type="button" class="miniBtn" id="tcImport">読み込み</button>
-        <input type="file" id="tcFile" accept=".json,application/json" style="display:none">
-        <button type="button" class="miniBtn del" id="tcReset">初期値に戻す</button>
-      </div>
-      <div id="tcEdit"></div>
+      <input id="koji" placeholder="例）枚岡公園　危険木調査業務(7)">
+      <p class="note">一度入力すれば記憶されます</p>
     </div>
   </details>
   <details>
     <summary>全データのバックアップ・復元</summary>
-    <div class="card"><div id="sysBackup" data-app="樹木点検"></div></div>
+    <div class="card"><div id="sysBackup" data-app="外観診断"></div></div>
   </details>
 
-  <details id="cfgPanel">
-    <summary>入力の設定（リスト取込・点検日時・市名/町名）</summary>
-    <div class="card">
-      <div class="seg" style="margin-bottom:12px">
-        <button type="button" class="segBtn on" id="segManual">手動入力</button>
-        <button type="button" class="segBtn" id="segList">Excelリスト</button>
+  <div class="card" id="listPanel2">
+    <div class="rowFlex">
+      <span style="font-size:14px;font-weight:600">診断対象リスト（任意）</span>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="miniBtn pri" id="importBtn">リスト取込</button>
+        <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none">
       </div>
-
-      <div id="listPanel">
-        <div class="rowFlex">
-          <span style="font-size:14px;font-weight:600">点検リスト</span>
-          <div style="display:flex;gap:6px">
-            <button type="button" class="miniBtn pri" id="importBtn">リスト取込</button>
-            <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none">
-          </div>
-        </div>
-        <p id="listProg" class="note">リスト未取込。Excel（樹木番号・樹木名・図面番号・市名・町名の列）または CSV を取り込めます</p>
-        <div style="display:flex;gap:6px;margin:10px 0 14px">
-          <button type="button" class="miniBtn" id="skipBtn">この樹木をスキップ</button>
-          <button type="button" class="miniBtn" id="insertBtn">リスト外の樹木を挿入</button>
-        </div>
-      </div>
-
-      <label class="lbl">点検日時（自動・タップで変更可）</label>
-      <input id="dt" type="datetime-local">
-      <div class="grid2" style="margin-top:12px">
-        <div>
-          <label class="lbl">市名</label>
-          <input id="city" data-key="city" placeholder="吹田市">
-        </div>
-        <div>
-          <label class="lbl">町名</label>
-          <input id="town" data-key="town" placeholder="江坂町4">
-        </div>
-      </div>
-      <div id="sug-city" class="sug"></div>
-      <div id="sug-town" class="sug"></div>
     </div>
-  </details>
-
-  <div class="card">
-    <div id="issueBar"></div>
-    <div id="editBanner"></div>
-    <div id="insertBanner">リスト外の樹木を入力中。保存するとリストに戻ります</div>
-    <div id="progWrap" style="display:none;margin-bottom:12px">
+    <p id="listProg" class="note">未取込。点検アプリのCSV（判定が外観診断の行）やExcel（樹木番号・樹種名の列）を取り込めます</p>
+    <div id="progWrap">
       <div class="rowFlex" style="margin-bottom:5px">
-        <span style="font-size:13px;font-weight:600">点検進捗</span>
+        <span style="font-size:13px;font-weight:600">診断進捗</span>
         <span id="progTxt" style="font-size:13px;color:var(--tx2)"></span>
       </div>
       <div style="height:8px;background:#EAE8E0;border-radius:4px;overflow:hidden">
         <div id="progBar" style="height:100%;width:0%;background:var(--g);border-radius:4px;transition:width .3s"></div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1.1fr 1.6fr 0.9fr;gap:8px">
-      <div>
-        <label class="lbl">図面番号</label>
-        <input id="zumen" data-key="zumen" placeholder="8" style="font-size:18px;height:54px;text-align:center">
-      </div>
-      <div>
-        <label class="lbl">桝No.</label>
-        <input id="tno" autocomplete="off" placeholder="例）L1">
-      </div>
-      <div>
-        <label class="lbl">樹木No.（補助番号）</label>
-        <input id="hojo" autocomplete="off" placeholder="L38／1" style="font-size:20px;font-weight:600;text-align:center;height:54px">
-      </div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button type="button" class="miniBtn" id="skipBtn">この樹木をスキップ</button>
+      <button type="button" class="miniBtn del" id="delListBtn">リスト削除</button>
     </div>
-    <div id="sug-zumen" class="sug"></div>
-    <div id="listInfo"></div>
-    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-      <button type="button" class="miniBtn" id="edaBtn">＋補助番号(1)</button>
-      <button type="button" class="miniBtn" id="edaKanaBtn">＋補助番号(イ)</button>
-      <button type="button" class="miniBtn" id="parentBtn">次の本番号へ</button>
-    </div>
-    <p id="tnoNote" class="note">前回保存の続き番号を自動提案。欠番は打ち直せば以降その番号から連番</p>
-    <label class="lbl">樹木名</label>
-    <input id="sp" data-key="sp" placeholder="例）イチョウ">
-    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-      <button type="button" class="miniBtn emptyBtn" id="karaBtn">空桝</button>
-      <button type="button" class="miniBtn emptyBtn" id="nashiBtn">桝無し</button>
-      <button type="button" class="miniBtn emptyBtn" id="bassaiZumiBtn">伐採済</button>
-      <button type="button" class="miniBtn emptyBtn" id="masshoBtn" title="重複した番号を整理するとき。点検表には出ません">番号抹消</button>
-      <button type="button" class="miniBtn" id="treeBtn" style="display:none">樹木ありに戻す</button>
-    </div>
+  </div>
+
+  <div class="card">
+    <div id="issueBar"></div>
+    <div id="editBanner"></div>
+    <label class="lbl">診断日時（自動・タップで変更可）</label>
+    <input id="dt" type="datetime-local">
+    <label class="lbl">樹木番号</label>
+    <input id="tno" autocomplete="off" placeholder="例）R7-430">
+    <p id="tnoNote" class="note">保存すると次の番号を自動提案</p>
+    <label class="lbl">樹種名</label>
+    <input id="sp" data-key="sp" placeholder="例）クスノキ">
     <div id="sug-sp" class="sug"></div>
+    <div class="grid3" style="margin-top:12px">
+      <div><label class="lbl">樹高H (m)</label><input id="th" type="number" inputmode="decimal" placeholder="12"></div>
+      <div><label class="lbl">幹周C (m)</label><input id="tc" type="number" inputmode="decimal" placeholder="3.1"></div>
+      <div><label class="lbl">枝張W (m)</label><input id="tw" type="number" inputmode="decimal" placeholder="8"></div>
+    </div>
+    <div class="tmRow"><a href="#" id="tmH">📐 樹高を測る</a><a href="#" id="tmW">📐 枝張りを測る</a><span id="ageTxt"></span></div>
+    <label class="lbl">植栽形態</label>
+    <div class="seg" id="segKeitai"></div>
+    <label class="lbl">支柱</label>
+    <div class="seg" id="segShichu"></div>
+    <label class="lbl">位置座標（GPS）</label>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input id="lat" placeholder="緯度" style="font-size:14px">
+      <input id="lng" placeholder="経度" style="font-size:14px">
+      <button type="button" class="miniBtn pri" id="gpsBtn">現在地</button>
+    </div>
+  </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:8px;margin-top:12px">
-      <div>
-        <label class="lbl">前回の幹周り（台帳）</label>
-        <input id="girthPrev" type="text" readonly placeholder="—" style="text-align:center">
+  <div class="card">
+    <p class="sec">活力診断 <small>1=良 〜 5=不良</small></p>
+    <label class="lbl">樹勢（枝の伸長量・梢端/枝の枯損・葉の密度・大きさ・葉色等）</label>
+    <div class="seg" id="segJusei"></div>
+    <label class="lbl">樹形（主幹・骨格大枝の枯損/欠損・枝の密度と配置等）</label>
+    <div class="seg" id="segJukei"></div>
+    <label class="lbl">所見</label>
+    <textarea id="katsShoken" rows="2" placeholder="例）樹高/幹径比率がやや大きい"></textarea>
+    <label class="lbl">活力判定</label>
+    <div class="seg h4" id="segKats"></div>
+  </div>
+
+  <div class="card" id="buiCard">
+    <p class="sec">部位診断 <small>該当項目をタップで○・メモ入力可</small></p>
+    <div id="buiTabs" class="seg"></div>
+    <div id="buiBody"></div>
+  </div>
+
+  <div class="card">
+    <p class="sec">建築限界超え</p>
+    <div class="grid2" id="kenBox"></div>
+  </div>
+
+  <div class="card">
+    <div class="rowFlex" style="margin-bottom:5px">
+      <label class="lbl" style="margin:0">部位診断の所見（1行1項目で「・」付きになります）</label>
+      <button type="button" class="miniBtn pri" id="autoShoken">選んだ項目から所見を作る</button>
+    </div>
+    <textarea id="buiShoken" rows="3" placeholder="根元部に樹皮欠損100cm×30cmが広がっている&#10;枯れ枝あり"></textarea>
+    <p class="note">部位診断・建築限界で選んだ項目とメモから文を作り、まだ無い行だけ足します。外観診断・総合判定の理由が空なら、いちばん重い被害の文を入れます</p>
+  </div>
+
+  <div class="card">
+    <p class="sec">部位判定</p>
+    <div id="hanteiBox"></div>
+    <p class="sec">外観診断 判定</p>
+    <div class="seg h4" id="segGai"></div>
+    <label class="lbl">理由</label>
+    <input id="gaiRiyu" placeholder="例）根元部に周囲比率1/3未満の樹皮欠損あり">
+  </div>
+
+  <details>
+    <summary>機器診断（実施した場合のみ）</summary>
+    <div class="card">
+      <div class="grid2">
+        <div><label class="lbl">部位GL① (cm)</label><input id="gl1" placeholder="例）30"></div>
+        <div><label class="lbl">腐朽空洞率① (%)</label><input id="fukyu1" type="number" inputmode="decimal"></div>
+        <div><label class="lbl">部位GL② (cm)</label><input id="gl2"></div>
+        <div><label class="lbl">腐朽空洞率② (%)</label><input id="fukyu2" type="number" inputmode="decimal"></div>
       </div>
-      <div>
-        <label class="lbl">今回の幹周り（cm）<span id="girthWarn"></span></label>
-        <input id="girth" type="number" inputmode="decimal" placeholder="例）104" style="text-align:center">
-      </div>
+      <label class="lbl">腐朽度判定</label>
+      <div class="seg h4" id="segKiki"></div>
+      <label class="lbl">理由</label>
+      <input id="kikiRiyu">
     </div>
-    <p id="girthDiff" class="note" style="margin-top:5px"></p>
-    <div class="tmRow"><span id="ageTxt"></span></div>
-    <p class="note padHint" style="margin-top:2px">幹周りをタップするとテンキーが出ます。株立ちは「＋幹」で各幹の周長を続けて入力（合計×0.7）</p>
-    <div class="kabuRow">
-      <input type="checkbox" id="kabuChk">
-      <label for="kabuChk">株立ち（各幹の周長から自動計算）</label>
-    </div>
-    <div id="kabuBox">
-      <p class="note" style="margin:0 0 6px">各幹の周長（cm）を入力（最大8本）。合計×0.7 を幹周りに自動セット</p>
-      <div class="grid4" id="stems"></div>
-      <p id="kabuNote"></p>
-    </div>
+  </details>
 
-    <p class="sec">①維持管理上の問題 <small>タップで異常○</small></p>
-    <div class="grid2" id="g1"></div>
-    <p class="sec">②活力点検</p>
-    <div class="grid2" id="g2"></div>
-    <p class="sec">③樹木の異常</p>
-    <div class="grid2" id="g3"></div>
-    <div id="lvBox">
-      <p class="lvHead">程度を選ぶと、その他特記事項に文が入ります（A＝軽度　B＝処置が必要　C＝緊急対応が必要）。✎で文を直すと次から使われます</p>
-      <div id="lvList"></div>
-    </div>
+  <div class="card">
+    <p class="sec">総合判定</p>
+    <div class="seg h4" id="segSogo"></div>
+    <label class="lbl">理由</label>
+    <input id="soRiyu" placeholder="例）根元部に周囲比率1/3未満の樹皮欠損あり">
+    <p class="sec">処置</p>
+    <label class="lbl">必要性</label>
+    <div class="seg" id="segHitsuyo"></div>
+    <label class="lbl">緊急性</label>
+    <div class="seg" id="segKinkyu"></div>
+    <label class="lbl">内容（該当する処置をタップ）</label>
+    <div class="grid2" id="shochiBox"></div>
+    <label class="lbl">内容の説明（自由記入）</label>
+    <textarea id="naiyo" rows="2" placeholder="例）園路付近なので風圧軽減剪定が望ましい。"></textarea>
+  </div>
 
-    <label class="lbl" style="margin-top:16px">その他特記事項<span id="memoAutoHint" style="color:var(--acc)"></span></label>
-    <textarea id="memo" data-key="memo" rows="2" placeholder="例）キノコ：根元に子実体2個"></textarea>
-    <div id="sug-memo" class="sug"></div>
+  <div class="card">
+    <label class="lbl">その他特記事項</label>
+    <textarea id="tokki" rows="2"></textarea>
+    <label class="lbl">次回診断</label>
+    <div class="seg" id="segJikai"></div>
+    <label class="lbl">測定部位（要機器診断の場合）</label>
+    <input id="sokuteiBui" placeholder="例）G.L.1.2m">
+    <label class="lbl">次回再診断時期</label>
+    <div class="seg" id="segNext"></div>
+  </div>
 
-    <div id="statusRow">
-      <span id="judge" class="badge"></span>
-      <span id="urgent" class="badge">C 緊急：監督員へ速やかに報告</span>
-      <span id="cutBadge" class="badge">要伐採</span>
-      <span id="photoHint"></span>
+  <div class="card">
+    <div class="rowFlex">
+      <span id="photoHint" style="font-size:13px;font-weight:600"></span>
+      <button type="button" class="miniBtn del" id="photoResetBtn">この樹木の写真を削除</button>
     </div>
     <div id="photoRow">
-      <button type="button" class="pbtn" id="shot1">📷 全体</button>
-      <button type="button" class="pbtn" id="shot2" style="display:none">📷 被害部</button>
+      <button type="button" class="pbtn" id="shot1" style="font-size:13px">📷 全景</button>
+      <button type="button" class="pbtn" id="shot2" style="font-size:13px">📷 位置(根元)</button>
+      <button type="button" class="pbtn" id="shot3" style="font-size:13px">📷 被害部</button>
     </div>
-    <div id="saveRow">
-      <button id="savePrev" class="btn nav" type="button">← 前の樹木</button>
-      <button id="saveHere" class="btn" type="button">この樹木</button>
-      <button id="saveNext" class="btn nav" type="button">次の樹木 →</button>
-    </div>
+    <button id="saveBtn" class="btn">保存して次の樹木へ</button>
     <button id="cancelEdit" class="btn">編集を取り消す</button>
   </div>
-  <p class="note" style="text-align:center">この路線の保存済み <b id="cnt">0</b> 本（一覧・集計タブで確認）</p>
+  <p class="note" style="text-align:center">このブロックの保存済み <b id="cnt">0</b> 本</p>
 </div>
 
 <div id="view-sum">
   <div class="card" style="padding:10px 14px">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div>
-        <label class="lbl">点検事務所</label>
-        <select id="sumOffice"></select>
-      </div>
-      <div>
-        <label class="lbl">路線名</label>
-        <select id="sumRoute"></select>
-      </div>
-    </div>
+    <label class="lbl">ブロック</label>
+    <select id="sumBlock"></select>
+  </div>
+  <div id="sumChips">
+    <div class="sumChip" style="background:#fff;border:1px solid var(--line)"><b id="sumAll">0</b>合計</div>
+    <div class="sumChip" style="background:var(--ok-bg);color:var(--ok-tx)"><b id="sumOk">0</b>健全</div>
+    <div class="sumChip" style="background:var(--warn-bg);color:var(--warn-tx)"><b id="sumWarn">0</b>注意</div>
+    <div class="sumChip" style="background:var(--ng-bg);color:var(--ng-tx)"><b id="sumNg">0</b>著しい/不健全</div>
   </div>
   <p class="note" id="storeInfo" style="margin:0 0 8px"></p>
   <div class="card" id="issueCard" style="display:none;border-color:var(--ng-bd)">
     <div style="font-size:14px;font-weight:600;color:var(--ng-tx)" id="issueTitle"></div>
-    <p class="note" style="margin:4px 0 0">タップするとその樹木を開きます。幹周りを入れる・写真を撮る・保存すると消えます。途中でやめた樹木は［未点検に戻す］で、点検結果と写真を消して未点検に戻せます。</p>
+    <p class="note" style="margin:4px 0 0">タップするとその樹木を開きます。写真を撮る・判定を入れて保存すると消えます。</p>
     <div id="issueList"></div>
-  </div>
-  <div id="sumChips">
-    <div class="sumChip" style="background:#fff;border:1px solid var(--line)"><b id="sumAll">0</b>合計</div>
-    <div class="sumChip" style="background:var(--ok-bg);color:var(--ok-tx)"><b id="sumOk">0</b>良好</div>
-    <div class="sumChip" style="background:var(--warn-bg);color:var(--warn-tx)"><b id="sumWarn">0</b>維持管理</div>
-    <div class="sumChip" style="background:var(--ng-bg);color:var(--ng-tx)"><b id="sumNg">0</b>外観診断</div>
-    <div class="sumChip" style="background:var(--obs-bg);color:var(--obs-tx)"><b id="sumObs">0</b>要経過観察</div>
-    <div class="sumChip" style="background:#EAE8E0;color:var(--tx2)"><b id="sumKara">0</b>空桝・伐採済等</div>
   </div>
   <div class="card">
     <div class="rowFlex">
@@ -459,63 +377,22 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
     </div>
     <div class="tblWrap">
       <table class="sum">
-        <thead><tr><th>樹木番号</th><th>樹木名</th><th>今回幹周</th><th>前回幹周</th><th>判定</th><th>写真</th><th>特記事項</th><th></th></tr></thead>
+        <thead><tr><th>樹木番号</th><th>樹種</th><th>総合判定</th><th>写真</th><th>処置</th><th></th></tr></thead>
         <tbody id="sumBody"></tbody>
       </table>
     </div>
     <div style="text-align:right;margin-top:12px">
-      <button id="delAllBtn" class="miniBtn del">この路線の記録を全削除</button>
-    </div>
-  </div>
-  <div class="card" id="listCard" style="display:none">
-    <div class="rowFlex">
-      <span style="font-size:14px;font-weight:600">取込リストの点検状況</span>
-      <span id="pageInfo" class="note" style="margin:0"></span>
-    </div>
-    <div class="tblWrap">
-      <table class="sum" style="min-width:360px">
-        <thead><tr><th></th><th>樹木番号</th><th>樹木名</th><th>状態</th><th>樹木備考</th><th></th></tr></thead>
-        <tbody id="listBody"></tbody>
-      </table>
-    </div>
-    <div class="rowFlex" style="margin-top:10px">
-      <button id="prevPage" class="miniBtn">← 前の100件</button>
-      <button id="nextPage" class="miniBtn">次の100件 →</button>
-    </div>
-
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
-      <div class="rowFlex" style="flex-wrap:wrap;gap:6px">
-        <span style="font-size:13px;font-weight:600">まとめて記録</span>
-        <span id="pickCount" class="note" style="margin:0"></span>
-      </div>
-      <p class="note">左の□をタップして選びます。連続する空桝は［範囲で選ぶ］を押してから
-        最初と最後をタップすると、間がまとめて選べます。</p>
-      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-        <button id="rangeBtn" class="miniBtn">範囲で選ぶ</button>
-        <button id="pickPageBtn" class="miniBtn">このページを全選択</button>
-        <button id="pickClearBtn" class="miniBtn">選択を解除</button>
-      </div>
-      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-        <button id="bulkKaraBtn" class="miniBtn pri">選んだ樹木を「空桝」で記録</button>
-        <button id="bulkNashiBtn" class="miniBtn pri">「桝無し」で記録</button>
-        <button id="bulkZumiBtn" class="miniBtn pri">「伐採済」で記録</button>
-        <button id="bulkMasshoBtn" class="miniBtn pri">「番号抹消」で記録</button>
-      </div>
-    </div>
-
-    <div style="text-align:right;margin-top:12px">
-      <button id="delListBtn" class="miniBtn del">取込リストを削除</button>
+      <button id="delAllBtn" class="miniBtn del">このブロックの記録を全削除</button>
     </div>
   </div>
 </div>
 </main>
 
-<!-- 小黒板カメラ -->
+<!-- カメラ -->
 <div id="camModal">
   <div id="camTop">
     <span id="camNo">-</span>
-    <span id="camKind">全体</span>
-    <span id="camRes" style="color:#aaa;font-size:11px"></span>
+    <span id="camKind">全景</span>
     <button type="button" id="camReset" style="margin-left:auto;display:none;background:#c62828;color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit">映像を取り直す</button>
     <button type="button" id="camSide" style="margin-left:auto">黒板を右へ</button>
     <button type="button" id="camClose" style="margin-left:8px">閉じる</button>
@@ -523,7 +400,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
   <div id="camWrap">
     <div id="camFrame">
       <video id="camVideo" autoplay playsinline muted></video>
-      <div id="camNoCam"></div>
+      <div id="camNoCam">カメラを利用できません<br>（テストモード：グレー画像で撮影されます）</div>
       <div id="camMarkBox"></div>
       <div id="camBoard">
         <div class="krow"><span class="klab">業務名</span><span class="kval" id="camKoji"></span></div>
@@ -531,7 +408,6 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
         <div class="kcmts" id="camCmts" style="display:none"></div>
       </div>
       <div id="camDraw"></div>
-      <div id="camWide">📱 iPadを縦に持つと、もっと広く写せます</div>
       <div id="zoomCtl">
         <button type="button" onclick="zoomStep(1)">＋</button>
         <span id="zoomVal">×1.0</span>
@@ -553,7 +429,6 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
     <div id="camRevTime"><i></i></div>
   </div>
 </div>
-<!-- 状況コメント選択パネル -->
 <div id="cmtPicker">
   <div class="cpHead">被害状況コメント（タップで黒板に記載 ⇔ 解除、✕で削除）</div>
   <div id="cmtList"></div>
@@ -573,29 +448,8 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 <div id="toast" class="toast"></div>
 
 <script src="../common/treemeasure.js"></script>
-<script src="comments.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-const ITEMS = [
-  {g:1,label:"建築限界越え 車道側",csv:"建築限界越え車道側"},
-  {g:1,label:"建築限界越え 歩道側",csv:"建築限界越え歩道側"},
-  {g:1,label:"道路施設との競合",csv:"道路施設との競合"},
-  {g:1,label:"支柱直し・撤去",csv:"支柱直し・撤去"},
-  {g:1,label:"太枝枯れ・折れ",csv:"太枝枯れ・折れ"},
-  {g:1,label:"根上がり・舗装クラック",csv:"根上がり・舗装クラック"},
-  {g:2,label:"葉の状態",csv:"葉の状態"},
-  {g:2,label:"先端枝の枯れ",csv:"先端枝の枯れ"},
-  {g:2,label:"枯死・著しい衰弱",csv:"枯死・著しい衰弱"},
-  {g:3,label:"キノコの有無",csv:"キノコの有無"},
-  {g:3,label:"開口空洞",csv:"開口空洞"},
-  {g:3,label:"樹皮枯死・欠損・腐朽",csv:"樹皮枯死・欠損・腐朽"},
-  {g:3,label:"病虫害（穿孔痕、フラス）",csv:"病虫害（穿孔痕、フラス）"},
-  {g:3,label:"揺れ",csv:"揺れ"},
-  {g:3,label:"不自然な傾斜",csv:"不自然な傾斜"},
-  // 新様式（R8〜）で追加された「その他」。保存済みデータの並びを崩さないよう末尾に足し、画面では各分類の最後に並ぶ
-  {g:1,label:"その他",csv:"その他（維持管理）"},
-  {g:3,label:"その他",csv:"その他（樹木の異常）"}
-];
 const load = (k,d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
 /* 保存に失敗したら（iPadの保存領域が一杯など）必ず知らせる。黙って失敗すると記録が残らないため */
 let storeWarned = 0;
@@ -611,571 +465,347 @@ const store = (k,v) => {
     return false;
   }
 };
-let recents  = Object.assign({office:[],route:[],sp:[],memo:[],zumen:[],city:[],town:[]}, load("gj_recents", {}));
-let records  = load("gj_records", []);
-let settings = load("gj_settings", {inspector:""});
-let last     = load("gj_last", {office:"",route:""});
-let modes    = load("gj_modes", {});
-let imports  = load("gj_imports", {});
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pad = n => String(n).padStart(2,"0");
+
+let settings = load("gk_settings", {inspector:"", koji:"", block:""});
+let records  = load("gk_records", []);
+let recents  = Object.assign({block:[], sp:[]}, load("gk_recents", {}));
+let imports  = load("gk_imports", {});
 let editingId = null;
-let insertMode = false;
-let listPage = 0;
-let sumSel = null;
 
-ITEMS.forEach((it,i)=>{
-  const b = document.createElement("button");
-  b.type = "button"; b.className = "itm"; b.dataset.i = i; b.textContent = it.label;
-  b.onclick = () => {
-    b.classList.toggle("on");
-    if(b.classList.contains("on")){ alt[i] = 0; setLevel(i, lv[i] || "A"); }     // 押すと「A 軽度」の文が入る
-    else dropLevel(i);
-    calc();
-  };
-  $("g"+it.g).appendChild(b);
-});
+/* ===== 部位診断の定義 ===== */
+const PARTS = [["root","根元"],["trunk","幹"],["branch","大枝"]];
+const PART_FULL = {root:"根元", trunk:"幹", branch:"骨格となる大枝"};
+const BUI3_ITEMS = [           // 3択（なし/1/3未満/1/3以上）の3項目
+  ["hifu","樹皮枯死・欠損・腐朽"],
+  ["kudo1","芯に達した開口空洞"],
+  ["kudo2","芯に達していない開口空洞"]
+];
+const BUI3_LV = ["","なし","1/3未満","1/3以上"];
+const BUI_ITEMS = [            // なし/あり（メモ）の項目
+  ["kinoko","キノコ（子実体）"],
+  ["kozuchi","小槌打診（異常音）"],
+  ["bunki","分岐部・付根の異常"],
+  ["dogare","胴枯れなどの被害"],
+  ["mushi","虫穴・虫フン、ヤニ"]
+];
+const ROOT_ITEMS = [
+  ["yuragi","根元の揺らぎ"],["kobo","鋼棒貫入異常"],["makine","巻き根"],
+  ["rcollar","ルートカラー見えない"],["roshutsu","露出根被害"],["keisha","不自然な傾斜"]
+];
+const SHOCHI_OPTS = [          // 処置内容（テンプレートのチェック項目）
+  ["obsL","要観察（長期周期）"],["obsS","要観察（短期周期）"],
+  ["senKare","剪定：枯枝"],["senFukyu","剪定：腐朽枝"],["senShisho","剪定：支障枝"],
+  ["senFuatsu","剪定：風圧軽減"],["senStub","剪定：スタブカット切除"],["senEtc","剪定：その他"],
+  ["tekBassai","撤去・更新：伐採"],["tekShichu","撤去・更新：支柱撤去"],["tekKessoku","撤去・更新：支柱結束直し"],
+  ["tekSai","撤去・更新：支柱再設置"],["tekHogo","撤去・更新：樹木保護蓋"],["tekEtc","撤去・更新：その他"],
+  ["otToatsu","その他：踏圧防止"],["otDojo","その他：土壌改良"],["otHiryo","その他：肥料"],
+  ["otYakuzai","その他：薬剤処理"],["otEtc","その他：その他"]
+];
+const BR_ITEMS = [["kareeda","枯枝（メモにφcm）"],["stub","スタブカット"]];
+const KEN_ITEMS = [
+  ["ktr","幹・車道側"],["ktw","幹・歩道側"],["kbr","枝・車道側"],["kbw","枝・歩道側"]
+];
+const HT4 = ["健全か健全に近い","注意すべき被害が見られる","著しい被害が見られる","不健全"];
+const HT4S = ["健全","注意","著しい","不健全"];
 
-/* ================= 程度（A・B・C）と特記事項の自動コメント ================= */
-/* 文の初期値は comments.js（CMT_DEFAULT）。iPadで直した文は gj_tc に保存され、初期値より優先 */
-const LV = {A: "軽度", B: "処置が必要", C: "緊急対応"};
-let tcUser = load("gj_tc", {});            // {点検項目: {A:[文…], B:[…], C:[…]}}
-let lv = {}, autoTxt = {}, alt = {};       // 入力中の樹木：項目番号 → 程度／特記事項に入れた文／候補の番号
-let bassai = false;                        // 入力中の樹木が「要伐採」か（程度B・Cの項目の［伐採］で切り替え）
-const BASSAI_TXT = "伐採が必要。";          // 要伐採にすると特記事項に入れる文
-/* 半枯れ：②活力点検の「枯死・著しい衰弱」をB（処置が必要）にしたときの［半枯れ］。
-   その項目の文を下の文にし、処置は維持管理（この項目は外観診断の対象に数えない） */
-let hangare = false;
-const HANGARE_TXT = "半枯れ状態、枯損部の除去が必要。";
-const KARE_I = ITEMS.findIndex(it => it.csv === "枯死・著しい衰弱");
-const SENT_END = /[。．.！!）)]$/;
-function tcDefault(i, g){ const d = (typeof CMT_DEFAULT !== "undefined" && CMT_DEFAULT[ITEMS[i].csv]) || {}; return d[g] || []; }
-function tcList(i, g){ const u = tcUser[ITEMS[i].csv]; return (u && u[g] && u[g].length) ? u[g] : tcDefault(i, g); }
-function tcText(i){
-  if(!lv[i]) return "";
-  if(hangare && i === KARE_I && lv[i] === "B") return HANGARE_TXT;
-  const L = tcList(i, lv[i]);
-  let t = L.length ? L[Math.min(alt[i] || 0, L.length - 1)] : "";
-  // ②活力点検・③樹木の異常でA（軽度）は、最後に（経過観察）を付ける（「経過観察とする。」で終わる文はそれを置き換える）
-  if(t && lv[i] === "A" && ITEMS[i].g !== 1 && !t.endsWith(OBS_TXT)) t = t.replace(/経過観察とする。$/, "") + OBS_TXT;
-  return t;
+/* ===== セグメントUI ===== */
+function segBuild(id, labels, allowOff){
+  const box = $(id); box.innerHTML = "";
+  labels.forEach((lb,i)=>{
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "segBtn"; b.textContent = lb; b.dataset.v = i+1;
+    b.onclick = ()=>{
+      const on = b.classList.contains("on");
+      [...box.children].forEach(x => x.classList.remove("on"));
+      if(!(allowOff && on)) b.classList.add("on");
+    };
+    box.appendChild(b);
+  });
 }
-const OBS_TXT = "（経過観察）";
-/* 特記事項の中の oldT を newT に差し替える。見つからなければ（手で書き換えた等）newT を後ろに足す */
-function memoPut(oldT, newT){
-  let m = $("memo").value;
-  if(oldT && m.includes(oldT)) m = m.replace(oldT, newT || "");
-  else if(newT){ m = m.trim(); m = m ? m + (SENT_END.test(m) ? "" : "。") + newT : newT; }
-  $("memo").value = m.replace(/。{2,}/g, "。").replace(/^[。\s]+/, "").trim();
+const segGet = id => { const b = $(id).querySelector(".on"); return b ? +b.dataset.v : 0; };
+const segSet = (id,v) => [...$(id).children].forEach(b => b.classList.toggle("on", +b.dataset.v === +v));
+segBuild("segKeitai", ["単独桝","植樹帯","緑地内","その他"], true);
+segBuild("segShichu", ["良好","なし","破損"], true);
+segBuild("segJusei", ["1 良","2","3","4","5 不良"], true);
+segBuild("segJukei", ["1 良","2","3","4","5 不良"], true);
+segBuild("segKats", HT4S, true);
+segBuild("segGai", HT4S, true);
+segBuild("segSogo", HT4S, true);
+segBuild("segKiki", HT4S, true);
+segBuild("segHitsuyo", ["なし","あり"], true);
+segBuild("segKinkyu", ["なし","あり"], true);
+segBuild("segJikai", ["フォローアップ","要機器診断","外観診断"], true);
+segBuild("segNext", ["1年後","2年後","3年後"], true);
+
+/* 処置内容チップ */
+let shochiSel = {};
+function renderShochi(){
+  const box = $("shochiBox"); box.innerHTML = "";
+  SHOCHI_OPTS.forEach(([k,lb])=>{
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "itm" + (shochiSel[k] ? " on" : "");
+    b.style.minHeight = "40px"; b.style.fontSize = "13px";
+    b.textContent = lb;
+    b.onclick = ()=>{ shochiSel[k] = !shochiSel[k]; renderShochi(); };
+    box.appendChild(b);
+  });
 }
-function setLevel(i, g){
-  lv[i] = g;
-  const t = tcText(i);
-  memoPut(autoTxt[i], t);
-  if(t) autoTxt[i] = t; else delete autoTxt[i];
+renderShochi();
+
+/* ===== 部位診断UI（タブ切替） ===== */
+let curPart = "root";
+const buiState = {};   // "hifu_root" -> {on, note} / "dmgW_root" 等は input
+function itemsOfPart(p){
+  let arr = [...BUI_ITEMS];
+  if(p === "root") arr = arr.concat(ROOT_ITEMS);
+  if(p === "branch") arr = arr.concat(BR_ITEMS);
+  return arr;
 }
-function dropLevel(i){
-  memoPut(autoTxt[i], "");
-  delete lv[i]; delete autoTxt[i]; delete alt[i];
+function buildBuiTabs(){
+  const tabs = $("buiTabs"); tabs.innerHTML = "";
+  PARTS.forEach(([p,lb])=>{
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "segBtn" + (p === curPart ? " on" : "");
+    b.id = "buiTab_" + p;
+    b.textContent = lb;
+    b.onclick = ()=>{ curPart = p; buildBuiTabs(); renderBuiBody(); };
+    tabs.appendChild(b);
+  });
+  updateBuiTabBadges();
 }
-function resetLevels(){ lv = {}; autoTxt = {}; alt = {}; bassai = false; hangare = false; }
-/* 要伐採の切り替え。特記事項に「伐採が必要。」を足す／消す */
-function setBassai(on){
-  if(!!on === bassai) return;
-  bassai = !!on;
-  memoPut(bassai ? "" : BASSAI_TXT, bassai ? BASSAI_TXT : "");
+function updateBuiTabBadges(){
+  PARTS.forEach(([p,lb])=>{
+    const n = BUI3_ITEMS.filter(([k]) => ((buiState[k+"_"+p]||{}).v || 0) >= 2).length
+            + itemsOfPart(p).filter(([k]) => (buiState[k+"_"+p]||{}).on).length;
+    const el = $("buiTab_" + p);
+    if(el) el.textContent = lb + (n ? "●" + n : "");
+  });
 }
-/* 特記事項の欄は文の量に合わせて高さを変える */
-function memoFit(){ const m = $("memo"); m.style.height = "auto"; m.style.height = Math.max(m.scrollHeight + 2, 52) + "px"; }
-$("memo").addEventListener("input", memoFit);
-function renderLv(){
-  memoFit();
-  const on = [...document.querySelectorAll(".itm.on")].map(b => +b.dataset.i)
-    .sort((a, b) => ITEMS[a].g - ITEMS[b].g || a - b);
-  const show = on.length > 0 && !isNoTree($("sp").value);
-  // 伐採はB・Cの項目があるときだけ。B・Cが無くなったら要伐採も外す
-  const hasBC = show && on.some(i => lv[i] === "B" || lv[i] === "C");
-  if(!hasBC && bassai) setBassai(false);
-  if(hangare && lv[KARE_I] !== "B") hangare = false;     // 枯死・著しい衰弱がBでなくなったら半枯れも外す
-  $("lvBox").classList.toggle("show", show);
-  $("urgent").style.display = show && on.some(i => lv[i] === "C") ? "inline-block" : "none";
-  $("cutBadge").style.display = bassai ? "inline-block" : "none";
-  $("lvList").innerHTML = on.map(i => {
-    const n = lv[i] ? tcList(i, lv[i]).length : 0;
-    return '<div class="lvRow" data-i="' + i + '"><span class="lvName">' + esc(ITEMS[i].csv) + '</span>' +
-      ["A", "B", "C"].map(g => '<button type="button" class="lvBtn' + (lv[i] === g ? " on" : "") + '" data-lv="' + g + '">' +
-        g + '<small>' + LV[g] + '</small></button>').join("") +
-      (n > 1 ? '<button type="button" class="lvTool" data-k="alt">候補 ' + ((alt[i] || 0) % n + 1) + '/' + n + '</button>' : '') +
-      (lv[i] ? '<button type="button" class="lvTool" data-k="edit">✎ 文を直す</button>' : '') +
-      (i === KARE_I && lv[i] === "B" ? '<button type="button" class="lvHan' + (hangare ? " on" : "") + '" data-k="han">' + (hangare ? "✓ 半枯れ" : "半枯れ") + '</button>' : '') +
-      (lv[i] === "B" || lv[i] === "C" ? '<button type="button" class="lvCut' + (bassai ? " on" : "") + '" data-k="cut">' + (bassai ? "✓ 伐採" : "伐採") + '</button>' : '') + '</div>';
-  }).join("");
-  $("lvList").querySelectorAll(".lvRow").forEach(row => {
-    const i = +row.dataset.i;
-    row.querySelectorAll(".lvBtn").forEach(b => b.onclick = () => {
-      if(lv[i] !== b.dataset.lv) alt[i] = 0;
-      setLevel(i, b.dataset.lv); calc();      // 判定（要経過観察）も変わるので calc（中で renderLv も呼ぶ）
+function renderBuiBody(){
+  const box = $("buiBody"); box.innerHTML = "";
+  const p = curPart;
+  // 3項目（なし/1/3未満/1/3以上 の3択）
+  BUI3_ITEMS.forEach(([k,lb])=>{
+    const key = k + "_" + p;
+    const st = buiState[key] || (buiState[key] = {v:0});
+    const w = document.createElement("div"); w.className = "itmRow";
+    const l = document.createElement("div");
+    l.style.cssText = "font-size:13px;margin:6px 0 2px;font-weight:600";
+    l.textContent = lb;
+    const seg = document.createElement("div"); seg.className = "seg";
+    BUI3_LV.slice(1).forEach((lv,i)=>{
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "segBtn" + (st.v === i+1 ? " on" : "");
+      b.textContent = lv;
+      b.onclick = ()=>{ st.v = (st.v === i+1) ? 0 : i+1; renderBuiBody(); updateBuiTabBadges(); updatePhotoHint(); };
+      seg.appendChild(b);
     });
-    const a = row.querySelector('[data-k="alt"]');
-    if(a) a.onclick = () => { alt[i] = ((alt[i] || 0) + 1) % tcList(i, lv[i]).length; setLevel(i, lv[i]); renderLv(); };
-    const e = row.querySelector('[data-k="edit"]');
-    if(e) e.onclick = () => editTc(i);
-    const han = row.querySelector('[data-k="han"]');
-    if(han) han.onclick = () => {
-      hangare = !hangare;
-      setLevel(KARE_I, "B");               // 特記事項の文を差し替える（半枯れの文 ⇔ Bの文）
-      calc();
-      toast(hangare ? "半枯れにしました（処置は維持管理）" : "半枯れを外しました");
-    };
-    const cut = row.querySelector('[data-k="cut"]');
-    if(cut) cut.onclick = () => {
-      setBassai(!bassai); calc();        // 判定（維持管理の処置が必要）も変わる
-      toast(bassai ? "要伐採にしました（特記事項に「" + BASSAI_TXT + "」）" : "要伐採を外しました");
-    };
+    w.appendChild(l); w.appendChild(seg);
+    box.appendChild(w);
   });
-}
-/* いま使っている文をその場で直す（直した文は次の樹木からも使われる） */
-function editTc(i){
-  const g = lv[i]; if(!g) return;
-  const k = ITEMS[i].csv, idx = alt[i] || 0, L = tcList(i, g).slice();
-  const v = prompt("「" + k + "」 " + g + "（" + LV[g] + "）の文を直します。\n直した文はこのiPadに保存され、次の樹木からも使われます。\n（空にすると、この候補を消します）", L[idx] || "");
-  if(v === null) return;
-  const t = v.trim().replace(/\s*\n\s*/g, "");
-  if(t){ L[idx] = SENT_END.test(t) ? t : t + "。"; } else { L.splice(idx, 1); alt[i] = 0; }
-  tcSave(k, g, L);
-  setLevel(i, g); renderLv();
-  toast(t ? "文を直しました（次の樹木からも使われます）" : "候補を消しました");
-}
-function tcSave(k, g, L){
-  const d = (typeof CMT_DEFAULT !== "undefined" && CMT_DEFAULT[k] && CMT_DEFAULT[k][g]) || [];
-  tcUser[k] = tcUser[k] || {};
-  if(JSON.stringify(L) === JSON.stringify(d)) delete tcUser[k][g]; else tcUser[k][g] = L;
-  if(!Object.keys(tcUser[k]).length) delete tcUser[k];
-  store("gj_tc", tcUser);
-}
-/* 点検コメント集（設定の欄）：全項目・全程度の文を直せる */
-function renderTcEdit(){
-  const order = ITEMS.map((it, i) => i).sort((a, b) => ITEMS[a].g - ITEMS[b].g || a - b);
-  $("tcEdit").innerHTML = order.map(i => {
-    const k = ITEMS[i].csv;
-    return '<div class="tcItem"><b>' + esc(k) + '</b>' + ["A", "B", "C"].map(g =>
-      '<label class="tcL" data-l="' + g + '">' + g + '　' + LV[g] + (tcUser[k] && tcUser[k][g] ? '<span class="tcMod">（このiPadで変更）</span>' : '') + '</label>' +
-      '<textarea rows="' + Math.max(2, tcList(i, g).length + 1) + '" data-i="' + i + '" data-l="' + g + '">' + esc(tcList(i, g).join("\n")) + '</textarea>').join("") + '</div>';
-  }).join("");
-  $("tcEdit").querySelectorAll("textarea").forEach(t => t.onchange = () => {
-    const L = t.value.split("\n").map(x => x.trim()).filter(Boolean).map(x => SENT_END.test(x) ? x : x + "。");
-    tcSave(ITEMS[+t.dataset.i].csv, t.dataset.l, L);
-    renderTcEdit(); renderLv();
-    toast("保存しました");
+  itemsOfPart(p).forEach(([k,lb])=>{
+    const key = k + "_" + p;
+    const st = buiState[key] || (buiState[key] = {on:false, note:""});
+    const row = document.createElement("div"); row.className = "itmRow" + (st.on ? " on" : "");
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "itm" + (st.on ? " on" : "");
+    b.textContent = lb;
+    b.onclick = ()=>{ st.on = !st.on; renderBuiBody(); updateBuiTabBadges(); updatePhotoHint(); };
+    const nt = document.createElement("input");
+    nt.className = "nt"; nt.placeholder = "メモ（大きさ・位置など）"; nt.value = st.note;
+    nt.oninput = ()=>{ st.note = nt.value; };
+    row.appendChild(b); row.appendChild(nt);
+    box.appendChild(row);
   });
+  // 最大被害部の周囲長比率
+  const st = buiState["dmg_" + p] || (buiState["dmg_" + p] = {w:"", l:""});
+  const rb = document.createElement("div"); rb.className = "ratioBox";
+  rb.innerHTML = '<div style="font-size:12px;color:var(--tx2);margin-bottom:6px">上記3項目（樹皮枯死/開口空洞）の最大被害部</div>';
+  const row = document.createElement("div"); row.className = "row";
+  const iw = document.createElement("input"); iw.type = "number"; iw.inputMode = "decimal"; iw.placeholder = "被害部幅cm"; iw.value = st.w;
+  const il = document.createElement("input"); il.type = "number"; il.inputMode = "decimal"; il.placeholder = "周囲長cm"; il.value = st.l;
+  const rv = document.createElement("span"); rv.className = "ratioVal";
+  const upd = ()=>{
+    st.w = iw.value; st.l = il.value;
+    const w = parseFloat(iw.value), l = parseFloat(il.value);
+    rv.textContent = (w > 0 && l > 0) ? "＝ " + Math.round(w / l * 100) + "%（1/" + (Math.round(l / w * 10) / 10) + "）" : "＝ ―";
+  };
+  iw.oninput = upd; il.oninput = upd; upd();
+  row.appendChild(iw); row.appendChild(document.createTextNode("÷"));
+  row.appendChild(il); row.appendChild(rv);
+  rb.appendChild(row);
+  box.appendChild(rb);
 }
-$("tcPanel").addEventListener("toggle", () => { if($("tcPanel").open) renderTcEdit(); });
-$("tcExport").onclick = () => {
-  const all = {};
-  ITEMS.forEach((it, i) => { all[it.csv] = {A: tcList(i, "A"), B: tcList(i, "B"), C: tcList(i, "C")}; });
-  const d = new Date();
-  const body = JSON.stringify({type: "gairoju-tenken-comments", version: 1, exported: d.toISOString(),
-                               inspector: settings.inspector || "", changed: tcUser, comments: all}, null, 1);
-  dl(new Blob([body], {type: "application/json"}), "点検コメント集_" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".json");
-};
-$("tcImport").onclick = () => $("tcFile").click();
-$("tcFile").addEventListener("change", async e => {
-  const f = e.target.files[0]; e.target.value = "";
-  if(!f) return;
-  try{
-    const d = JSON.parse(await f.text());
-    if(d.type !== "gairoju-tenken-comments") throw new Error("点検コメント集のファイルではありません");
-    if(!confirm("このiPadの点検コメント集を、読み込んだファイルの内容に置き換えますか？")) return;
-    Object.entries(d.comments || {}).forEach(([k, v]) => ["A", "B", "C"].forEach(g => { if(Array.isArray(v[g])) tcSave(k, g, v[g]); }));
-    renderTcEdit(); renderLv(); toast("読み込みました");
-  }catch(err){ alert("読み込めませんでした\n" + err.message); }
-});
-$("tcReset").onclick = () => {
-  if(!confirm("このiPadで直した文をすべて消して、初期値に戻しますか？\n（先に［書き出し］で控えておくと安心です）")) return;
-  tcUser = {}; store("gj_tc", tcUser); renderTcEdit(); renderLv(); toast("初期値に戻しました");
-};
-for(let i = 0; i < 8; i++){
-  const inp = document.createElement("input");
-  inp.type = "number"; inp.inputMode = "decimal"; inp.className = "stem"; inp.placeholder = (i+1)+"本目";
-  inp.addEventListener("input", kabuCalc);
-  $("stems").appendChild(inp);
-}
+buildBuiTabs(); renderBuiBody();
 
+/* 建築限界 */
+const kenState = {};
+function renderKen(){
+  const box = $("kenBox"); box.innerHTML = "";
+  KEN_ITEMS.forEach(([k,lb])=>{
+    const st = kenState[k] || (kenState[k] = {on:false, note:""});
+    const row = document.createElement("div"); row.className = "itmRow" + (st.on ? " on" : "");
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "itm" + (st.on ? " on" : ""); b.textContent = lb;
+    b.onclick = ()=>{ st.on = !st.on; renderKen(); updatePhotoHint(); };
+    const nt = document.createElement("input"); nt.className = "nt"; nt.placeholder = "メモ"; nt.value = st.note;
+    nt.oninput = ()=>{ st.note = nt.value; };
+    row.appendChild(b); row.appendChild(nt);
+    box.appendChild(row);
+  });
+}
+renderKen();
+
+/* 部位判定 */
+function buildHantei(){
+  const box = $("hanteiBox"); box.innerHTML = "";
+  PARTS.forEach(([p,lb])=>{
+    const l = document.createElement("label"); l.className = "lbl"; l.textContent = PART_FULL[p];
+    const seg = document.createElement("div"); seg.className = "seg h4"; seg.id = "segH_" + p;
+    box.appendChild(l); box.appendChild(seg);
+    const sh = document.createElement("div");
+    sh.style.cssText = "display:flex;gap:8px;margin:6px 0 2px";
+    [["sen","剪定が必要"],["sei","精密診断が必要"]].forEach(([k,slb])=>{
+      const cb = document.createElement("button");
+      cb.type = "button"; cb.className = "miniBtn"; cb.id = "sho_" + k + "_" + p; cb.textContent = slb;
+      cb.onclick = ()=>{ cb.classList.toggle("pri"); };
+      sh.appendChild(cb);
+    });
+    box.appendChild(sh);
+  });
+  PARTS.forEach(([p]) => segBuild("segH_" + p, HT4S, true));
+}
+buildHantei();
+
+/* ===== 候補チップ ===== */
 function bump(key, v){
   if(!v) return;
   const a = recents[key]; const i = a.indexOf(v);
   if(i > -1) a.splice(i,1);
-  a.unshift(v); if(a.length > (key === "route" ? 40 : 10)) a.pop();   // 路線（ブロック）は案件の全路線を残す
-  store("gj_recents", recents);
+  a.unshift(v); if(a.length > (key === "block" ? 40 : 10)) a.pop();   // 路線（ブロック）は案件の全路線を残す
+  store("gk_recents", recents);
 }
 function renderSug(key){
-  const box = $("sug-"+key); box.innerHTML = "";
+  const box = $("sug-" + key); box.innerHTML = "";
   const cur = $(key).value;
-  // 路線名は案件の路線を全部出す（他の項目は最近使った4つ）
-  recents[key].filter(v => v !== cur).slice(0, key === "route" ? 30 : 4).forEach(v=>{
+  recents[key].filter(v => v !== cur).slice(0, key === "block" ? 30 : 4).forEach(v=>{
     const b = document.createElement("button");
     b.type = "button"; b.className = "chip";
-    b.textContent = v.length > 24 ? v.slice(0,24)+"…" : v;
+    b.textContent = v.length > 20 ? v.slice(0,20) + "…" : v;
     b.addEventListener("pointerdown", e=>{
       e.preventDefault();
       $(key).value = v; bump(key,v); box.classList.remove("show");
-      if(key === "office" || key === "route") routeChanged();
+      if(key === "block") blockChanged();
     });
     box.appendChild(b);
   });
 }
-["office","route","sp","memo","zumen","city","town"].forEach(key=>{
+["block","sp"].forEach(key=>{
   const inp = $(key);
-  inp.addEventListener("focus", ()=>{ renderSug(key); if(recents[key].length) $("sug-"+key).classList.add("show"); });
-  inp.addEventListener("blur", ()=>{ setTimeout(()=>$("sug-"+key).classList.remove("show"), 200); });
+  inp.addEventListener("focus", ()=>{ renderSug(key); if(recents[key].length) $("sug-" + key).classList.add("show"); });
+  inp.addEventListener("blur", ()=>{ setTimeout(()=>$("sug-" + key).classList.remove("show"), 200); });
 });
-$("office").addEventListener("change", routeChanged);
-$("route").addEventListener("change", routeChanged);
-$("inspector").addEventListener("change", ()=>{
-  settings.inspector = $("inspector").value; store("gj_settings", settings); renderHeader();
-});
+$("inspector").addEventListener("change", ()=>{ settings.inspector = $("inspector").value; store("gk_settings", settings); renderHeader(); });
+$("koji").addEventListener("change", ()=>{ settings.koji = $("koji").value.trim(); store("gk_settings", settings); });
+$("block").addEventListener("change", blockChanged);
 
-const pad = n => String(n).padStart(2,"0");
-function nowStr(){ const d = new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes()); }
-function routeKey(){ return $("office").value.trim()+"|"+$("route").value.trim(); }
-function routeRecords(){ const k = routeKey(); return records.filter(r => (r.office+"|"+r.route) === k); }
-function getMode(){ return modes[routeKey()] || "manual"; }
-function allKeys(){
-  const s = new Set(records.map(r => r.office+"|"+r.route));
-  Object.keys(imports).forEach(k => { if(imports[k] && imports[k].items.length) s.add(k); });
-  const ck = routeKey();
-  if(ck.split("|")[0] && ck.split("|")[1]) s.add(ck);
-  return [...s].sort();
-}
-function sumKey(){ return (sumSel && allKeys().includes(sumSel)) ? sumSel : routeKey(); }
-function sumRecords(){ const k = sumKey(); return records.filter(r => (r.office+"|"+r.route) === k); }
-function sumListState(){ return imports[sumKey()] || null; }
-function renderSumSel(){
-  const keys = allKeys();
-  const cur = sumKey();
-  const [co, cr] = cur.split("|");
-  const offices = [...new Set(keys.map(k => k.split("|")[0]))];
-  const so = $("sumOffice"); so.innerHTML = "";
-  offices.forEach(o=>{
-    const op = document.createElement("option"); op.value = o; op.textContent = o || "（未設定）"; op.selected = o === co;
-    so.appendChild(op);
-  });
-  const routes = keys.filter(k => k.split("|")[0] === co).map(k => k.split("|")[1]);
-  const sr = $("sumRoute"); sr.innerHTML = "";
-  routes.forEach(r=>{
-    const op = document.createElement("option"); op.value = r; op.textContent = r || "（未設定）"; op.selected = r === cr;
-    sr.appendChild(op);
-  });
-}
-$("sumOffice").addEventListener("change", ()=>{
-  const o = $("sumOffice").value;
-  const first = allKeys().find(k => k.split("|")[0] === o);
-  sumSel = first || null; listPage = 0; renderSummary();
-});
-$("sumRoute").addEventListener("change", ()=>{
-  sumSel = $("sumOffice").value + "|" + $("sumRoute").value; listPage = 0; renderSummary();
-});
-
-function routeChanged(){
-  last = {office:$("office").value, route:$("route").value}; store("gj_last", last);
-  listPage = 0;
-  updateModeUI();
-  if(!editingId && !insertMode){
-    if(getMode() === "list"){ fillFromList(); }
+function nowStr(){ const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+function blockKey(){ return $("block").value.trim(); }
+function blockRecords(){ const k = blockKey(); return records.filter(r => r.block === k); }
+function blockChanged(){
+  settings.block = blockKey(); store("gk_settings", settings);
+  if(!editingId){
+    const st = listState();
+    if(st && st.items.length){ fillFromList(); }
     else {
-      const rr = routeRecords();
-      if(rr.length){ $("hojo").value = ""; $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
-      else { $("tno").value = ""; $("hojo").value = ""; $("tnoNote").textContent = "この路線の最初の樹木番号を入力（例：R7-274）。以降は自動で連番"; $("tnoNote").className = "note"; }
+      const rr = blockRecords();
+      if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
     }
   }
-  renderCnt(); renderHeader(); renderSummary(); updatePhotoButtons();
+  renderCnt(); renderHeader(); renderSummary(); renderProgress(); updatePhotoHint();
 }
 function renderHeader(){
   const parts = [];
-  if($("route").value) parts.push(esc($("office").value)+"　"+esc($("route").value));
+  if(blockKey()) parts.push(esc(blockKey()));
   if(settings.inspector) parts.push(esc(settings.inspector.split("（")[0]));
   $("hdInfo").innerHTML = parts.join("<br>");
 }
-function renderCnt(){ $("cnt").textContent = routeRecords().length; }
+function renderCnt(){ $("cnt").textContent = blockRecords().length; }
 
 $("tab-input").onclick = () => setView("input");
 $("tab-sum").onclick = () => setView("sum");
 function setView(v){
-  // 入力タブは "" にして、図面と入力の横並び（zumen.js の display:grid）を上書きしない。
-  // "block" を入れていたため、一覧・集計から戻ると横並びが崩れていた
-  $("view-input").style.display = v === "input" ? "" : "none";
+  $("view-input").style.display = v === "input" ? "block" : "none";
   $("view-sum").style.display = v === "sum" ? "block" : "none";
   $("tab-input").classList.toggle("on", v === "input");
   $("tab-sum").classList.toggle("on", v === "sum");
   if(v === "sum") renderSummary();
 }
 
-$("segManual").onclick = () => setMode("manual");
-$("segList").onclick = () => setMode("list");
-function setMode(m){
-  modes[routeKey()] = m; store("gj_modes", modes);
-  updateModeUI();
-  if(m === "list" && !editingId){ fillFromList(); }
-  if(m === "manual" && !editingId && !insertMode){
-    const rr = routeRecords();
-    if(rr.length){ $("hojo").value = ""; $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
-  }
+function nextNo(no){
+  no = String(no).trim();
+  const m = no.match(/^(.*?)(\d+)\s*$/);
+  if(m) return m[1] + String(parseInt(m[2],10)+1).padStart(m[2].length,"0");
+  return "";
 }
-function updateModeUI(){
-  const m = getMode();
-  $("segManual").classList.toggle("on", m === "manual");
-  $("segList").classList.toggle("on", m === "list");
-  $("listPanel").classList.toggle("show", m === "list");
-  renderProgress();
+function noteAuto(prevNo){
+  $("tnoNote").textContent = prevNo + " の次として自動提案。違う場合は打ち直してください";
+  $("tnoNote").className = "note";
 }
-function jumpTo(i){
-  const k = sumKey();
-  if(k !== routeKey()){
-    const [o, r] = k.split("|");
-    $("office").value = o; $("route").value = r;
-    routeChanged();
-  }
-  const st = listState(); if(!st) return;
-  modes[routeKey()] = "list"; store("gj_modes", modes);
-  st.idx = i; store("gj_imports", imports);
-  if(editingId) endEdit();
-  insertMode = false; $("insertBanner").style.display = "none";
-  updateModeUI(); fillFromList(); setView("input");
-  window.scrollTo({top:0, behavior:"smooth"});
-}
-function renderListTable(){
-  const st = sumListState();
-  if(!st || !st.items.length){ $("listCard").style.display = "none"; return; }
-  $("listCard").style.display = "block";
-  const doneSet = new Set(sumRecords().map(r => r.no));
-  const total = st.items.length;
-  const pages = Math.ceil(total / 100);
-  if(listPage >= pages) listPage = pages - 1;
-  if(listPage < 0) listPage = 0;
-  const from = listPage * 100, to = Math.min(from + 100, total);
-  $("pageInfo").textContent = (from+1) + "〜" + to + " / " + total + " 件（" + (listPage+1) + "/" + pages + " ページ）";
-  $("prevPage").disabled = listPage === 0;
-  $("nextPage").disabled = listPage >= pages - 1;
-  $("prevPage").style.opacity = listPage === 0 ? .4 : 1;
-  $("nextPage").style.opacity = listPage >= pages - 1 ? .4 : 1;
-  const tb = $("listBody"); tb.innerHTML = "";
-  const savedByNo = {};
-  sumRecords().forEach(r => { savedByNo[r.no] = r; });
-  st.items.slice(from, to).forEach((it, k)=>{
-    const i = from + k;
-    const isDone = listItemDone(it, doneSet);
-    const gone = goneReason(it);
-    const rec = savedByNo[it.no];
-    // 状態…点検済（空桝ならその内容）／台帳で伐採などになっていればその内容／未
-    let label, style;
-    if(isDone){
-      label = (rec && isNoTree(rec.sp)) ? rec.sp : "点検済";
-      style = (rec && isNoTree(rec.sp)) ? "background:#EAE8E0;color:var(--tx2)"
-                                        : "background:var(--ok-bg);color:var(--ok-tx)";
-    }
-    else if(gone){ label = gone; style = "background:var(--ng-bg);color:var(--ng-tx)"; }
-    else { label = "未"; style = "background:#F1EFE8;color:var(--tx2)"; }
-    const tr = document.createElement("tr");
-    if(picked.has(i)) tr.className = "picked";
-    tr.innerHTML = '<td class="chk">' + (picked.has(i) ? "☑" : "☐") + "</td>" +
-      "<td><b>" + esc(it.no) + "</b></td><td>" + esc((rec && rec.sp) || it.sp || "—") + "</td>" +
-      '<td><span class="rjudge" style="' + style + '">' + esc(label) + "</span></td>" +
-      '<td class="memoCell">' + esc(it.bikou || "") + "</td>";
-    tr.querySelector(".chk").onclick = () => togglePick(i);
-    const td = document.createElement("td");
-    const b = document.createElement("button");
-    b.className = (isDone || gone) ? "miniBtn" : "miniBtn pri";
-    b.textContent = isDone ? "見直す" : "入力へ";
-    b.onclick = () => jumpTo(i);
-    td.appendChild(b);
-    tr.appendChild(td);
-    tb.appendChild(tr);
-  });
-  $("pickCount").textContent = picked.size ? picked.size + "本を選択中" : "";
-}
+$("tno").addEventListener("input", ()=>{ updatePhotoHint(); });
 
-/* ===== まとめて「空桝」「桝無し」で記録する（連続する空桝の入力を省く） ===== */
-let picked = new Set();
-let rangeMode = false, rangeFirst = null;
-
-function togglePick(i){
-  if(rangeMode){
-    if(rangeFirst === null){
-      rangeFirst = i;
-      toast("ここから。もう1つの端をタップしてください");
-      renderListTable();
-      return;
-    }
-    const a = Math.min(rangeFirst, i), b = Math.max(rangeFirst, i);
-    for(let k = a; k <= b; k++) picked.add(k);
-    rangeFirst = null; rangeMode = false;
-    $("rangeBtn").classList.remove("pri");
-    renderListTable();
-    toast((b - a + 1) + "本を選びました");
-    return;
-  }
-  if(picked.has(i)) picked.delete(i); else picked.add(i);
-  renderListTable();
-}
-$("rangeBtn").onclick = ()=>{
-  rangeMode = !rangeMode; rangeFirst = null;
-  $("rangeBtn").classList.toggle("pri", rangeMode);
-  toast(rangeMode ? "最初と最後の樹木をタップしてください" : "範囲選択をやめました");
-};
-$("pickPageBtn").onclick = ()=>{
-  const st = sumListState(); if(!st) return;
-  const from = listPage * 100, to = Math.min(from + 100, st.items.length);
-  for(let i = from; i < to; i++) picked.add(i);
-  renderListTable();
-};
-$("pickClearBtn").onclick = ()=>{ picked.clear(); rangeFirst = null; renderListTable(); };
-$("bulkKaraBtn").onclick = ()=> bulkNoTree("空桝");
-$("bulkNashiBtn").onclick = ()=> bulkNoTree("桝無し");
-$("bulkZumiBtn").onclick = ()=> bulkNoTree("伐採済");
-$("bulkMasshoBtn").onclick = ()=> bulkNoTree("番号抹消");
-
-function bulkNoTree(label){
-  const st = sumListState();
-  if(!st){ toast("取込リストがありません"); return; }
-  if(!picked.size){ toast("記録する樹木を選んでください"); return; }
-  const key = sumKey(), parts = key.split("|");
-  const office = parts[0], route = parts[1];
-  const idx = [...picked].sort((a,b)=>a-b);
-  const targets = idx.map(i => st.items[i]).filter(Boolean);
-  if(!confirm(targets.length + "本を「" + label + "」として記録します。よろしいですか？\n\n"
-              + targets.slice(0,8).map(t=>t.no).join("、") + (targets.length>8 ? " ほか" : ""))) return;
-  const now = nowStr();
-  let added = 0, updated = 0;
-  targets.forEach(it=>{
-    const exist = records.find(r => r.office === office && r.route === route && r.no === it.no);
-    const base = {
-      office, route, zumen: it.zumen || "", city: it.city || "", town: it.town || "",
-      no: it.no, masu: it.base || it.no, hojo: it.hojo || "",
-      sp: label, girth: "", girthPrev: it.girth || "",
-      kabu: [], kabuNote: "", dt: now, items: new Array(ITEMS.length).fill(""),
-      memo: it.bikou ? "台帳備考：" + it.bikou : ""
-    };
-    if(exist){ Object.assign(exist, base); updated++; }
-    else { records.push(Object.assign({id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-                                       created: Date.now()}, base)); added++; }
-  });
-  store("gj_records", records);
-  picked.clear(); rangeFirst = null; rangeMode = false;
-  $("rangeBtn").classList.remove("pri");
-  renderCnt(); renderSummary(); renderProgress();
-  toast(label + " として " + (added + updated) + "本を記録しました");
-}
-$("prevPage").onclick = ()=>{ listPage--; renderListTable(); };
-$("nextPage").onclick = ()=>{ listPage++; renderListTable(); };
-function confirm2(msg1, msg2){ return confirm(msg1) && confirm(msg2); }
-$("delAllBtn").onclick = ()=>{
-  const k = sumKey(); const [ko, kr] = k.split("|");
-  const rr = sumRecords();
-  if(!rr.length){ toast("この路線の記録はありません"); return; }
-  if(!confirm2(ko + "／" + kr + " の記録 " + rr.length + " 本と撮影写真をすべて削除しますか？",
-    "本当に " + rr.length + " 本すべて削除しますか？\nこの操作は取り消せません。CSV・写真ZIPの書き出し済みか確認してください")) return;
-  records = records.filter(r => (r.office+"|"+r.route) !== k);
-  store("gj_records", records);
-  if(pdb) deletePhotosOfKey(k);
-  if(editingId) endEdit();
-  renderCnt(); renderSummary(); renderProgress();
-  if(getMode() === "list") fillFromList();
-  toast(kr + " の記録 " + rr.length + " 本を削除しました");
-};
-$("delListBtn").onclick = ()=>{
-  const k = sumKey(); const [ko, kr] = k.split("|");
-  const st = imports[k];
-  if(!st || !st.items.length){ toast("取込リストがありません"); return; }
-  if(!confirm2(ko + "／" + kr + " の取込リスト（" + st.items.length + " 件）を削除しますか？\n点検記録は消えません",
-    "本当にリストを削除しますか？\n再度使うにはExcel／CSVの取込が必要です")) return;
-  delete imports[k]; store("gj_imports", imports);
-  listPage = 0;
-  renderSummary(); renderProgress();
-  if(k === routeKey() && getMode() === "list") fillFromList();
-  toast(kr + " の取込リストを削除しました");
+/* GPS */
+$("gpsBtn").onclick = ()=>{
+  if(!navigator.geolocation){ toast("この端末では位置情報を取得できません"); return; }
+  toast("位置情報を取得中…");
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      $("lat").value = pos.coords.latitude.toFixed(6);
+      $("lng").value = pos.coords.longitude.toFixed(6);
+      toast("位置座標を取得しました");
+    },
+    () => toast("位置情報を取得できませんでした（設定で許可が必要です）"),
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
 };
 
+/* ===== リスト取込 ===== */
 $("importBtn").onclick = () => $("importFile").click();
 $("importFile").addEventListener("change", async e=>{
   const f = e.target.files[0]; if(!f) return;
   try {
     const items = /\.csv$/i.test(f.name) ? parseCsvList(await f.text()) : await parseXlsxList(f);
     if(!items.length){ toast("リストの行が見つかりませんでした"); return; }
-    applyImport(items);
+    imports[blockKey()] = {items, idx:0}; store("gk_imports", imports);
     toast(items.length + " 本のリストを取り込みました");
+    fillFromList(); renderProgress();
   } catch(err){ toast("取込に失敗しました：" + err.message); }
   e.target.value = "";
 });
-/* 桝No＋樹木No だけでは重なる（図面の区間ごとに番号がふり直されている）かを調べる */
-function detectZumenKey(items){
-  const seen = new Set();
-  for(const it of items){
-    const k = (it.base || "") + "|" + (it.hojo || "");
-    if(seen.has(k)) return true;
-    seen.add(k);
-  }
-  return false;
-}
-function applyImport(items){
-  const zk = detectZumenKey(items);
-  const baseCount = {};
-  items.forEach(it => { const b = it.base || it.no; baseCount[b] = (baseCount[b] || 0) + 1; });
-  items.forEach(it => {
-    it.no = composeNo(it.zumen, it.base, it.hojo, zk);
-    // solo … その桝に樹木が1本だけ。現場で枝番を足したときの済判定に使う
-    it.solo = !it.hojo && baseCount[it.base || it.no] === 1;
-  });
-  imports[routeKey()] = {items, idx:0, zumenKey:zk}; store("gj_imports", imports);
-  setMode("list");
-}
 function normHead(s){ return String(s ?? "").replace(/[\s　]/g,""); }
-function mapColumns(head){
-  const find = names => head.findIndex(h => names.some(n => normHead(h).includes(n)));
-  let c = { no: find(["樹木番号","桝番号","管理番号"]), hojo: find(["補助番号","補助","枝番"]),
-            sp: find(["樹木名","樹種"]),
-            zumen: find(["図面"]), city: find(["市名","市町村"]), town: find(["町名","地区"]),
-            bikou: find(["樹木備考","備考"]), girth: find(["幹周","幹回"]) };
-  if(c.no < 0){ c = {no:0, hojo:-1, sp:1, zumen:2, city:3, town:4, bikou:-1, girth:-1};
-                return {cols:c, skipHeader:false}; }
-  return {cols:c, skipHeader:true};
-}
 function rowsToItems(rows){
   if(!rows.length) return [];
-  const {cols, skipHeader} = mapColumns(rows[0]);
+  const head = rows[0];
+  const find = names => head.findIndex(h => names.some(n => normHead(h).includes(n)));
+  let cNo = find(["樹木番号","桝番号","管理番号"]), cSp = find(["樹種","樹木名"]), cJudge = find(["判定"]);
+  let skip = true;
+  if(cNo < 0){ cNo = 0; cSp = 1; cJudge = -1; skip = false; }
   const out = [];
-  rows.slice(skipHeader ? 1 : 0).forEach(r=>{
-    let no = String(r[cols.no] ?? "").trim();
+  rows.slice(skip ? 1 : 0).forEach(r=>{
+    const no = String(r[cNo] ?? "").trim();
     if(!no) return;
-    // 桝Noと樹木Noは別々に持ち、照合用の番号は applyImport で組み立てる
-    const hojo = String(cols.hojo > -1 ? r[cols.hojo] ?? "" : "").trim();
-    const base = no;
-    if(hojo && !no.endsWith("-" + hojo)) no = no + "-" + hojo;
-    const g = c => String(cols[c] > -1 ? r[cols[c]] ?? "" : "").trim();
-    out.push({ no, base, hojo, sp: g("sp"), zumen: g("zumen"), city: g("city"),
-               town: g("town"), bikou: g("bikou"), girth: g("girth") });
+    // 点検アプリCSVなら「外観診断」判定の行だけを対象にする
+    if(cJudge > -1){
+      const j = String(r[cJudge] ?? "");
+      if(j && !j.includes("外観診断")) return;
+    }
+    out.push({ no, sp: String(cSp > -1 ? r[cSp] ?? "" : "").trim() });
   });
   return out;
-}
-/* 「左18-1」「左18-イ」「049-L1-L38」の末尾を樹木No（補助番号）として切り出す */
-function splitHojo(no){
-  const m = String(no).match(/^(.*\d.*)-([A-Za-z]{0,2}\d{1,3}|[ア-ヴ])$/);
-  return m ? {base:m[1], hojo:m[2]} : {base:no, hojo:""};
-}
-/* リスト項目が点検済みか
-   「左18」に対して現場で「左18-1」と枝番を付けて保存した場合も済とみなす。
-   ただし1つの桝に複数の樹木がある形式（桝L1に樹木L2/L9…）では、
-   隣の樹木が済でもこの樹木が済とは限らないので、その判定はしない（it.solo===false）。*/
-function listItemDone(it, doneSet){
-  const no = (typeof it === "string") ? it : it.no;
-  if(doneSet.has(no)) return true;
-  if(typeof it === "object" && it.solo === false) return false;
-  for(const d of doneSet){ if(d.startsWith(no + "-")) return true; }
-  return false;
-}
-/* 樹木備考が「伐採」などで、もう木が無いことを表しているか */
-const GONE_WORDS = ["伐採", "撤去", "欠株", "抜根", "無し", "なし", "枯死撤去"];
-function goneReason(it){
-  const b = String((it && it.bikou) || "");
-  const w = GONE_WORDS.find(x => b.includes(x));
-  return w ? b.trim() : "";
 }
 function parseCsvList(text){
   const rows = [];
@@ -1204,499 +834,310 @@ async function parseXlsxList(f){
   }
   const wb = XLSX.read(await f.arrayBuffer(), {type:"array"});
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:""});
-  return rowsToItems(rows);
+  return rowsToItems(XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:""}));
 }
-
-function listState(){ return imports[routeKey()] || null; }
-function savedNos(){ return new Set(routeRecords().map(r => r.no)); }
+function listState(){ return imports[blockKey()] || null; }
+function savedNos(){ return new Set(blockRecords().map(r => r.no)); }
 function nextListIndex(from){
   const st = listState(); if(!st) return -1;
   const done = savedNos();
   for(let i = Math.max(0, from); i < st.items.length; i++){
-    if(!listItemDone(st.items[i], done)) return i;
+    if(!done.has(st.items[i].no)) return i;
   }
   return -1;
 }
 function renderProgress(){
   const st = listState();
-  const show = getMode() === "list" && st && st.items.length;
+  const show = st && st.items.length;
   $("progWrap").style.display = show ? "block" : "none";
-  if(!show) return;
+  if(!show){ $("listProg").textContent = "未取込。点検アプリのCSV（判定が外観診断の行）やExcel（樹木番号・樹種名の列）を取り込めます"; return; }
   const done = savedNos();
-  const doneCount = st.items.filter(it => listItemDone(it, done)).length;
-  const pct = Math.round(doneCount / st.items.length * 100);
-  $("progTxt").textContent = doneCount + "/" + st.items.length + " 本　点検済み " + pct + "%";
+  const dc = st.items.filter(it => done.has(it.no)).length;
+  const pct = Math.round(dc / st.items.length * 100);
+  $("progTxt").textContent = dc + "/" + st.items.length + " 本　診断済み " + pct + "%";
   $("progBar").style.width = pct + "%";
+  $("listProg").innerHTML = "リスト <b>" + dc + "/" + st.items.length + "</b> 本済";
 }
-/* リストの現在位置にある樹木を画面に出す。
-   すでに保存済みの樹木なら、その内容を呼び出して直せる状態にする（どこからでも前後に動けるように）。*/
-function showListItem(i, noGuard){
-  const st = listState(); if(!st) return;
-  if(!noGuard && i !== st.idx && !guardLeave()) return;      // 保存していない入力を黙って消さない
-  if(i < 0) i = 0;
-  if(i > st.items.length - 1) i = st.items.length - 1;
-  st.idx = i; store("gj_imports", imports);
+function fillFromList(){
+  const st = listState(); if(!st || !st.items.length) return;
+  let i = nextListIndex(st.idx);
+  if(i < 0) i = nextListIndex(0);
+  if(i < 0){ renderProgress(); toast("リストの診断は全て完了しています"); return; }
+  st.idx = i; store("gk_imports", imports);
   const it = st.items[i];
-  const sh = it.base != null ? {base: it.base, hojo: it.hojo || ""} : splitHojo(it.no);
-
-  // その番号がすでに保存済みなら編集モードで開く
-  const saved = routeRecords().find(r => r.no === it.no);
-  if(saved){
-    startEdit(saved.id, true);
-  } else {
-    if(editingId) endEdit(true);
-    clearTreeFields();
-    $("tno").value = sh.base; $("hojo").value = sh.hojo; $("sp").value = it.sp || "";
-    // 台帳の幹周は「前回」に入れ、今回はこれから測って入力する
-    $("girthPrev").value = it.girth || "";
-    girthWarnUpd();
-  }
-  if(it.zumen) $("zumen").value = it.zumen;
-  if(it.city) $("city").value = it.city;
-  if(it.town) $("town").value = it.town;
-  $("tnoNote").textContent = "リスト " + (i+1) + " / " + st.items.length + " 本目"
-    + (saved ? "（保存済み。直して上書きできます）" : "");
-  $("tnoNote").className = "note";
-  renderListInfo(it, saved);
+  $("tno").value = it.no;
+  if(it.sp) $("sp").value = it.sp;
+  $("tnoNote").textContent = "リスト " + (i+1) + " 番目。内容は手で修正できます";
+  renderProgress(); updatePhotoHint();
+  markClean();
+}
+$("skipBtn").onclick = ()=>{
+  const st = listState(); if(!st){ toast("リストが取り込まれていません"); return; }
+  if(!guardLeave()) return;
+  let i = nextListIndex(st.idx);
+  if(i < 0) i = nextListIndex(0);
+  if(i < 0){ toast("未診断の樹木はありません"); return; }
+  st.idx = i + 1; store("gk_imports", imports);
+  fillFromList();
+};
+$("delListBtn").onclick = ()=>{
+  const st = listState();
+  if(!st){ toast("取込リストがありません"); return; }
+  if(!confirm("取込リスト（" + st.items.length + "件）を削除しますか？\n診断記録は消えません")) return;
+  delete imports[blockKey()]; store("gk_imports", imports);
   renderProgress();
-  updateListProg();
-  updatePhotoButtons();
-  updateNavButtons();
+  toast("リストを削除しました");
+};
+
+/* ===== 保存 ===== */
+function collectBui(){
+  const bui = {}, bui3 = {};
+  PARTS.forEach(([p])=>{
+    BUI3_ITEMS.forEach(([k])=>{
+      const st = buiState[k + "_" + p];
+      if(st && st.v) bui3[k + "_" + p] = st.v;
+    });
+    itemsOfPart(p).forEach(([k])=>{
+      const st = buiState[k + "_" + p];
+      if(st && (st.on || st.note)) bui[k + "_" + p] = {on: st.on ? 1 : 0, note: st.note || ""};
+    });
+  });
+  return {bui, bui3};
+}
+function anyDamage(){
+  return Object.values(buiState).some(v => v && (v.on || (v.v || 0) >= 2)) ||
+         Object.values(kenState).some(v => v && v.on);
+}
+$("saveBtn").onclick = () => saveCurrent();
+/* いま入力している樹木を保存する。保存できたら true（撮り忘れの確認で止めた・番号が無い等は false） */
+function saveCurrent(){
+  const no = $("tno").value.trim();
+  if(!blockKey()){ $("setPanel").open = true; toast("基本設定のブロック名を入力してください"); return false; }
+  if(!no){ toast("樹木番号を入力してください"); return false; }
+  const dup = blockRecords().find(r => r.no === no && r.id !== editingId);
+  if(dup){ toast("樹木番号 " + no + " はこのブロックで保存済みです（一覧の［編集］で直してください）"); return false; }
+  // 撮り忘れチェック
+  if(pdb){
+    const ps = photosFor(blockKey(), no);
+    const has1 = ps.some(m => m.branch === 1);
+    const hasPos = ps.some(m => m.branch === 2);
+    const n3 = ps.filter(m => m.branch >= 3).length;
+    if(!has1 && !confirm("⚠ 全景写真がありません。撮影せずに保存しますか？")) return false;
+    if(!hasPos && !confirm("⚠ 位置（根元の状況）写真がありません。撮影せずに保存しますか？")) return false;
+    if(anyDamage() && !n3 && !confirm("⚠ 被害項目がありますが被害部写真がありません。\n撮影せずに保存しますか？")) return false;
+  }
+  const dmg = {};
+  PARTS.forEach(([p])=>{ const d = buiState["dmg_" + p]; if(d && (d.w || d.l)) dmg[p] = {w: d.w, l: d.l}; });
+  const ken = {};
+  KEN_ITEMS.forEach(([k])=>{ const st = kenState[k]; if(st && (st.on || st.note)) ken[k] = {on: st.on ? 1 : 0, note: st.note || ""}; });
+  const hantei = {}, shochi = {};
+  PARTS.forEach(([p])=>{
+    hantei[p] = segGet("segH_" + p);
+    shochi[p] = { sen: $("sho_sen_" + p).classList.contains("pri") ? 1 : 0,
+                  sei: $("sho_sei_" + p).classList.contains("pri") ? 1 : 0 };
+  });
+  const {bui, bui3} = collectBui();
+  const rec = {
+    id: editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,6)),
+    block: blockKey(), no,
+    sp: $("sp").value.trim(), h: $("th").value, c: $("tc").value, w: $("tw").value,
+    keitai: segGet("segKeitai"),                 // 1単独桝 2植樹帯 3緑地内 4その他
+    shichu: segGet("segShichu"),                 // 1良好 2なし 3破損
+    dt: $("dt").value, lat: $("lat").value.trim(), lng: $("lng").value.trim(),
+    jusei: segGet("segJusei"), jukei: segGet("segJukei"),
+    katsShoken: $("katsShoken").value.trim(), katsHantei: segGet("segKats"),
+    bui, bui3, dmg, ken,
+    buiShoken: $("buiShoken").value.trim(),
+    hantei, shochi,
+    gaiHantei: segGet("segGai"), gaiRiyu: $("gaiRiyu").value.trim(),
+    kiki: { gl1: $("gl1").value.trim(), fukyu1: $("fukyu1").value, gl2: $("gl2").value.trim(), fukyu2: $("fukyu2").value,
+            hantei: segGet("segKiki"), riyu: $("kikiRiyu").value.trim() },
+    soHantei: segGet("segSogo"), soRiyu: $("soRiyu").value.trim(),
+    hitsuyo: segGet("segHitsuyo"), kinkyu: segGet("segKinkyu"),   // 1なし 2あり
+    shochiSel: Object.keys(shochiSel).filter(k => shochiSel[k]),
+    naiyo: $("naiyo").value.trim(),
+    tokki: $("tokki").value.trim(),
+    jikai: segGet("segJikai"), sokuteiBui: $("sokuteiBui").value.trim(),
+    next: segGet("segNext"),
+    created: editingId ? (records.find(r => r.id === editingId) || {}).created || Date.now() : Date.now()
+  };
+  const wasEdit = !!editingId;
+  const before = records.slice();
+  if(wasEdit){
+    const i = records.findIndex(r => r.id === editingId);
+    if(i > -1) records[i] = rec;
+  } else {
+    records.push(rec);
+  }
+  if(!store("gk_records", records)){ records = before; return false; }     // 保存できなければ入力を消さない
+  if(wasEdit){ endEdit(); toast(no + " を更新しました"); }
+  else toast(no + " を保存しました（計 " + blockRecords().length + " 本）");
+  bump("block", rec.block); bump("sp", rec.sp);
+  clearFields();
+  if(!wasEdit){
+    const st = listState();
+    if(st && st.items.length){ fillFromList(); }
+    else { $("tno").value = nextNo(no); noteAuto(no); }
+  }
+  renderCnt(); renderSummary(); renderProgress(); updatePhotoHint();
+  markClean();
+  window.scrollTo({top:0, behavior:"smooth"});
+  return true;
+}
+/* 樹高・枝張りの測定（common/treemeasure.js）と推定樹齢。推定樹齢は画面に出すだけで、CSV・カルテには入らない */
+function tmUpd(){
+  const c = parseFloat($("tc").value);
+  $("ageTxt").textContent = window.TreeMeasure && c > 0 ? TreeMeasure.ageText($("sp").value, c * 100) : "";
+}
+function tmMeasure(e, kind, id, lab){
+  e.preventDefault();
+  if(!window.TreeMeasure){ alert("測定の部品が読み込めていません。アプリを最新版に更新してください"); return; }
+  TreeMeasure.open({kind, title: $("tno").value + "　" + $("sp").value, onResult: v => {
+    $(id).value = v; $(id).dispatchEvent(new Event("input", {bubbles: true}));
+  }});
+}
+$("tmH").onclick = e => tmMeasure(e, "h", "th");
+$("tmW").onclick = e => tmMeasure(e, "w", "tw");
+["sp", "tc"].forEach(i => $(i).addEventListener("input", tmUpd));
+function clearFields(){
+  setTimeout(tmUpd, 0);
+  ["sp","th","tc","tw","lat","lng","katsShoken","buiShoken","gaiRiyu",
+   "gl1","fukyu1","gl2","fukyu2","kikiRiyu","soRiyu","naiyo","tokki","sokuteiBui"]
+    .forEach(id => $(id).value = "");
+  $("dt").value = nowStr();
+  ["segKeitai","segShichu","segJusei","segJukei","segKats","segGai","segSogo","segKiki",
+   "segHitsuyo","segKinkyu","segJikai","segNext"].forEach(id => segSet(id, 0));
+  shochiSel = {}; renderShochi();
+  PARTS.forEach(([p])=>{
+    segSet("segH_" + p, 0);
+    $("sho_sen_" + p).classList.remove("pri");
+    $("sho_sei_" + p).classList.remove("pri");
+  });
+  Object.keys(buiState).forEach(k => delete buiState[k]);
+  Object.keys(kenState).forEach(k => delete kenState[k]);
+  curPart = "root";
+  buildBuiTabs(); renderBuiBody(); renderKen();
   markClean();
 }
 
-/* 図面番号・桝No・樹木No・樹種名・樹木備考を見せる（鳳土木の台帳のように情報が多い場合に効く）*/
-function renderListInfo(it, saved){
-  const box = $("listInfo");
-  if(!it){ box.classList.remove("show"); box.innerHTML = ""; return; }
-  const parts = [];
-  if(it.zumen) parts.push("図面番号 <b>" + esc(it.zumen) + "</b>");
-  const sh = it.base != null ? {base: it.base, hojo: it.hojo || ""} : splitHojo(it.no);
-  if(sh.base) parts.push("桝No. <b>" + esc(sh.base) + "</b>");
-  if(sh.hojo) parts.push("樹木No. <b>" + esc(sh.hojo) + "</b>");
-  if(it.sp) parts.push("<b>" + esc(it.sp) + "</b>");
-  if(it.girth) parts.push("幹周 " + esc(it.girth) + "cm");
-  let html = parts.join("　｜　");
-  if(it.bikou) html += '<br><span class="bikou">備考：' + esc(it.bikou) + "</span>";
-  if(saved) html += '<br><span style="color:var(--ok-tx);font-weight:600">✓ 保存済み</span>';
-  box.innerHTML = html;
-  box.classList.toggle("show", !!html);
+function startEdit(id, noGuard){
+  const r = records.find(x => x.id === id); if(!r) return;
+  if(!noGuard && id !== editingId && !guardLeave()) return;      // 保存していない入力を黙って消さない
+  editingId = id;
+  setView("input");
+  $("block").value = r.block; renderHeader();
+  $("tno").value = r.no; $("sp").value = r.sp || "";
+  $("th").value = r.h || ""; $("tc").value = r.c || ""; $("tw").value = r.w || ""; tmUpd();
+  segSet("segKeitai", r.keitai || 0); segSet("segShichu", r.shichu || 0);
+  $("dt").value = r.dt || nowStr(); $("lat").value = r.lat || ""; $("lng").value = r.lng || "";
+  segSet("segJusei", r.jusei || 0); segSet("segJukei", r.jukei || 0);
+  $("katsShoken").value = r.katsShoken || ""; segSet("segKats", r.katsHantei || 0);
+  Object.keys(buiState).forEach(k => delete buiState[k]);
+  Object.entries(r.bui || {}).forEach(([k,v]) => buiState[k] = {on: !!v.on, note: v.note || ""});
+  Object.entries(r.bui3 || {}).forEach(([k,v]) => buiState[k] = {v: v});
+  Object.entries(r.dmg || {}).forEach(([p,v]) => buiState["dmg_" + p] = {w: v.w || "", l: v.l || ""});
+  Object.keys(kenState).forEach(k => delete kenState[k]);
+  Object.entries(r.ken || {}).forEach(([k,v]) => kenState[k] = {on: !!v.on, note: v.note || ""});
+  curPart = "root"; buildBuiTabs(); renderBuiBody(); renderKen();
+  $("buiShoken").value = r.buiShoken || "";
+  PARTS.forEach(([p])=>{
+    segSet("segH_" + p, (r.hantei || {})[p] || 0);
+    $("sho_sen_" + p).classList.toggle("pri", !!((r.shochi || {})[p] || {}).sen);
+    $("sho_sei_" + p).classList.toggle("pri", !!((r.shochi || {})[p] || {}).sei);
+  });
+  segSet("segGai", r.gaiHantei || 0); $("gaiRiyu").value = r.gaiRiyu || "";
+  const kk = r.kiki || {};
+  $("gl1").value = kk.gl1 || ""; $("fukyu1").value = kk.fukyu1 || "";
+  $("gl2").value = kk.gl2 || ""; $("fukyu2").value = kk.fukyu2 || "";
+  segSet("segKiki", kk.hantei || 0); $("kikiRiyu").value = kk.riyu || "";
+  segSet("segSogo", r.soHantei || 0); $("soRiyu").value = r.soRiyu || "";
+  segSet("segHitsuyo", r.hitsuyo || 0); segSet("segKinkyu", r.kinkyu || 0);
+  shochiSel = {}; (r.shochiSel || []).forEach(k => shochiSel[k] = true); renderShochi();
+  $("naiyo").value = r.naiyo || ""; $("tokki").value = r.tokki || "";
+  segSet("segJikai", r.jikai || 0); $("sokuteiBui").value = r.sokuteiBui || "";
+  segSet("segNext", r.next || 0);
+  $("editBanner").style.display = "block"; $("editBanner").textContent = r.no + " を編集中";
+  $("saveBtn").textContent = "変更を保存"; $("cancelEdit").style.display = "block";
+  updatePhotoHint();
+  markClean();
+  window.scrollTo({top:0, behavior:"smooth"});
 }
 
-function updateListProg(){
-  const st = listState();
-  if(!st){ $("listProg").innerHTML = "リスト未取込。Excel（樹木番号・樹木名・図面番号・市名・町名の列）または CSV を取り込めます"; return; }
-  const done = savedNos();
-  const doneCount = st.items.filter(it => listItemDone(it, done)).length;
-  const it = st.items[st.idx];
-  $("listProg").innerHTML = "リスト <b>" + doneCount + "/" + st.items.length + "</b> 本済"
-    + (it ? "　｜　現在: " + esc(it.no) + (it.sp ? "（" + esc(it.sp) + "）" : "") : "");
-}
-
-function updateNavButtons(){
-  const st = listState();
-  const listMode = getMode() === "list" && st && st.items.length && !insertMode;
-  if(listMode){
-    $("savePrev").disabled = st.idx <= 0;
-    $("saveNext").disabled = st.idx >= st.items.length - 1;
-  } else {
-    $("savePrev").disabled = false;
-    $("saveNext").disabled = false;
-  }
-}
-
-/* リスト取込直後や路線切替時に、未点検の先頭を出す */
-function fillFromList(){
-  renderProgress();
-  const st = listState();
-  if(!st){ updateListProg(); renderListInfo(null); return; }
-  let i = nextListIndex(st.idx);
-  if(i < 0) i = nextListIndex(0);
-  if(i < 0){
-    // 全部済み → 現在位置のまま表示する
-    showListItem(Math.min(st.idx, st.items.length - 1));
-    const done = savedNos();
-    const dc = st.items.filter(x => listItemDone(x, done)).length;
-    $("listProg").innerHTML = "リスト <b>" + dc + "/" + st.items.length + "</b> 本済　— 全て完了しました";
-    return;
-  }
-  showListItem(i);
-}
-
-/* 画面に出ている番号がすでに保存済みなら、その内容を呼び出して直せる状態にする。
-   手動入力でも前後に自由に行き来できるようにするため。 */
-function loadIfSaved(){
-  const saved = routeRecords().find(r => r.no === fullNo());
-  if(saved){
-    startEdit(saved.id, true);
-    $("tnoNote").textContent = saved.no + " は保存済みです。直して上書きできます";
-    $("tnoNote").className = "note manual";
-  }
-  updateNavButtons();
-  return !!saved;
-}
-
-/* 画面の番号がリストの何番目かを探す（手で番号を打った場合の位置合わせ）*/
-function findListIndex(base, hojo){
-  const st = listState(); if(!st) return -1;
-  const full = hojo ? base + "-" + hojo : base;
-  return st.items.findIndex(it => it.no === full || (it.base === base && (it.hojo || "") === hojo));
-}
-
-$("skipBtn").onclick = ()=>{
-  const st = listState(); if(!st){ toast("リストが取り込まれていません"); return; }
-  let i = nextListIndex(st.idx + 1);
-  if(i < 0) i = nextListIndex(0);
-  if(i < 0){ toast("未点検の樹木はありません"); return; }
-  showListItem(i);
-};
-$("insertBtn").onclick = ()=>{
-  if(getMode() !== "list"){ toast("Excelリストモードで使うボタンです"); return; }
-  insertMode = true;
-  $("insertBanner").style.display = "block";
-  $("tno").value = ""; $("hojo").value = ""; $("sp").value = "";
-  $("tnoNote").textContent = "リスト外の樹木番号を入力してください";
-  $("tnoNote").className = "note manual";
-  $("tno").focus();
-};
-
-function noteAuto(prevNo){
-  $("tnoNote").textContent = prevNo + " の次として自動提案。欠番は打ち直せば以降その番号から連番";
-  $("tnoNote").className = "note";
-}
-$("tno").addEventListener("input", ()=>{
-  if(getMode() === "manual" && !editingId){
-    $("tnoNote").textContent = "手動入力中。保存後はこの番号＋1から連番を再開";
-    $("tnoNote").className = "note manual";
-  }
-});
-const IROHA = "イロハニホヘトチリヌルヲワカヨタレソツネナラム";
-function nextNo(no){
-  no = String(no).trim();
-  const m = no.match(/^(.*?)(\d+)\s*$/);
-  if(m) return m[1] + String(parseInt(m[2],10)+1).padStart(m[2].length,"0");
-  // 末尾がイロハ形式の枝番なら次の文字へ（左18-イ→左18-ロ）
-  const last = no.slice(-1);
-  const i = IROHA.indexOf(last);
-  if(i > -1 && i < IROHA.length - 1) return no.slice(0, -1) + IROHA[i + 1];
-  return "";
-}
-function prevNo(no){
-  no = String(no).trim();
-  const m = no.match(/^(.*?)(\d+)\s*$/);
-  if(m){
-    const v = parseInt(m[2],10) - 1;
-    if(v >= 0) return m[1] + String(v).padStart(m[2].length,"0");
-    return no;
-  }
-  const i = IROHA.indexOf(no.slice(-1));
-  if(i > 0) return no.slice(0, -1) + IROHA[i - 1];
-  return no;
-}
-/* 「1」「イ」だけでなく「L6」のような英字＋数字にも対応する */
-function nextHojo(h){
-  h = String(h).trim();
-  if(!h) return "";
-  const m = h.match(/^(.*?)(\d+)$/);
-  if(m) return m[1] + String(parseInt(m[2],10)+1).padStart(m[2].length,"0");
-  const i = IROHA.indexOf(h);
-  if(i > -1 && i < IROHA.length - 1) return IROHA[i + 1];
-  return "";
-}
-function prevHojo(h){
-  h = String(h).trim();
-  if(!h) return "";
-  const m = h.match(/^(.*?)(\d+)$/);
-  if(m){
-    const v = parseInt(m[2],10) - 1;
-    return v >= 1 ? m[1] + String(v).padStart(m[2].length,"0") : "";
-  }
-  const i = IROHA.indexOf(h);
-  if(i > 0) return IROHA[i - 1];
-  return "";
-}
-/* 図面番号「130-41-049」→「049」。区間ごとに桝Noがふり直される台帳で番号を区別するのに使う */
-function zumenTag(z){
-  const parts = String(z || "").trim().split(/[-‐－_\s]+/).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : "";
-}
-/* 図面番号・桝No・樹木No から、路線の中で重ならない1つの番号を組み立てる。
-   画面には桝No「L1」だけを出し、写真名や照合にはこの番号を使う。 */
-function composeNo(zumen, masu, eda, useZumen){
-  masu = String(masu || "").trim();
-  eda = String(eda || "").trim();
-  if(!masu) return "";
-  let n = masu;
-  const tag = useZumen ? zumenTag(zumen) : "";
-  if(tag && !n.startsWith(tag + "-")) n = tag + "-" + n;
-  return eda ? n + "-" + eda : n;
-}
-function useZumenKey(){
-  const st = listState();
-  return !!(st && st.zumenKey);
-}
-function fullNo(){
-  return composeNo($("zumen").value, $("tno").value, $("hojo").value, useZumenKey());
-}
-$("edaBtn").onclick = ()=>{
-  const h = $("hojo").value.trim();
-  $("hojo").value = /^\d+$/.test(h) ? nextHojo(h) : "1";
-  $("tno").dispatchEvent(new Event("input"));
-};
-$("edaKanaBtn").onclick = ()=>{
-  const h = $("hojo").value.trim();
-  $("hojo").value = IROHA.includes(h) && h !== "" ? nextHojo(h) : "イ";
-  $("tno").dispatchEvent(new Event("input"));
-};
-$("parentBtn").onclick = ()=>{
-  let v = $("tno").value.trim(); if(!v) return;
-  $("hojo").value = "";
-  const n = v.match(/^(.*?)(\d+)$/);
-  if(n) v = n[1] + String(parseInt(n[2],10)+1).padStart(n[2].length,"0");
-  $("tno").value = v;
-  $("tno").dispatchEvent(new Event("input"));
-};
-
-/* 推定樹齢（common/treemeasure.js）。画面に出すだけで、CSV・点検表には入らない。樹木点検に樹高の測定は無い（点検表に樹高の欄が無い） */
-function tmUpd(){
-  $("ageTxt").textContent = window.TreeMeasure ? TreeMeasure.ageText($("sp").value, $("girth").value || $("girthPrev").value) : "";
-}
-function girthWarnUpd(){
-  tmUpd();
-  const empty = !$("girth").value;
-  $("girth").classList.toggle("empty", empty);
-  $("girthWarn").textContent = empty ? "　⚠ 未入力" : "";
-  girthDiffUpd();
-}
-/* 前回（台帳）と今回の差を出して、測り間違いや成長がすぐ分かるようにする */
-function girthDiffUpd(){
-  const prev = parseFloat($("girthPrev").value), now = parseFloat($("girth").value);
-  const el = $("girthDiff");
-  if(!(prev > 0) || !(now > 0)){ el.textContent = ""; el.style.color = "var(--tx2)"; return; }
-  const d = Math.round((now - prev) * 10) / 10;
-  if(d === 0){ el.textContent = "前回と同じ（" + prev + "cm）"; el.style.color = "var(--tx2)"; return; }
-  const sign = d > 0 ? "＋" : "−";
-  const pct = Math.round(Math.abs(d) / prev * 100);
-  el.textContent = "前回 " + prev + "cm → 今回 " + now + "cm（" + sign + Math.abs(d) + "cm／" + pct + "％）";
-  // 3割以上ちがうときは打ち間違いの可能性があるので目立たせる
-  el.style.color = pct >= 30 ? "var(--ng-tx)" : "var(--tx2)";
-}
-$("girth").addEventListener("input", girthDiffUpd);
-$("girth").addEventListener("input", girthWarnUpd);
-$("kabuChk").addEventListener("change", ()=>{
-  const on = $("kabuChk").checked;
-  $("kabuBox").classList.toggle("show", on);
-  if(!on){ $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; }
-  kabuCalc();
-});
-function stemVals(){
-  return [...document.querySelectorAll(".stem")].map(i => parseFloat(i.value)).filter(v => v > 0);
-}
-function kabuText(stems, g){
-  return "株立ち" + stems.length + "本立ち　幹周り＝(" + stems.join("＋") + ")×0.7＝" + g + "cm";
-}
-function kabuCalc(){
-  if(!$("kabuChk").checked) return;
-  const stems = stemVals();
-  if(!stems.length){ $("girth").value = ""; $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; return; }
-  const g = Math.round(stems.reduce((a,b) => a+b, 0) * 0.7 * 10) / 10;
-  $("girth").value = g;
-  $("kabuNote").textContent = kabuText(stems, g);
-  $("memoAutoHint").textContent = "　※株立ちの計算式は自動で追記されます";
-  girthWarnUpd();
-}
-
-/* 樹木名が「空桝」「桝無し」「伐採済」「番号抹消」＝そこに点検する樹木が無い状態（点検項目・写真なし）。
-   番号抹消は、台帳で重複した番号を整理するとき。点検表を作るときハブが外す */
-const NO_TREE = ["空桝", "桝無し", "伐採済", "番号抹消"];
-function isNoTree(sp){ return NO_TREE.indexOf(String(sp || "").trim()) > -1; }
-
-function calc(){
-  const noTree = isNoTree($("sp").value);
-  document.body.classList.toggle("noTree", noTree);
-  $("karaBtn").classList.toggle("on", $("sp").value.trim() === "空桝");
-  $("nashiBtn").classList.toggle("on", $("sp").value.trim() === "桝無し");
-  $("bassaiZumiBtn").classList.toggle("on", $("sp").value.trim() === "伐採済");
-  $("masshoBtn").classList.toggle("on", $("sp").value.trim() === "番号抹消");
-  $("treeBtn").style.display = noTree ? "" : "none";
-  const j = $("judge");
-  if(noTree){
-    j.textContent = $("sp").value.trim();
-    j.style.background = "#EAE8E0"; j.style.color = "var(--tx2)";
-    updatePhotoButtons(); renderLv();
-    return;
-  }
-  const btns = [...document.querySelectorAll(".itm")];
-  const on1  = btns.filter(b => ITEMS[b.dataset.i].g === 1 && b.classList.contains("on")).length;
-  const on23 = btns.filter(b => ITEMS[b.dataset.i].g !== 1 && b.classList.contains("on")).length;
-  const items = new Array(ITEMS.length).fill("");
-  btns.forEach(b => { if(b.classList.contains("on")) items[+b.dataset.i] = "○"; });
-  const jj = judgeOf(items, $("sp").value, lv, bassai, hangare);
-  // 要経過観察になったら特記事項に定期剪定の文を入れ、外れたら消す
-  const mNow = $("memo").value;
-  if(jj === JUDGE_OBS && !mNow.includes(OBS_MEMO)) memoPut("", OBS_MEMO);
-  else if(jj !== JUDGE_OBS && mNow.includes(OBS_MEMO)) memoPut(OBS_MEMO, "");
-  if(bassai){ j.textContent = "維持管理の処置が必要（要伐採）"; j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
-  else if(jj === JUDGE_OBS){ j.textContent = JUDGE_OBS; j.style.background = "var(--obs-bg)"; j.style.color = "var(--obs-tx)"; }
-  else if(jj === "樹木の外観診断が必要"){ j.textContent = jj; j.style.background = "var(--ng-bg)"; j.style.color = "var(--ng-tx)"; }
-  else if(jj.startsWith("維持")){ j.textContent = "維持管理の処置が必要" + (hangare ? "（半枯れ）" : ""); j.style.background = "var(--warn-bg)"; j.style.color = "var(--warn-tx)"; }
-  else { j.textContent = "概ね良好・異常なし"; j.style.background = "var(--ok-bg)"; j.style.color = "var(--ok-tx)"; }
-  updatePhotoButtons(); renderLv();
-}
-
-/* 空桝・桝無しを設定する。樹木の情報は使わないので消してしまう */
-function setNoTree(label){
-  const cur = $("sp").value.trim();
-  if(cur === label){ clearNoTree(); return; }
-  $("sp").value = label;
-  $("girth").value = "";
-  $("kabuChk").checked = false; $("kabuBox").classList.remove("show");
-  $("kabuNote").textContent = ""; $("memoAutoHint").textContent = "";
-  document.querySelectorAll(".stem").forEach(i => i.value = "");
-  document.querySelectorAll(".itm.on").forEach(b => { b.classList.remove("on"); dropLevel(+b.dataset.i); });
-  calc(); girthWarnUpd();
-}
-function clearNoTree(){
-  if(isNoTree($("sp").value)) $("sp").value = "";
-  calc(); girthWarnUpd();
-}
-$("karaBtn").onclick = ()=> setNoTree("空桝");
-$("nashiBtn").onclick = ()=> setNoTree("桝無し");
-$("bassaiZumiBtn").onclick = ()=> setNoTree("伐採済");
-$("masshoBtn").onclick = ()=> setNoTree("番号抹消");
-$("treeBtn").onclick = ()=> clearNoTree();
-$("sp").addEventListener("input", ()=>{ calc(); girthWarnUpd(); });
-
-/* 要経過観察：②活力点検・③樹木の異常で○の項目が、全部A（軽度）。
-   点検結果は「維持管理の処置が必要」（外観診断はしない）、特記事項に定期剪定の文を入れる（2026-10-24〜） */
-const JUDGE_OBS = "維持管理の処置が必要（要経過観察）";
-const OBS_MEMO = "定期的な枯れ枝剪定、風圧軽減剪定が必要。";
-function isObs(items, lvMap, hang){
-  const on = ITEMS.map((it, i) => i).filter(i => ITEMS[i].g !== 1 && items[i] === "○" && !(hang && i === KARE_I));
-  return on.length > 0 && !!lvMap && on.every(i => lvMap[i] === "A");
-}
-/* lvMap（項目番号→程度）を渡すと、要経過観察を見分ける。
-   cut（要伐採）なら、②③に○があっても「維持管理の処置が必要」（伐採は維持管理の処置。外観診断はしない） */
-/* hang（半枯れ）なら「枯死・著しい衰弱」は維持管理の処置として数える（外観診断の対象にしない） */
-function judgeOf(items, sp, lvMap, cut, hang){
-  if(isNoTree(sp)) return String(sp).trim();
-  if(cut) return "維持管理の処置が必要";
-  const on1 = ITEMS.filter((it, i) => it.g === 1 && items[i] === "○").length;
-  const on23 = ITEMS.filter((it, i) => it.g !== 1 && items[i] === "○" && !(hang && i === KARE_I)).length;
-  if(on23 > 0) return isObs(items, lvMap, hang) ? JUDGE_OBS : "樹木の外観診断が必要";
-  if(on1 > 0 || (hang && items[KARE_I] === "○")) return "維持管理の処置が必要";
-  return "概ね良好・異常なし";
-}
-function photosOf(items, sp){
-  if(isNoTree(sp)) return 0;      // 樹木が無いので撮影は任意
-  return items.includes("○") ? 2 : 1;
-}
-/* CSVの特記事項：要経過観察なのに定期剪定の文が無い記録（前の版で保存したもの）は足して書き出す */
-function csvMemo(r){
-  const m = fullMemo(r);
-  if(judgeOf(r.items, r.sp, r.lv, r.bassai, r.hangare) !== JUDGE_OBS || m.includes(OBS_MEMO)) return m;
-  return m + (m && !/[。．.）)]$/.test(m) ? "。" : "") + OBS_MEMO;
-}
-function fullMemo(r){ return (r.kabuNote ? r.kabuNote + (r.memo ? "。" : "") : "") + (r.memo || ""); }
-
-/* ================= 保存し忘れの防止と「要確認」 ================= */
-/* 画面に出している樹木の入力（保存した時・開いた時の状態と比べて、変わっていれば未保存） */
+/* ================= 保存し忘れの防止と「要確認」（樹木点検アプリ v27 と同じ考え方） ================= */
+/* 画面に出している樹木の入力（開いた時・保存した時の状態と比べて、変わっていれば未保存） */
 let formBase = "", guardOn = false;
+const SNAP_IDS = ["sp","th","tc","tw","lat","lng","katsShoken","buiShoken","gaiRiyu","gl1","fukyu1","gl2","fukyu2",
+  "kikiRiyu","soRiyu","naiyo","tokki","sokuteiBui"];
+const SNAP_SEGS = ["segKeitai","segShichu","segJusei","segJukei","segKats","segGai","segSogo","segKiki",
+  "segHitsuyo","segKinkyu","segJikai","segNext"];
 function formSnap(){
-  return JSON.stringify([$("girth").value.trim(), $("sp").value.trim(), $("memo").value.trim(),
-    [...document.querySelectorAll(".itm.on")].map(b => b.dataset.i).join(","),
-    [...document.querySelectorAll(".stem")].map(i => i.value).join(",")]);
+  const clean = o => Object.fromEntries(Object.entries(o).filter(([k, v]) => v && (v.on || v.v || v.note || v.w || v.l)).sort());
+  return JSON.stringify([SNAP_IDS.map(id => $(id).value.trim()), SNAP_SEGS.map(segGet),
+    PARTS.map(([p]) => [segGet("segH_" + p), $("sho_sen_" + p).classList.contains("pri"), $("sho_sei_" + p).classList.contains("pri")]),
+    clean(buiState), clean(kenState), Object.keys(shochiSel).filter(k => shochiSel[k]).sort()]);
 }
 function markClean(){ formBase = formSnap(); }
 function unsavedReason(){
-  const no = fullNo(); if(!no) return "";
+  const no = $("tno").value.trim(); if(!no) return "";
   if(formSnap() !== formBase) return "入力";
-  const rec = routeRecords().find(r => r.no === no);
-  if(!rec && pdb && photosFor(routeKey(), no).length) return "点検（写真は撮影済み）";
+  if(!editingId && !blockRecords().some(r => r.no === no) && pdb && photosFor(blockKey(), no).length) return "診断（写真は撮影済み）";
   return "";
 }
 /* 別の樹木へ移る前に呼ぶ。移ってよければ true */
 function guardLeave(){
   if(!guardOn) return true;
   const why = unsavedReason(); if(!why) return true;
-  const no = fullNo();
+  const no = $("tno").value.trim();
   if(confirm("⚠ " + no + " の" + why + "がまだ保存されていません。\n\n［OK］保存してから移動します\n［キャンセル］保存しないで移動するか選べます")){
-    saveAndMove(0);
-    return !!routeRecords().find(r => r.no === no) && formSnap() === formBase;   // 保存できなかったら移動しない
+    return saveCurrent();                       // 保存できなかったら移動しない
   }
-  if(!confirm(no + " を保存しないで移動しますか？\n（入力した内容は消えます）")) return false;
-  // まだ点検を保存していない樹木で写真だけ撮ってあれば、写真も消して未点検に戻すか聞く（残すと「要確認」に出る）
-  const key = routeKey(), nPh = pdb ? photosFor(key, no).length : 0;
-  if(nPh && !routeRecords().some(r => r.no === no) &&
-     confirm(no + " で撮った写真 " + nPh + "枚も消して、未点検に戻しますか？\n［キャンセル］写真は残す（「要確認」に出ます）")){
-    revertCore(key, no).then(() => toast(no + " を未点検に戻しました"));
-  }
-  return true;
+  return confirm(no + " を保存しないで移動しますか？\n（入力した内容は消えます。撮った写真は残ります）");
 }
-/* 樹木を未点検に戻す：その樹木の点検結果と写真を消す（入力の途中で離れた樹木を「要確認」から外すため） */
-async function revertCore(key, no){
-  records = records.filter(r => !((r.office + "|" + r.route) === key && r.no === no));
-  store("gj_records", records);
-  if(pdb && photosFor(key, no).length){ try{ await deletePhotosOf(key, no); }catch(_){} }
-  if(editingId && !records.some(r => r.id === editingId)) endEdit(true);
-  renderCnt(); renderSummary(); renderProgress(); updatePhotoButtons();
-  if(window.SysZumen && SysZumen.sync) SysZumen.sync();
+/* 被害（部位診断・建築限界）の項目がある記録か */
+function recDamage(r){
+  return Object.values(r.bui3 || {}).some(v => v >= 2) || Object.values(r.bui || {}).some(v => v && v.on) ||
+         Object.values(r.ken || {}).some(v => v && v.on);
 }
-async function revertTree(x, key){
-  if(!x) return;
-  const saved = records.some(r => (r.office + "|" + r.route) === key && r.no === x.no);
-  const nPh = pdb ? photosFor(key, x.no).length : 0;
-  const what = [saved ? "入力した点検結果" : "", nPh ? "撮った写真 " + nPh + "枚" : ""].filter(Boolean).join("と");
-  if(!confirm(x.no + " を未点検に戻しますか？\n" + (what ? what + "を消します（取り消せません）" : ""))) return;
-  const showing = routeKey() === key && fullNo() === x.no;
-  await revertCore(key, x.no);
-  // 入力画面に出している樹木なら、入力欄も空にする
-  if(showing){
-    const st = listState();
-    if(st && getMode() === "list") showListItem(st.idx, true);
-    else { clearTreeFields(); updatePhotoButtons(); }
-  }
-  toast(x.no + " を未点検に戻しました");
-}
-/* 要確認の樹木：写真だけあって点検が未保存／幹周り未入力／写真が必要枚数に足りない */
+/* 要確認の樹木：写真だけあって診断が未保存／全景・位置・被害部の写真が無い／総合判定が無い */
 function issuesOf(key){
-  const recs = records.filter(r => (r.office + "|" + r.route) === key);
+  const recs = records.filter(r => r.block === key);
   const byNo = new Map(recs.map(r => [r.no, r]));
   const out = [], seen = new Set();
   photoMetas.filter(m => m.key === key).forEach(m => {
-    if(!byNo.has(m.no) && !seen.has(m.no)){ seen.add(m.no); out.push({no: m.no, label: "写真だけ（点検が未保存）"}); }
+    if(!byNo.has(m.no) && !seen.has(m.no)){ seen.add(m.no); out.push({no: m.no, label: "写真だけ（診断が未保存）"}); }
   });
   recs.forEach(r => {
-    if(isNoTree(r.sp)) return;
-    const need = photosOf(r.items || [], r.sp), have = photoMetas.filter(m => m.key === key && m.no === r.no).length;
     const probs = [];
-    if(!String(r.girth || "").trim()) probs.push("幹周り未入力");
-    if(pdb && have < need) probs.push("写真 " + have + "/" + need + "枚");
+    if(!r.soHantei) probs.push("総合判定なし");
+    if(pdb){
+      const ps = photosFor(key, r.no);
+      const miss = [];
+      if(!ps.some(m => m.branch === 1)) miss.push("全景");
+      if(!ps.some(m => m.branch === 2)) miss.push("位置");
+      if(recDamage(r) && !ps.some(m => m.branch >= 3)) miss.push("被害部");
+      if(miss.length) probs.push(miss.join("・") + "の写真なし");
+    }
     if(probs.length) out.push({no: r.no, id: r.id, label: probs.join("・")});
   });
-  // 点検リストの並び（無ければ番号順）
+  // 診断対象リストの並び（無ければ番号順）
   const st = imports[key], ord = new Map(st && st.items ? st.items.map((x, i) => [x.no, i]) : []);
   return out.sort((a, b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || (a.no < b.no ? -1 : 1));
 }
 function issueBtns(list){
-  return list.map((x, k) => '<span class="issueItem"><button type="button" data-k="' + k + '"><b>' + esc(x.no) + '</b> <small>' + esc(x.label) + '</small></button>' +
-    '<button type="button" class="issueRev" data-r="' + k + '" title="この樹木の点検結果・写真を消して未点検に戻す">未点検に戻す</button></span>').join("");
+  return list.map((x, k) => '<button type="button" data-k="' + k + '"><b>' + esc(x.no) + '</b> <small>' + esc(x.label) + '</small></button>').join("");
 }
 function renderIssues(){
   const sk = sumKey(), list = issuesOf(sk);
   $("issueCard").style.display = list.length ? "" : "none";
-  $("issueTitle").textContent = "⚠ 要確認 " + list.length + "本（" + sk.split("|")[1] + "）";
+  $("issueTitle").textContent = "⚠ 要確認 " + list.length + "本（" + (sk || "ブロック未設定") + "）";
   $("issueList").innerHTML = issueBtns(list);
-  $("issueList").querySelectorAll("button[data-k]").forEach(b => b.onclick = () => openIssue(list[+b.dataset.k], sk));
-  $("issueList").querySelectorAll("button[data-r]").forEach(b => b.onclick = () => revertTree(list[+b.dataset.r], sk));
-  // 入力画面の上にも出す（いま入力している路線）
-  const rk = routeKey(), l2 = rk === sk ? list : issuesOf(rk);
+  $("issueList").querySelectorAll("button").forEach(b => b.onclick = () => openIssue(list[+b.dataset.k], sk));
+  // 入力画面の上にも出す（いま入力しているブロック）
+  const bk = blockKey(), l2 = bk === sk ? list : issuesOf(bk);
   $("issueBar").classList.toggle("show", l2.length > 0);
-  $("issueBar").innerHTML = "⚠ 要確認 " + l2.length + "本（幹周り未入力・写真不足・点検が未保存）<br>" +
+  $("issueBar").innerHTML = "⚠ 要確認 " + l2.length + "本（写真の撮り忘れ・総合判定なし・診断が未保存）<br>" +
     issueBtns(l2.slice(0, 8)) + (l2.length > 8 ? '<button type="button" data-all="1">ほか ' + (l2.length - 8) + '本は一覧・集計で</button>' : "");
-  $("issueBar").querySelectorAll("button[data-k]").forEach(b => b.onclick = () => openIssue(l2[+b.dataset.k], rk));
-  $("issueBar").querySelectorAll("button[data-r]").forEach(b => b.onclick = () => revertTree(l2[+b.dataset.r], rk));
+  $("issueBar").querySelectorAll("button[data-k]").forEach(b => b.onclick = () => openIssue(l2[+b.dataset.k], bk));
   const all = $("issueBar").querySelector("button[data-all]");
   if(all) all.onclick = () => setView("sum");
 }
@@ -1704,185 +1145,152 @@ function openIssue(x, key){
   if(!x) return;
   if(!guardLeave()) return;
   setView("input");
-  if(x.id){ startEdit(x.id, false); return; }
-  const st = imports[key];
-  const i = st && st.items ? st.items.findIndex(it => it.no === x.no) : -1;
-  if(i >= 0 && getMode() === "list"){ showListItem(i, true); }
-  else { clearTreeFields(); const sh = splitHojo(x.no); $("tno").value = sh.base; $("hojo").value = sh.hojo; updatePhotoButtons(); markClean(); }
+  if(key && key !== blockKey()){ $("block").value = key; blockChanged(); }
+  if(x.id){ startEdit(x.id, true); return; }
+  if(editingId) endEdit();
+  clearFields();
+  const st = listState(), i = st && st.items ? st.items.findIndex(it => it.no === x.no) : -1;
+  if(i >= 0){ st.idx = i; store("gk_imports", imports); fillFromList(); }
+  else { $("tno").value = x.no; updatePhotoHint(); markClean(); }
   window.scrollTo({top: 0, behavior: "smooth"});
   toast(x.no + "：" + x.label);
 }
 
-/* 保存して move の向きへ動く（-1=前の樹木 / 0=この樹木 / +1=次の樹木）*/
-$("savePrev").onclick = ()=> saveAndMove(-1);
-$("saveHere").onclick = ()=> saveAndMove(0);
-$("saveNext").onclick = ()=> saveAndMove(1);
-
-function saveAndMove(move){
-  const no = fullNo();
-  if(!$("office").value.trim() || !$("route").value.trim()){
-    $("setPanel").open = true; toast("基本設定の点検事務所と路線名を入力してください"); return;
-  }
-  if(!$("tno").value.trim()){ toast("樹木番号を入力してください"); return; }
-  // 保存で画面が書き換わる前に、いまリストの何番目にいるかを控えておく
-  const startIdx = findListIndex($("tno").value.trim(), $("hojo").value.trim());
-  const dup = routeRecords().find(r => r.no === no && r.id !== editingId);
-  if(dup){ toast("樹木番号 " + no + " はこの路線で保存済みです"); return; }
-  // 画面の並びと保存の並びが違うので、ボタンに持たせた番号で並べる
-  const items = new Array(ITEMS.length).fill("");
-  document.querySelectorAll(".itm").forEach(b => { if(b.classList.contains("on")) items[+b.dataset.i] = "○"; });
-  // 撮り忘れチェック: 必要枚数（異常あり2枚/なし1枚）に足りなければ警告
-  const needP = photosOf(items, $("sp").value), haveP = pdb ? photosFor(routeKey(), no).length : 0;
-  if(pdb && haveP < needP && !confirm("⚠ 写真が " + haveP + "/" + needP + " 枚です。\n撮影せずに保存しますか？\n（キャンセル→📷ボタンで撮影できます）")) return;
-  const kabuOn = $("kabuChk").checked;
-  const stems = kabuOn ? stemVals() : [];
-  const rec = {
-    id: editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,6)),
-    office: $("office").value.trim(), route: $("route").value.trim(),
-    zumen: $("zumen").value.trim(), city: $("city").value.trim(), town: $("town").value.trim(),
-    no, masu: $("tno").value.trim(), hojo: $("hojo").value.trim(),
-    sp: $("sp").value.trim(), girth: $("girth").value.trim(),
-    girthPrev: $("girthPrev").value.trim(),
-    kabu: stems, kabuNote: (kabuOn && stems.length) ? kabuText(stems, $("girth").value) : "",
-    dt: $("dt").value, items, memo: $("memo").value.trim(),
-    lv: Object.fromEntries(Object.entries(lv).filter(([i]) => items[i] === "○")),
-    autoTxt: Object.fromEntries(Object.entries(autoTxt).filter(([i]) => items[i] === "○")),
-    bassai: bassai ? 1 : 0,
-    hangare: (hangare && items[KARE_I] === "○") ? 1 : 0,
-    created: editingId ? (records.find(r => r.id === editingId) || {}).created || Date.now() : Date.now()
+/* ================= 部位診断の所見を、選んだ項目から作る ================= */
+/* 樹木点検アプリの「程度を選ぶと特記事項に文が入る」と同じ考え方。文は現地に合わせて直してください */
+const PART_WORD = {root:"根元部", trunk:"幹部", branch:"骨格となる大枝"};
+function autoShokenLines(){
+  const lines = [];      // [{t: 文, w: 重さ}]
+  const ratioTxt = p => {
+    const d = buiState["dmg_" + p] || {}, w = parseFloat(d.w), l = parseFloat(d.l);
+    return (w > 0 && l > 0) ? "（被害部幅" + d.w + "cm／周囲長" + d.l + "cm＝" + Math.round(w / l * 100) + "%）" : "";
   };
-  const wasEdit = !!editingId;
-  if(wasEdit){
-    const i = records.findIndex(r => r.id === editingId);
-    if(i > -1) records[i] = rec;
-    endEdit(true);           // 位置を動かさずに編集状態だけ解除する
-    toast(no + " を更新しました");
-  } else {
-    records.push(rec);
-    toast(no + " を保存しました（計 " + routeRecords().length + " 本）");
-  }
-  store("gj_records", records);
-  bump("office", rec.office); bump("route", rec.route); bump("sp", rec.sp); bump("memo", rec.memo);
-  bump("zumen", rec.zumen); bump("city", rec.city); bump("town", rec.town);
-
-  const wasInsert = insertMode;
-  if(insertMode){ insertMode = false; $("insertBanner").style.display = "none"; }
-  const st = listState();
-  const listMode = getMode() === "list" && st && st.items.length;
-
-  if(move === 0){
-    // この樹木にとどまる（保存した内容を編集状態で残す）
-    renderCnt(); renderSummary(); renderProgress(); updateListProg();
-    startEdit(rec.id, true);
-    if(listMode) renderListInfo(st.items[st.idx], true);
-    updateNavButtons();
-    return;
-  }
-
-  clearTreeFields();
-  if(listMode && !wasInsert){
-    // 保存前に控えた位置から動く（途中から入力しても前後に正しく動けるように）
-    const from = startIdx >= 0 ? startIdx : st.idx;
-    showListItem(from + move);
-  } else if(listMode && wasInsert){
-    showListItem(st.idx);
-  } else {
-    // 手動入力：番号を1つ進める／戻す
-    if(editingId) endEdit(true);
-    const savedHojo = rec.hojo || splitHojo(rec.no).hojo;
-    if(savedHojo){
-      const nh = move > 0 ? nextHojo(savedHojo) : prevHojo(savedHojo);
-      if(nh){
-        $("hojo").value = nh; $("sp").value = rec.sp;
-        $("tnoNote").textContent = rec.no + " の" + (move > 0 ? "次" : "前") + "の補助番号です。次の樹木へは「次の本番号へ」";
-        $("tnoNote").className = "note manual";
-      } else {
-        $("hojo").value = "";
-        $("tno").value = move > 0 ? nextNo(splitHojo(rec.no).base) : prevNo(splitHojo(rec.no).base);
-        noteAuto(rec.no);
-      }
-    } else {
-      $("hojo").value = "";
-      $("tno").value = move > 0 ? nextNo(no) : prevNo(no);
-      noteAuto(no);
-    }
-    loadIfSaved();
-  }
-  renderCnt(); renderSummary(); renderProgress(); updatePhotoButtons(); updateNavButtons();
-  window.scrollTo({top:0, behavior:"smooth"});
+  PARTS.forEach(([p]) => {
+    const pw = PART_WORD[p];
+    let rt = ratioTxt(p);
+    BUI3_ITEMS.forEach(([k, lb]) => {
+      const v = (buiState[k + "_" + p] || {}).v || 0;
+      if(v < 2) return;
+      const what = k === "hifu" ? "樹皮枯死・欠損・腐朽" : k === "kudo1" ? "芯に達した開口空洞" : "芯に達していない開口空洞";
+      lines.push({t: pw + "に周囲長の" + (v === 3 ? "1/3以上" : "1/3未満") + "の" + what + "がある" + rt, w: (v === 3 ? 30 : 20) + (k === "kudo1" ? 3 : 0)});
+      rt = "";          // 比率は最初の文にだけ付ける
+    });
+    itemsOfPart(p).forEach(([k, lb]) => {
+      const st = buiState[k + "_" + p];
+      if(!st || !st.on) return;
+      const memo = (st.note || "").trim();
+      const base = {
+        kinoko: pw + "にキノコ（子実体）の発生がある", kozuchi: pw + "で小槌打診の異常音がある",
+        bunki: pw + "の分岐部・付根に異常がある", dogare: pw + "に胴枯れなどの被害がある",
+        mushi: pw + "に虫穴・虫フン・ヤニがある", yuragi: "根元に揺らぎがある", kobo: "鋼棒貫入に異常がある",
+        makine: "巻き根がある", rcollar: "ルートカラーが見えない", roshutsu: "露出根に被害がある",
+        keisha: "幹が不自然に傾斜している", kareeda: "大枝に枯枝がある", stub: "大枝にスタブカットがある"
+      }[k] || (pw + "に" + lb + "がある");
+      const w = {kinoko: 25, yuragi: 28, kobo: 26, keisha: 24, kozuchi: 22, bunki: 18, dogare: 16, mushi: 15, kareeda: 12}[k] || 10;
+      lines.push({t: base + (memo ? "（" + memo + "）" : ""), w});
+    });
+  });
+  KEN_ITEMS.forEach(([k, lb]) => {
+    const st = kenState[k];
+    if(!st || !st.on) return;
+    const [part, side] = lb.split("・");
+    lines.push({t: part + "が" + side + "の建築限界を超えている" + ((st.note || "").trim() ? "（" + st.note.trim() + "）" : ""), w: 8});
+  });
+  return lines;
 }
-function clearTreeFields(){
-  $("sp").value = ""; $("girth").value = "";
-  $("girthPrev").value = ""; $("girthDiff").textContent = "";
-  $("memo").value = ""; $("dt").value = nowStr();
-  $("kabuChk").checked = false; $("kabuBox").classList.remove("show");
-  $("kabuNote").textContent = ""; $("memoAutoHint").textContent = "";
-  document.querySelectorAll(".stem").forEach(i => i.value = "");
-  document.querySelectorAll(".itm.on").forEach(b => b.classList.remove("on"));
-  resetLevels();
-  calc(); girthWarnUpd();
-  markClean();
-}
-
-/* quiet=true … リスト内を前後に動いた結果の呼び出し。路線の再読込やスクロールをしない */
-function startEdit(id, quiet){
-  const r = records.find(x => x.id === id); if(!r) return;
-  editingId = id; insertMode = false; $("insertBanner").style.display = "none";
-  if(!quiet){
-    setView("input");
-    $("office").value = r.office; $("route").value = r.route;
-    routeChanged();
-  }
-  $("zumen").value = r.zumen || ""; $("city").value = r.city || ""; $("town").value = r.town || "";
-  // 保存時の桝No・樹木Noをそのまま戻す（番号から切り出そうとすると「L38」のような
-  // 英字付きの樹木Noを拾えず、桝Noに番号全体が入ってしまう）
-  const esh = (r.masu != null && r.masu !== "")
-    ? {base: r.masu, hojo: r.hojo || ""}
-    : splitHojo(r.no);
-  $("tno").value = esh.base; $("hojo").value = esh.hojo; $("sp").value = r.sp;
-  $("dt").value = r.dt; $("memo").value = r.memo;
-  const stems = r.kabu || [];
-  $("kabuChk").checked = stems.length > 0;
-  $("kabuBox").classList.toggle("show", stems.length > 0);
-  $("girth").readOnly = stems.length > 0;
-  document.querySelectorAll(".stem").forEach((inp,i) => inp.value = stems[i] ?? "");
-  $("girth").value = r.girth || "";
-  $("girthPrev").value = r.girthPrev || "";
-  if(stems.length){ $("kabuNote").textContent = r.kabuNote; $("memoAutoHint").textContent = "　※株立ちの計算式は自動で追記されます"; }
-  else { $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; }
-  document.querySelectorAll(".itm").forEach(b => b.classList.toggle("on", r.items[+b.dataset.i] === "○"));
-  lv = Object.assign({}, r.lv || {}); autoTxt = Object.assign({}, r.autoTxt || {}); alt = {};
-  bassai = !!r.bassai; hangare = !!r.hangare;
-  $("editBanner").style.display = "block"; $("editBanner").textContent = r.no + " を編集中（上書きされます）";
-  $("saveHere").textContent = "上書き保存"; $("cancelEdit").style.display = "block";
-  if(!quiet){
-    $("tnoNote").textContent = "編集中は番号を変更すると上書き保存されます"; $("tnoNote").className = "note manual";
-  }
-  calc(); girthWarnUpd(); updateNavButtons();
-  markClean();
-  if(!quiet) window.scrollTo({top:0, behavior:"smooth"});
-}
-/* quiet=true … 番号の再提案をせず、編集状態だけ解除する */
-function endEdit(quiet){
+$("autoShoken").onclick = ()=>{
+  const lines = autoShokenLines();
+  if(!lines.length){ toast("部位診断・建築限界で項目を選んでください"); return; }
+  const cur = $("buiShoken").value.split("\n").map(x => x.trim()).filter(Boolean);
+  const add = lines.map(x => x.t).filter(t => !cur.includes(t));
+  $("buiShoken").value = cur.concat(add).join("\n");
+  const top = lines.slice().sort((a, b) => b.w - a.w)[0].t;
+  if(!$("gaiRiyu").value.trim()) $("gaiRiyu").value = top;
+  if(!$("soRiyu").value.trim()) $("soRiyu").value = top;
+  toast(add.length ? "所見に " + add.length + "行を足しました（文は現地に合わせて直してください）" : "所見には全部入っています");
+};
+function endEdit(){
   editingId = null;
   $("editBanner").style.display = "none";
-  $("saveHere").textContent = "この樹木"; $("cancelEdit").style.display = "none";
-  if(quiet){ updateNavButtons(); return; }
-  if(getMode() === "list"){ fillFromList(); }
-  else {
-    const rr = routeRecords();
-    if(rr.length){ $("hojo").value = ""; $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
-  }
-  updatePhotoButtons(); updateNavButtons();
+  $("saveBtn").textContent = "保存して次の樹木へ"; $("cancelEdit").style.display = "none";
 }
-$("cancelEdit").onclick = ()=>{ endEdit(); clearTreeFields(); };
+$("cancelEdit").onclick = ()=>{
+  endEdit(); clearFields();
+  const st = listState();
+  if(st && st.items.length) fillFromList();
+  else {     // 編集していた樹木の番号を残さず、次の番号に戻す（そのまま入力すると保存済みの番号と重なるため）
+    const rr = blockRecords();
+    if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); } else $("tno").value = "";
+    updatePhotoHint();
+  }
+};
 
-/* iPadの保存領域（写真・記録）の使用量と空き */
+/* ===== 一覧・集計 ===== */
+function allBlocks(){
+  const s = new Set(records.map(r => r.block));
+  if(blockKey()) s.add(blockKey());
+  Object.keys(imports).forEach(k => { if(imports[k] && imports[k].items.length) s.add(k); });
+  return [...s].filter(Boolean).sort();
+}
+let sumSel = null;
+function sumKey(){ return (sumSel && allBlocks().includes(sumSel)) ? sumSel : blockKey(); }
+$("sumBlock").addEventListener("change", ()=>{ sumSel = $("sumBlock").value; renderSummary(); });
+function renderSummary(){
+  const blocks = allBlocks(), cur = sumKey();
+  const sb = $("sumBlock"); sb.innerHTML = "";
+  blocks.forEach(b=>{
+    const op = document.createElement("option");
+    op.value = b; op.textContent = b || "（未設定）"; op.selected = b === cur;
+    sb.appendChild(op);
+  });
+  renderStoreInfo();
+  try{ renderIssues(); }catch(e){ console.warn(e); }
+  // 診断対象リストの順に並べる。リストに無い樹木は保存した順で後ろに
+  const ls = imports[cur], ord = new Map(ls && ls.items ? ls.items.map((x, i) => [x.no, i]) : []);
+  const rr = records.filter(r => r.block === cur).slice()
+    .sort((a,b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || a.created - b.created);
+  $("sumAll").textContent = rr.length;
+  $("sumOk").textContent = rr.filter(r => r.soHantei === 1).length;
+  $("sumWarn").textContent = rr.filter(r => r.soHantei === 2).length;
+  $("sumNg").textContent = rr.filter(r => r.soHantei >= 3).length;
+  $("sumTitle").textContent = (cur || "ブロック未設定") + " の一覧";
+  const tb = $("sumBody"); tb.innerHTML = "";
+  rr.forEach(r=>{
+    const j = r.soHantei || 0;
+    const cls = j === 1 ? "background:var(--ok-bg);color:var(--ok-tx)"
+             : j === 2 ? "background:var(--warn-bg);color:var(--warn-tx)"
+             : j >= 3 ? "background:var(--ng-bg);color:var(--ng-tx)"
+             : "background:#F1EFE8;color:var(--tx2)";
+    const ps = pdb ? photosFor(r.block, r.no) : [];
+    const has1 = ps.some(m => m.branch === 1);
+    const shochiTxt = [r.hitsuyo === 3 ? "要処置" : "", r.kinkyu === 3 ? "緊急高" : ""].filter(Boolean).join("/") || "—";
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td><b>" + esc(r.no) + "</b></td><td>" + esc(r.sp || "—") + "</td>" +
+      '<td><span class="rjudge" style="' + cls + '">' + (j ? HT4S[j-1] : "未") + "</span></td>" +
+      '<td style="' + (has1 ? "color:var(--ok-tx)" : "color:var(--ng-tx)") + ';font-weight:600">' + (has1 ? "" : "⚠") + ps.length + "枚</td>" +
+      "<td>" + esc(shochiTxt) + "</td>";
+    const td = document.createElement("td");
+    const eb = document.createElement("button"); eb.className = "miniBtn"; eb.textContent = "編集";
+    eb.onclick = () => startEdit(r.id);
+    const db = document.createElement("button"); db.className = "miniBtn del"; db.textContent = "削除"; db.style.marginLeft = "6px";
+    db.onclick = ()=>{
+      if(!confirm(r.no + " の診断記録を削除しますか？（取り消せません）")) return;
+      records = records.filter(x => x.id !== r.id);
+      store("gk_records", records);
+      if(editingId === r.id){ endEdit(); clearFields(); }
+      renderCnt(); renderSummary(); renderProgress();
+      toast(r.no + " を削除しました");
+    };
+    td.appendChild(eb); td.appendChild(db);
+    tr.appendChild(td);
+    tb.appendChild(tr);
+  });
+}
 async function renderStoreInfo(){
   const el = $("storeInfo"); if(!el) return;
   const n = photoMetas.length, mb = photoMetas.reduce((a, m) => a + (m.size || 0), 0) / 1048576;
   const nNew = photoMetas.filter(m => !m.exp).length;
-  let t = "このiPadの写真 " + n + "枚（約" + Math.round(mb) + "MB、未書き出し " + nNew + "枚）・点検記録 " + records.length + "本";
+  let t = "このiPadの写真 " + n + "枚（約" + Math.round(mb) + "MB、未書き出し " + nNew + "枚）・診断記録 " + records.length + "本";
   try{
     if(navigator.storage && navigator.storage.estimate){
       const e = await navigator.storage.estimate();
@@ -1891,95 +1299,100 @@ async function renderStoreInfo(){
   }catch(_){}
   el.textContent = t;
 }
-function renderSummary(){
-  renderSumSel();
-  renderStoreInfo();
-  try{ renderIssues(); }catch(e){ console.warn(e); }
-  // 点検リストの順（右283 → 右284 → …）に並べる。リストに無い樹木は保存した順で後ろに
-  const ls = sumListState(), ord = new Map(ls && ls.items ? ls.items.map((x, i) => [x.no, i]) : []);
-  const rr = sumRecords().slice().sort((a,b) => (ord.has(a.no) ? ord.get(a.no) : 1e9) - (ord.has(b.no) ? ord.get(b.no) : 1e9) || a.created - b.created);
-  const jd = rr.map(r => judgeOf(r.items, r.sp, r.lv, r.bassai, r.hangare));
-  $("sumAll").textContent = rr.length;
-  $("sumOk").textContent = jd.filter(j => j.startsWith("概ね")).length;
-  $("sumWarn").textContent = jd.filter(j => j.startsWith("維持")).length;
-  $("sumNg").textContent = jd.filter(j => j === "樹木の外観診断が必要").length;
-  $("sumObs").textContent = jd.filter(j => j === JUDGE_OBS).length;
-  $("sumKara").textContent = rr.filter(r => isNoTree(r.sp)).length;
-  $("sumTitle").textContent = (sumKey().split("|")[1] || "路線未設定") + " の一覧";
-  renderListTable();
-  const tb = $("sumBody"); tb.innerHTML = "";
-  rr.forEach((r,i)=>{
-    const j = jd[i];
-    const cls = isNoTree(r.sp) ? "background:#EAE8E0;color:var(--tx2)"
-             : j === JUDGE_OBS ? "background:var(--obs-bg);color:var(--obs-tx)"
-             : j.startsWith("概ね") ? "background:var(--ok-bg);color:var(--ok-tx)"
-             : j.startsWith("維持") ? "background:var(--warn-bg);color:var(--warn-tx)"
-             : "background:var(--ng-bg);color:var(--ng-tx)";
-    const tr = document.createElement("tr");
-    const needP = photosOf(r.items, r.sp);
-    const haveP = pdb ? photosFor(r.office + "|" + r.route, r.no).length : 0;
-    const pCls = haveP >= needP ? "color:var(--ok-tx);font-weight:600" : "color:var(--ng-tx);font-weight:600";
-    // 今回と前回の幹周を並べ、3割以上ちがうときは赤くする
-    const gN = parseFloat(r.girth), gP = parseFloat(r.girthPrev);
-    const bigDiff = gN > 0 && gP > 0 && Math.abs(gN - gP) / gP >= 0.3;
-    tr.innerHTML = "<td><b>" + esc(r.no) + "</b></td><td>" + esc(r.sp || "—") + "</td>" +
-      '<td style="' + (bigDiff ? "color:var(--ng-tx);font-weight:600" : "") + '">' + esc(r.girth || "—") + "</td>" +
-      '<td style="color:var(--tx2)">' + esc(r.girthPrev || "—") + "</td>" +
-      '<td><span class="rjudge" style="' + cls + '">' +
-        (isNoTree(r.sp) ? esc(r.sp) : j === JUDGE_OBS ? "経過観察" : j.startsWith("概ね") ? "良好" : j.startsWith("維持") ? "維持管理" : "外観診断") + "</span></td>" +
-      '<td style="' + pCls + '">' + (needP === 0 ? (haveP ? haveP + "枚" : "—")
-        : (haveP >= needP ? "" : "⚠") + haveP + "/" + needP + "枚") + "</td>" +
-      '<td class="memoCell' + (r.bassai ? " cut" : "") + '">' + (r.bassai ? "【要伐採】" : "") + esc(fullMemo(r)) + "</td>";
-    const td = document.createElement("td");
-    const eb = document.createElement("button"); eb.className = "miniBtn"; eb.textContent = "編集";
-    eb.onclick = () => startEdit(r.id);
-    const db = document.createElement("button"); db.className = "miniBtn del"; db.textContent = "削除"; db.style.marginLeft = "6px";
-    db.onclick = ()=>{
-      if(!confirm2(r.no + " を削除しますか？", r.no + " の点検記録が完全に消えます。\n本当に削除しますか？（取り消せません）")) return;
-      records = records.filter(x => x.id !== r.id);
-      store("gj_records", records);
-      if(editingId === r.id) endEdit();
-      renderCnt(); renderSummary(); renderProgress();
-      if(getMode() === "list") fillFromList();
-      toast(r.no + " を削除しました");
-    };
-    td.appendChild(eb); td.appendChild(db);
-    tr.appendChild(td);
-    tb.appendChild(tr);
-  });
-}
-function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+$("delAllBtn").onclick = ()=>{
+  const k = sumKey();
+  const rr = records.filter(r => r.block === k);
+  if(!rr.length){ toast("このブロックの記録はありません"); return; }
+  if(!confirm(k + " の記録 " + rr.length + " 本と撮影写真をすべて削除しますか？") ||
+     !confirm("本当に削除しますか？CSV・写真ZIPの書き出し済みか確認してください")) return;
+  records = records.filter(r => r.block !== k);
+  store("gk_records", records);
+  if(pdb) deletePhotosOfKey(k);
+  if(editingId) endEdit();
+  renderCnt(); renderSummary(); renderProgress();
+  toast(k + " の記録を削除しました");
+};
 
+/* ===== CSV ===== */
 function csvField(v){ v = String(v ?? ""); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
-/* 路線の点検CSV（CSV書き出し・写真ZIPに同梱）。記録が無ければ null */
-function buildCsv(key){
-  const rr = records.filter(r => (r.office + "|" + r.route) === key).sort((a,b) => a.created - b.created);
-  if(!rr.length) return null;
-  const head = ["点検事務所","路線名","図面番号","樹木番号","補助番号","樹木名","幹周り(cm)","前回幹周り(cm)","市名","町名","点検日時","点検者",
-    ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数","要伐採","要経過観察","半枯れ","記録番号"];
-  const rows = rr.map(r => [r.office, r.route, r.zumen || "",
-    (r.masu != null && r.masu !== "") ? r.masu : splitHojo(r.no).base,
-    (r.hojo != null && r.hojo !== "") ? r.hojo : splitHojo(r.no).hojo,
-    r.sp, r.girth || "", r.girthPrev || "", r.city || "", r.town || "",
-    (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), csvMemo(r), judgeOf(r.items, r.sp, r.lv, r.bassai, r.hangare), photosOf(r.items, r.sp), r.bassai ? "○" : "",
-    judgeOf(r.items, r.sp, r.lv, r.bassai, r.hangare) === JUDGE_OBS ? "○" : "", r.hangare ? "○" : "", r.no]
-    .map(csvField).join(","));
-  const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
-  const d = new Date();
-  const [ko, kr] = key.split("|");
-  const fname = (ko + "_" + kr + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".csv").replace(/[\\/:*?"<>|]/g,"");
-  return {fname, csv};
-}
+const mk = v => v || "";
+const onMark = st => (st && st.on) ? "○" : "";
 $("csvBtn").onclick = ()=>{
   const c = buildCsv(sumKey());
-  if(!c){ toast("この路線の保存データがありません"); return; }
-  const fname = c.fname, csv = c.csv;
-  const blob = new Blob([csv], {type:"text/csv"});
-  const file = new File([blob], fname, {type:"text/csv"});
+  if(!c){ toast("このブロックの保存データがありません"); return; }
+  const blob = new Blob([c.csv], {type:"text/csv"});
+  const file = new File([blob], c.fname, {type:"text/csv"});
   if(navigator.canShare && navigator.canShare({files:[file]})){
-    navigator.share({files:[file], title:fname}).catch(() => dl(blob, fname));
-  } else { dl(blob, fname); }
+    navigator.share({files:[file], title:c.fname}).catch(() => dl(blob, c.fname));
+  } else { dl(blob, c.fname); }
 };
+/* ブロックの診断CSV（{csv, fname}）。記録が無ければ null。写真ZIPにも同じものを入れる */
+function buildCsv(k){
+  const rr = records.filter(r => r.block === k).slice().sort((a,b) => a.created - b.created);
+  if(!rr.length) return null;
+  const head = ["ブロック名","樹木番号","樹種名","樹高H","幹周C","枝張W","植栽形態","支柱","診断日時","樹木医","緯度","経度",
+    "樹勢","樹形","活力所見","活力判定"];
+  BUI3_ITEMS.forEach(([key,lb])=>{
+    PARTS.forEach(([p,plb])=> head.push(lb + "_" + plb));
+  });
+  BUI_ITEMS.concat(ROOT_ITEMS).concat(BR_ITEMS).forEach(([key,lb])=>{
+    PARTS.forEach(([p,plb])=>{
+      const valid = BUI_ITEMS.some(x=>x[0]===key) || (p==="root" && ROOT_ITEMS.some(x=>x[0]===key)) || (p==="branch" && BR_ITEMS.some(x=>x[0]===key));
+      if(valid){ head.push(lb + "_" + plb); head.push(lb + "_" + plb + "_メモ"); }
+    });
+  });
+  PARTS.forEach(([p,plb])=>{ head.push("被害部幅_" + plb, "被害部周囲長_" + plb, "周囲長比率_" + plb); });
+  KEN_ITEMS.forEach(([kk,lb])=>{ head.push("建築限界_" + lb, "建築限界_" + lb + "_メモ"); });
+  head.push("部位所見");
+  PARTS.forEach(([p,plb])=> head.push("部位判定_" + plb));
+  PARTS.forEach(([p,plb])=>{ head.push("処置剪定_" + plb, "処置精密_" + plb); });
+  head.push("外観診断判定","外観診断理由","機器_部位GL1","機器_腐朽空洞率1","機器_部位GL2","機器_腐朽空洞率2","腐朽度判定","腐朽度理由",
+    "総合判定","総合理由","処置必要性","処置緊急性");
+  SHOCHI_OPTS.forEach(([k,lb])=> head.push("処置_" + lb));
+  head.push("処置内容説明","特記事項","次回診断","測定部位","次回再診断時期","写真枚数",
+    "全景コメント","位置コメント","被害部1コメント","被害部2コメント","被害部3コメント");
+  const HIA = ["","なし","あり"];
+  const KEITAI = ["","単独桝","植樹帯","緑地内","その他"];
+  const SHI3 = ["","良好","なし","破損"];
+  const JIK = ["","フォローアップ診断","要機器診断","外観診断"];
+  const NX = ["","1年後","2年後","3年後"];
+  const rows = rr.map(r=>{
+    const row = [r.block, r.no, r.sp, r.h, r.c, r.w, KEITAI[r.keitai||0], SHI3[r.shichu||0], (r.dt||"").replace("T"," "), settings.inspector,
+      r.lat, r.lng, mk(r.jusei), mk(r.jukei), r.katsShoken, r.katsHantei ? HT4[r.katsHantei-1] : ""];
+    BUI3_ITEMS.forEach(([key])=>{
+      PARTS.forEach(([p])=> row.push(BUI3_LV[(r.bui3 || {})[key + "_" + p] || 0]));
+    });
+    BUI_ITEMS.concat(ROOT_ITEMS).concat(BR_ITEMS).forEach(([key])=>{
+      PARTS.forEach(([p])=>{
+        const valid = BUI_ITEMS.some(x=>x[0]===key) || (p==="root" && ROOT_ITEMS.some(x=>x[0]===key)) || (p==="branch" && BR_ITEMS.some(x=>x[0]===key));
+        if(valid){ const st = (r.bui || {})[key + "_" + p]; row.push(onMark(st), st ? st.note || "" : ""); }
+      });
+    });
+    PARTS.forEach(([p])=>{
+      const d = (r.dmg || {})[p] || {};
+      const w = parseFloat(d.w), l = parseFloat(d.l);
+      row.push(d.w || "", d.l || "", (w > 0 && l > 0) ? Math.round(w / l * 100) + "%" : "");
+    });
+    KEN_ITEMS.forEach(([kk])=>{ const st = (r.ken || {})[kk]; row.push(onMark(st), st ? st.note || "" : ""); });
+    row.push((r.buiShoken || "").split(/\n/).filter(Boolean).map(s => "・" + s).join("\n"));
+    PARTS.forEach(([p])=> row.push((r.hantei || {})[p] ? HT4[(r.hantei)[p]-1] : ""));
+    PARTS.forEach(([p])=>{ const s = (r.shochi || {})[p] || {}; row.push(s.sen ? "○" : "", s.sei ? "○" : ""); });
+    const kk = r.kiki || {};
+    row.push(r.gaiHantei ? HT4[r.gaiHantei-1] : "", r.gaiRiyu,
+      kk.gl1, kk.fukyu1, kk.gl2, kk.fukyu2, kk.hantei ? HT4[kk.hantei-1] : "", kk.riyu,
+      r.soHantei ? HT4[r.soHantei-1] : "", r.soRiyu, HIA[r.hitsuyo||0], HIA[r.kinkyu||0]);
+    SHOCHI_OPTS.forEach(([k])=> row.push((r.shochiSel || []).includes(k) ? "○" : ""));
+    const pss = pdb ? photosFor(r.block, r.no) : [];
+    const cmtOf = b => { const m = pss.find(x => x.branch === b); return m ? (m.cmt || "") : ""; };
+    row.push(r.naiyo, r.tokki, JIK[r.jikai||0], r.sokuteiBui || "", NX[r.next||0],
+      pss.length, cmtOf(1), cmtOf(2), cmtOf(3), cmtOf(4), cmtOf(5));
+    return row.map(csvField).join(",");
+  });
+  const csv = "﻿" + [head.map(csvField).join(","), ...rows].join("\r\n");
+  const d = new Date();
+  const fname = ("外観診断_" + k + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".csv").replace(/[\\/:*?"<>|]/g,"");
+  return {csv, fname};
+}
 function dl(blob, fname){
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = fname;
@@ -1987,11 +1400,11 @@ function dl(blob, fname){
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
 
-/* ================= 小黒板カメラ・写真管理 ================= */
+/* ===== 写真（IndexedDB） ===== */
 let pdb, photoMetas = [];
 function openPdb(){
   return new Promise((res, rej)=>{
-    const r = indexedDB.open("gj_photos", 1);
+    const r = indexedDB.open("gk_photos", 1);
     r.onupgradeneeded = ()=>{
       r.result.createObjectStore("blobs", {keyPath:"id", autoIncrement:true});
       r.result.createObjectStore("meta", {keyPath:"id"});
@@ -2002,15 +1415,16 @@ function openPdb(){
 const ptx = (s,m) => pdb.transaction(s,m).objectStore(s);
 const preq = q => new Promise((res, rej)=>{ q.onsuccess = ()=>res(q.result); q.onerror = ()=>rej(q.error); });
 function photosFor(key, no){ return photoMetas.filter(m => m.key === key && m.no === no); }
-async function addPhotoBlob(key, no, branch, blob){
-  // 同じ枠（全体/被害部）は撮り直しで置き換え
-  for(const o of photoMetas.filter(m => m.key === key && m.no === no && m.branch === branch)){
-    await preq(ptx("blobs","readwrite").delete(o.id));
-    await preq(ptx("meta","readwrite").delete(o.id));
+async function addPhotoBlob(key, no, branch, blob, replace, cmt){
+  if(replace){
+    for(const o of photoMetas.filter(m => m.key === key && m.no === no && m.branch === branch)){
+      await preq(ptx("blobs","readwrite").delete(o.id));
+      await preq(ptx("meta","readwrite").delete(o.id));
+    }
+    photoMetas = photoMetas.filter(m => !(m.key === key && m.no === no && m.branch === branch));
   }
-  photoMetas = photoMetas.filter(m => !(m.key === key && m.no === no && m.branch === branch));
   const id = await preq(ptx("blobs","readwrite").add({blob}));
-  const meta = {id, key, no, branch, filename: no + "_" + branch + ".jpeg", ts: Date.now(), size: blob.size};
+  const meta = {id, key, no, branch, filename: no + "_" + branch + ".jpeg", ts: Date.now(), size: blob.size, cmt: cmt || ""};
   await preq(ptx("meta","readwrite").put(meta));
   photoMetas.push(meta);
   return meta;
@@ -2031,43 +1445,45 @@ async function deletePhotosOfKey(key){
 }
 async function getPhotoBlob(id){ return (await preq(ptx("blobs","readonly").get(id))).blob; }
 
-function kojiText(){ return (settings.koji || "").trim() || ($("office").value + " " + $("route").value + " 樹木点検").trim(); }
-function requiredPhotos(){
-  if(isNoTree($("sp").value)) return 0;   // 空桝・桝無しは撮影任意
-  return document.querySelectorAll(".itm.on").length > 0 ? 2 : 1;
-}
-function updatePhotoButtons(){
+function kojiText(){ return (settings.koji || "").trim() || (blockKey() + " 外観診断").trim(); }
+function updatePhotoHint(){
   if(!pdb) return;
-  const no = fullNo(), key = routeKey(), req = requiredPhotos();
+  const no = $("tno").value.trim(), key = blockKey();
   const ps = no ? photosFor(key, no) : [];
-  const has1 = ps.some(m => m.branch === 1), has2 = ps.some(m => m.branch === 2);
+  const has1 = ps.some(m => m.branch === 1);
+  const hasPos = ps.some(m => m.branch === 2);
+  const n3 = ps.filter(m => m.branch >= 3).length;
   $("shot1").classList.toggle("done", has1);
-  $("shot1").textContent = (has1 ? "✔ 全体（撮り直し）" : "📷 全体を撮影");
-  $("shot2").style.display = (req === 2 || has2) ? "block" : "none";
-  $("shot2").classList.toggle("done", has2);
-  $("shot2").textContent = (has2 ? "✔ 被害部（撮り直し）" : "📷 被害部を撮影");
-  $("photoHint").textContent = req === 0
-    ? "📷 撮影は任意（撮影済" + ps.length + "枚）"
-    : "📷 必要" + req + "枚・撮影済" + ps.length + "枚";
-  $("photoHint").style.color = ps.length >= req ? "var(--ok-tx)" : "var(--ng-tx)";
-  $("photoHint").style.fontWeight = "600";
+  $("shot1").textContent = has1 ? "✔ 全景" : "📷 全景";
+  $("shot2").classList.toggle("done", hasPos);
+  $("shot2").textContent = hasPos ? "✔ 位置(根元)" : "📷 位置(根元)";
+  $("shot3").classList.toggle("done", n3 > 0);
+  $("shot3").textContent = n3 ? "📷 被害部 " + n3 + "/3" : "📷 被害部";
+  $("photoHint").textContent = "📷 撮影済 " + ps.length + "/5枚" + (anyDamage() && !n3 ? "（被害部の撮影推奨）" : "");
+  $("photoHint").style.color = (has1 && hasPos) ? "var(--ok-tx)" : "var(--ng-tx)";
 }
+$("photoResetBtn").onclick = async ()=>{
+  const no = $("tno").value.trim();
+  if(!no || !pdb) return;
+  const ps = photosFor(blockKey(), no);
+  if(!ps.length){ toast("この樹木の写真はありません"); return; }
+  if(!confirm(no + " の写真 " + ps.length + "枚を削除しますか？")) return;
+  await deletePhotosOf(blockKey(), no);
+  updatePhotoHint(); toast("写真を削除しました");
+};
 
+/* ===== カメラ（小黒板・レンズ切替・ズーム・コメント・赤点線） ===== */
 const CAM_AR = 3/4, CAM_MAXH = 1280;
 let camStream = null, camBranch = 1, camNo = "";
 let camTrack = null, hwZoom = null, digitalZ = 1, curZoom = 1, lensAutoPicked = false;
-
-// ---- カメラ取得（レンズ記憶・広角優先） ----
 function getCam(){
-  // 写真は縦長（3:4）なので、縦長の映像を求める。iPadのSafariは求めた縦横に合わせて映像を切り抜くため、
-  // 横長（1920×1440）を求めると、縦向きに持っても上下を切られて狭くなっていた（2026-10-15 iPad Air 13で判明）。
-  // 縦向きならカメラの写せる範囲をまるごと使える。横向きでは中央を縦長に切り抜く（いままでと同じ）
+  // 写真は縦長（3:4）なので縦長の映像を求める。横長（1920×1440）を求めると、iPadを縦に持っても
+  // 上下を切られた映像が届いて狭く写っていた（樹木点検アプリで 2026-10-15 に判明・v25で修正）
   const base = { width:{ideal:1440}, height:{ideal:1920}, aspectRatio:{ideal:3/4}, resizeMode:"none" };
   const make = v => navigator.mediaDevices.getUserMedia({ video: v, audio: false });
   if(settings.camId){
     return make(Object.assign({deviceId:{exact:settings.camId}}, base))
-      .catch(e=>{
-        if(e && (e.name === "OverconstrainedError" || e.name === "NotFoundError")){ settings.camId = null; store("gj_settings", settings); }
+      .catch(()=>{ settings.camId = null; store("gk_settings", settings);
         return make(Object.assign({facingMode:"environment"}, base)); });
   }
   return make(Object.assign({facingMode:"environment"}, base));
@@ -2077,16 +1493,7 @@ function getCam(){
    次から真っ暗になる（iPadを再起動するまで直らない）ことがあった（2026-10-22）。
    取った映像は全部 camLive に入れて、閉じる・取り直すときは全部止める。待っている間に古くなった映像はすぐ止める */
 const camLive = new Set();
-let camGen = 0, camWatch = 0, camRetried = false, camBroken = false, camTest = false;
-const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-const camWait = ms => new Promise(r => setTimeout(r, ms));
-const camShown = () => $("camModal").style.display === "flex";
-/* カメラを開けなかった記録（原因を調べるため。gj_camlog に新しい順で10件） */
-function camLog(e){
-  let L = []; try{ L = JSON.parse(localStorage.getItem("gj_camlog")) || []; }catch(_){}
-  L.unshift({t: new Date().toLocaleString("ja-JP"), name: (e && e.name) || "?", msg: ((e && e.message) || "").slice(0, 120), vis: document.visibilityState});
-  try{ localStorage.setItem("gj_camlog", JSON.stringify(L.slice(0, 10))); }catch(_){}
-}
+let camGen = 0, camWatch = 0, camRetried = false, camBroken = false;
 function stopAllCams(){
   clearTimeout(camWatch);
   camLive.forEach(s => s.getTracks().forEach(t => { try{ t.stop(); }catch(_){} }));
@@ -2094,20 +1501,11 @@ function stopAllCams(){
 }
 async function restartCamStream(){
   const gen = ++camGen;
-  const had = camLive.size > 0;
   stopAllCams();
-  $("camVideo").srcObject = null; camTest = false; $("camNoCam").style.display = "none";
-  if(had) await camWait(300);              // 止めた直後はカメラがまだ放されていないことがある
-  let s = null, err = null;
-  // 失敗しても少し待って取り直す（アプリの切り替え直後などは、カメラの準備ができるまで失敗することがある）
-  for(let k = 0; k < 4 && !s; k++){
-    if(gen !== camGen || !camShown()) return;
-    if(document.hidden){ await camWait(500); continue; }
-    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ err = {name: "NoMediaDevices"}; break; }
-    try { s = await getCam(); }
-    catch(e){ err = e; camLog(e); if(!IS_IOS && e.name === "NotFoundError") break; await camWait([400, 900, 1600, 0][k]); }
-  }
-  if(!s){ if(gen === camGen && camShown()) camFail(err); return; }
+  $("camVideo").srcObject = null;
+  let s;
+  try { s = await getCam(); }
+  catch(e){ if(gen === camGen) $("camNoCam").style.display = "flex"; return; }    // カメラが無い（PCで試すとき）
   camLive.add(s);
   if(gen !== camGen || $("camModal").style.display !== "flex"){       // 待っている間に閉じた・取り直した
     s.getTracks().forEach(t => t.stop()); camLive.delete(s); return;
@@ -2135,24 +1533,6 @@ function watchCam(gen){
     else camBlack();
   }, 4000);
 }
-/* カメラを開けなかったとき。iPad ではグレーの写真を撮らせず、原因と直し方を出す（グレーはカメラの無い PC での試験用だけ） */
-function camFail(e){
-  const n = (e && e.name) || "";
-  if(!IS_IOS && (n === "NotFoundError" || n === "NoMediaDevices")){
-    camTest = true;
-    $("camNoCam").innerHTML = "カメラがありません<br>（PC での試験用：グレー画像で撮影されます）";
-    $("camNoCam").style.display = "flex"; return;
-  }
-  const why = n === "NotAllowedError" ?
-      "カメラの使用が許可されていないか、アプリを切り替えた直後でカメラを使えませんでした。<br>上の［映像を取り直す］を押してください。<br>何度も出るときは iPad の 設定 → アプリ → Safari → カメラ を「許可」にしてください。" :
-    n === "NotReadableError" || n === "AbortError" ?
-      "ほかのアプリ（カメラ・FaceTime・長野公園の調査アプリなど）がカメラを使っている可能性があります。<br>そのアプリを上にスワイプして終了してから、上の［映像を取り直す］を押してください。" :
-      "上の［映像を取り直す］を押してください。";
-  $("camNoCam").innerHTML = "<div>カメラを開けませんでした（" + esc(n || "不明") + "）<br><br>" + why +
-    "<br><br>直らないときは：アプリを上にスワイプして終了 → 開き直す → それでもだめなら iPad を再起動</div>";
-  $("camNoCam").style.display = "flex";
-  setCamBroken(true);
-}
 function camBlack(){
   if(!camRetried){ camRetried = true; toast("カメラの映像を取り直しています…"); restartCamStream(); return; }
   stopAllCams();
@@ -2165,17 +1545,12 @@ function setCamBroken(on){
   $("camShutter").style.opacity = on ? ".35" : "";
 }
 $("camReset").onclick = () => { camRetried = false; setCamBroken(false); restartCamStream(); };
-/* 別のアプリに切り替えたらカメラを放し、戻ってきたら取り直す（そのままだとiPadでは映像が止まることがある）。
-   戻った直後はまだカメラを使えないことがあるので、少し待ってから開く */
-let camVisT = 0;
+/* 別のアプリに切り替えたらカメラを放し、戻ってきたら取り直す（そのままだとiPadでは映像が止まることがある） */
 document.addEventListener("visibilitychange", () => {
-  clearTimeout(camVisT);
-  if(!camShown()) return;
+  if($("camModal").style.display !== "flex") return;
   if(document.hidden){ camGen++; stopAllCams(); }
-  else { camGen++; camVisT = setTimeout(() => { if(camShown() && !document.hidden){ camRetried = false; setCamBroken(false); restartCamStream(); } }, 600); }
+  else { camRetried = false; restartCamStream(); }
 });
-
-// ---- ズーム（対応機種はレンズズーム / 非対応はデジタル1〜3×） ----
 function applyZoom(z){
   if(camStream && hwZoom){
     z = Math.min(hwZoom.max, Math.max(hwZoom.min, z));
@@ -2196,37 +1571,20 @@ function applyZoom(z){
     $("camVideo").style.transform = z === 1 ? "" : "scale(" + z + ")";
   }
   curZoom = Math.round(z * 10) / 10;
-  settings.zoom = curZoom; store("gj_settings", settings);
+  settings.zoom = curZoom; store("gk_settings", settings);
   $("zoomVal").textContent = "×" + curZoom.toFixed(1);
 }
 function zoomStep(dir){
   const minZ = hwZoom ? hwZoom.min : 1;
-  if(dir < 0 && curZoom <= minZ + 0.001){
-    toast("これ以上広くできません（いちばん広い状態です）");
-    return;
-  }
+  if(dir < 0 && curZoom <= minZ + 0.001){ toast("これ以上広くできません（いちばん広い状態です）"); return; }
   applyZoom(curZoom + dir * (curZoom >= 3 ? 0.5 : 0.2));
 }
-/* 樹木写真は縦長（3:4）。横向きのiPadでは横長の映像から縦長に切り抜くので狭くなる → 縦に持つよう案内 */
-function camLandscape(){ return !!camStream && window.innerWidth > window.innerHeight * 1.05; }   // iPadを横向きに持っている
-function updWideHint(){
-  // 「縦に持つと広く写せる」の案内は出さない（縦長の映像を求めるようにした v25 以降、iPad Air 13 では横向きのほうが広く写ったため）
-  $("camWide").style.display = "none";
-  // iPadから届いている映像の大きさ（広さの確認用）。縦長の写真は、この映像の中央を3:4で使う
-  const v = $("camVideo");
-  $("camRes").textContent = (camStream && v.videoWidth) ? "映像 " + v.videoWidth + "×" + v.videoHeight : "";
-}
-$("camVideo").addEventListener("loadedmetadata", updWideHint);
-$("camVideo").addEventListener("resize", updWideHint);
-window.addEventListener("resize", () => setTimeout(updWideHint, 400));
 function hwZoomFail(){
   if(!hwZoom) return;
   hwZoom = null;
-  settings.noHwZoom = true; store("gj_settings", settings);   // 次からは最初からデジタルズーム
+  settings.noHwZoom = true; store("gk_settings", settings);   // 次からは最初からデジタルズーム
   applyZoom(curZoom);
 }
-
-// ---- レンズ切り替え（超広角0.5×/広角1×/望遠。望遠が選ばれて拡大される対策） ----
 async function renderLensCtl(){
   const box = $("lensCtl");
   box.innerHTML = "";
@@ -2243,11 +1601,10 @@ async function renderLensCtl(){
   const cams = pool.map(d => ({ id:d.deviceId, c:classify(d.label) }))
     .filter(x => x.c)
     .sort((a,b) => a.c.ord - b.c.ord);
-  // 初回のみ: 超広角があれば自動で選ぶ（標準カメラの1×相当の画角になる）
   if(!settings.camId && !lensAutoPicked && cams.length){
     lensAutoPicked = true;
     if(cams[0].c.short === "0.5×"){
-      settings.camId = cams[0].id; store("gj_settings", settings);
+      settings.camId = cams[0].id; store("gk_settings", settings);
       await restartCamStream();
       return;
     }
@@ -2260,7 +1617,7 @@ async function renderLensCtl(){
     b.textContent = cam.c.short;
     b.className = cam.id === curId ? "on" : "";
     b.onclick = async ()=>{
-      settings.camId = cam.id; store("gj_settings", settings);
+      settings.camId = cam.id; store("gk_settings", settings);
       await restartCamStream();
       toast("レンズ: " + cam.c.short);
     };
@@ -2274,7 +1631,7 @@ function fitCamFrame(){
   f.style.width = fw + "px"; f.style.height = fh + "px";
   f.style.left = (w - fw) / 2 + "px"; f.style.top = (h - fh) / 2 + "px";
 }
-/* カメラを開いたままiPadの向きを変えたら、その向きで映像を取り直す（縦向きにしたとき広く写せるように） */
+/* カメラを開いたままiPadの向きを変えたら、その向きで映像を取り直す */
 let camOrient = null, camOrientT = 0;
 window.addEventListener("resize", ()=>{
   if($("camModal").style.display !== "flex") return;
@@ -2287,16 +1644,21 @@ window.addEventListener("resize", ()=>{
   camOrient = o;
 });
 async function openCam(branch){
-  const no = fullNo();
+  const no = $("tno").value.trim();
   if(!no){ toast("樹木番号を入力してください"); return; }
+  if(branch === 3 && pdb){
+    const n3 = photosFor(blockKey(), no).filter(m => m.branch >= 3).length;
+    if(n3 >= 3){ toast("被害部写真は3枚までです（不要なら「この樹木の写真を削除」）"); return; }
+  }
   camBranch = branch; camNo = no;
   clearTimeout(revTimer); $("camReview").classList.remove("show");   // 前の確認表示が残っていたら消す
   $("camNo").textContent = no;
-  $("camKind").textContent = branch === 1 ? "全体" : "被害部";
+  $("camKind").textContent = branch === 1 ? "全景" : branch === 2 ? "位置(根元)" : "被害部";
   $("camKoji").textContent = kojiText();
   $("camBNum").textContent = no;
   selCmts = []; camMark = null;
-  $("camCmtBar").classList.toggle("show", branch === 2);
+  $("camCmtBar").classList.add("show");   // コメントは全種類の写真で利用可（カルテの写真下に印字）
+  $("cmtHint").textContent = branch === 3 ? "指でなぞると赤点線で囲めます（任意）" : "コメントは写真下の説明として印字されます";
   renderCamCmts(); updateMarkUI();
   applyBoardSide();
   $("camModal").style.display = "flex";
@@ -2311,8 +1673,7 @@ function closeCam(){
   $("cmtPicker").classList.remove("show");
   camGen++; stopAllCams();                 // 取りかけの映像も含めて全部止める
   $("camVideo").srcObject = null;
-  $("camNoCam").style.display = "none"; camTest = false;
-  clearTimeout(camVisT);
+  $("camNoCam").style.display = "none";
 }
 /* 黒板の位置（左下／右下）。写真に描く位置もこれに合わせる */
 function applyBoardSide(){
@@ -2322,19 +1683,19 @@ function applyBoardSide(){
   $("camSide").textContent = r ? "黒板を左へ" : "黒板を右へ";
 }
 $("camSide").onclick = ()=>{
-  settings.boardRight = !settings.boardRight; store("gj_settings", settings);
+  settings.boardRight = !settings.boardRight; store("gk_settings", settings);
   applyBoardSide();
   toast("黒板を" + (settings.boardRight ? "右下" : "左下") + "にしました（次からもこの位置）");
 };
 $("camClose").onclick = closeCam;
-/* 撮った写真の確認：1.5秒表示して閉じる。［撮り直す］でカメラに戻る（同じ枠の写真は撮り直しで置き換わる） */
+/* 撮った写真の確認：1.5秒表示して閉じる。［撮り直す］でカメラに戻る（撮った写真は消して撮り直す） */
 const REVIEW_MS = 1500;
-let revTimer = 0, revUrl = "";
-function showReview(blob, fname){
+let revTimer = 0, revUrl = "", revMeta = null;
+function showReview(blob, meta){
   if(revUrl) URL.revokeObjectURL(revUrl);
-  revUrl = URL.createObjectURL(blob);
+  revUrl = URL.createObjectURL(blob); revMeta = meta;
   $("camRevImg").src = revUrl;
-  $("camRevTxt").textContent = "✔ " + fname + " を保存しました";
+  $("camRevTxt").textContent = "✔ " + meta.filename + " を保存しました";
   const bar = $("camRevTime").firstElementChild;
   bar.style.transition = "none"; bar.style.width = "100%";
   $("camReview").classList.add("show");
@@ -2347,16 +1708,27 @@ function endReview(close){
   $("camReview").classList.remove("show");
   $("camRevImg").removeAttribute("src");
   if(revUrl){ URL.revokeObjectURL(revUrl); revUrl = ""; }
-  if(close) closeCam();
+  if(close){ revMeta = null; closeCam(); }
 }
-$("camRetake").onclick = e => { e.stopPropagation(); endReview(false); toast("撮り直してください（前の写真と置き換わります）"); };
+$("camRetake").onclick = async e => {
+  e.stopPropagation();
+  const m = revMeta; endReview(false); revMeta = null;
+  // 被害部は撮るたびに増えるので、撮り直すときは今の写真を消す（全景・位置は撮り直しで置き換わる）
+  if(m && m.branch >= 3){
+    try{ await preq(ptx("blobs","readwrite").delete(m.id)); await preq(ptx("meta","readwrite").delete(m.id)); }catch(_){}
+    photoMetas = photoMetas.filter(x => x.id !== m.id);
+    updatePhotoHint(); renderSummary();
+  }
+  toast("撮り直してください（前の写真と置き換わります）");
+};
 $("camRevOk").onclick = e => { e.stopPropagation(); endReview(true); };
 $("camRevImg").onclick = () => endReview(true);
 $("shot1").onclick = ()=>openCam(1);
 $("shot2").onclick = ()=>openCam(2);
+$("shot3").onclick = ()=>openCam(3);
 
-/* ---- 被害状況コメント（保存・再利用・削除可） ---- */
-let dmgComments = load("gj_cmts", []);
+/* 被害状況コメント */
+let dmgComments = load("gk_cmts", []);
 let selCmts = [], camMark = null, drawStart = null;
 function renderCamCmts(){
   $("camCmts").style.display = selCmts.length ? "block" : "none";
@@ -2388,7 +1760,7 @@ function renderCmtList(){
     const x = document.createElement("button"); x.type = "button"; x.className = "cx"; x.textContent = "✕";
     x.onclick = ()=>{
       if(!confirm("コメント「" + t + "」を一覧から削除しますか？")) return;
-      dmgComments = dmgComments.filter(v => v !== t); store("gj_cmts", dmgComments);
+      dmgComments = dmgComments.filter(v => v !== t); store("gk_cmts", dmgComments);
       selCmts = selCmts.filter(v => v !== t);
       renderCamCmts(); renderCmtList();
     };
@@ -2399,13 +1771,13 @@ $("cmtEditBtn").onclick = ()=>{ renderCmtList(); $("cmtPicker").classList.add("s
 $("cmtCloseBtn").onclick = ()=>$("cmtPicker").classList.remove("show");
 $("cmtAddBtn").onclick = ()=>{
   const t = $("cmtNew").value.trim(); if(!t) return;
-  if(!dmgComments.includes(t)){ dmgComments.unshift(t); store("gj_cmts", dmgComments); }
+  if(!dmgComments.includes(t)){ dmgComments.unshift(t); store("gk_cmts", dmgComments); }
   if(!selCmts.includes(t)) selCmts.push(t);
   $("cmtNew").value = "";
   renderCamCmts(); renderCmtList();
 };
 
-/* ---- 赤点線の囲み（なぞって指定・任意） ---- */
+/* 赤点線の囲み＋ピンチズーム */
 function updateMarkUI(){
   const box = $("camMarkBox"), f = $("camFrame");
   if(camMark){
@@ -2419,7 +1791,6 @@ function updateMarkUI(){
   $("cmtHint").style.display = (camMark || selCmts.length) ? "none" : "inline";
 }
 $("markClearBtn").onclick = ()=>{ camMark = null; updateMarkUI(); };
-// 1本指: 赤点線の囲み（被害部のみ）／ 2本指: ピンチズーム（全体・被害部とも）
 const _ptrs = new Map(); let _pinch = null;
 const _dist = ()=>{ const [a,b] = [..._ptrs.values()]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); };
 $("camDraw").addEventListener("pointerdown", e=>{
@@ -2427,8 +1798,8 @@ $("camDraw").addEventListener("pointerdown", e=>{
   try { $("camDraw").setPointerCapture(e.pointerId); } catch(err) {}
   if(_ptrs.size === 2){
     _pinch = { d: _dist(), z: curZoom };
-    drawStart = null; // 囲み描画中ならピンチ優先で中断
-  } else if(camBranch === 2){
+    drawStart = null;
+  } else if(camBranch === 3){
     const r = $("camDraw").getBoundingClientRect();
     drawStart = {x: e.clientX - r.left, y: e.clientY - r.top};
   }
@@ -2453,10 +1824,11 @@ $("camDraw").addEventListener("pointermove", e=>{
   if(_ptrs.size < 2) _pinch = null;
   if(!drawStart) return;
   drawStart = null;
-  if(camMark && (camMark.w < 0.04 || camMark.h < 0.04)) camMark = null; // 誤タップは無視
+  if(camMark && (camMark.w < 0.04 || camMark.h < 0.04)) camMark = null;
   updateMarkUI();
 }));
 
+/* 黒板描画 */
 function drawCamBoard(ctx, W, H, num){
   const bw = W * 0.46, bh = H * 0.20, by = H - bh - H * 0.03;
   const bx = settings.boardRight ? W - bw - W * 0.03 : W * 0.03;     // 黒板の位置（左下／右下）
@@ -2488,7 +1860,6 @@ function drawCamBoard(ctx, W, H, num){
   while(kf > 8 && (lines.length > 2 || lines.length * kf * 1.25 > rowH)){ kf -= 1; lines = wrapText(koji, kf); }
   const lh = kf * 1.25, y0 = by + rowH / 2 - (lines.length - 1) * lh / 2;
   lines.forEach((ln, i)=>ctx.fillText(ln, kx, y0 + i * lh));
-  // 下段: 番号（＋状況コメント）
   const lowH = bh - rowH, cx0 = bx + bw / 2;
   ctx.textAlign = "center";
   if(selCmts.length){
@@ -2515,9 +1886,7 @@ function drawCamBoard(ctx, W, H, num){
 let camShooting = false;
 $("camShutter").onclick = async ()=>{
   if(camShooting) return;
-  const v0 = $("camVideo");
-  // 映像が届いていないのに撮るとグレーの写真になる（グレーはカメラの無い PC での試験用だけ）
-  if(camBroken || (camStream && !v0.videoWidth) || (!camStream && !camTest)){ toast("カメラの映像が届いていません。少し待つか、上の［映像を取り直す］を押してください"); return; }
+  if(camBroken){ toast("カメラの映像が届いていません。上の［映像を取り直す］を押してください"); return; }
   camShooting = true; $("camShutter").disabled = true;
   try {
     const v = $("camVideo");
@@ -2526,19 +1895,18 @@ $("camShutter").onclick = async ()=>{
       const vw = v.videoWidth, vh = v.videoHeight;
       let cw, ch;
       if(vw / vh > CAM_AR){ ch = vh; cw = vh * CAM_AR; } else { cw = vw; ch = vw / CAM_AR; }
-      cw /= digitalZ; ch /= digitalZ; // デジタルズーム時は中央をさらに切り抜き
+      cw /= digitalZ; ch /= digitalZ;
       const H = Math.min(CAM_MAXH, Math.round(ch)), W = Math.round(H * CAM_AR);
       c.width = W; c.height = H;
       c.getContext("2d").drawImage(v, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, W, H);
-    } else { // テストモード
+    } else {
       c.width = 960; c.height = 1280;
       const ctx = c.getContext("2d");
       const g = ctx.createLinearGradient(0, 0, 960, 1280);
       g.addColorStop(0, "#666"); g.addColorStop(1, "#333");
       ctx.fillStyle = g; ctx.fillRect(0, 0, 960, 1280);
     }
-    // 赤点線の囲み（被害部・指定時のみ）
-    if(camMark && camBranch === 2){
+    if(camMark && camBranch === 3){
       const ctx = c.getContext("2d");
       ctx.save();
       ctx.setLineDash([c.width * 0.025, c.width * 0.015]);
@@ -2552,16 +1920,23 @@ $("camShutter").onclick = async ()=>{
     }
     drawCamBoard(c.getContext("2d"), c.width, c.height, camNo);
     const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
-    const meta = await addPhotoBlob(routeKey(), camNo, camBranch, blob);
+    // 全景=_1（置換） / 位置(根元)=_2（置換） / 被害部=_3〜_5（追加・最大3枚）
+    let branch = camBranch, replace = true;
+    if(camBranch === 3){
+      const ps = photosFor(blockKey(), camNo).filter(m => m.branch >= 3);
+      branch = 3 + ps.length;
+      replace = false;
+    }
+    const meta = await addPhotoBlob(blockKey(), camNo, branch, blob, replace, selCmts.join("、"));
     $("camFlash").style.opacity = "0.9";
     setTimeout(()=>$("camFlash").style.opacity = "0", 120);
-    updatePhotoButtons();
+    updatePhotoHint();
     renderSummary();
-    showReview(blob, meta.filename);      // 撮れた写真を少しの間見せてから閉じる
+    showReview(blob, meta);      // 撮れた写真を少しの間見せてから閉じる
   } finally { camShooting = false; $("camShutter").disabled = false; }
 };
 
-/* 写真ZIP書き出し（無圧縮ZIP自前実装） */
+/* ===== 写真ZIP ===== */
 const CRC_T = (()=>{ const t = new Uint32Array(256);
   for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c; }
   return t; })();
@@ -2589,37 +1964,35 @@ async function makeZip(files){
   end.setUint32(12, cSize, true); end.setUint32(16, offset, true);
   return new Blob([...parts, ...central, end.buffer], {type:"application/zip"});
 }
-/* iPadの「共有（ファイルに保存）」は、ボタンを押すたびに1回しか開けない。
-   続けて自動で開こうとすると2個目からは断られて保存されないので、ZIPごとに［保存する］を押してもらう。
-   次のZIPは前のZIPを保存している間に作っておく（押してすぐ共有画面が開くように） */
-let zipJob = null;     // {key, chunks, base, st:["idle"|"building"|"ready"|"done"], ready:{ci, file}, all}
-/* 写真は一度書き出したら印（exp＝書き出した日時）を付け、次からは新しい写真（撮り直しを含む）だけを書き出す。
-   どのZIPにもその路線の点検CSV（その時点の全記録）を入れる → PCのハブはZIPを取り込むだけで点検表を作れる */
+/* iPadの「共有（ファイルに保存）」は、ボタンを押すたびに1回しか開けない。続けて自動で開こうとすると
+   2個目からは断られて保存されない（樹木点検アプリで判明）。ZIPごとに［保存する］を押してもらう。
+   写真は一度書き出したら印（exp＝書き出した日時）を付け、次からは新しい写真（撮り直しを含む）だけを書き出す。
+   どのZIPにもそのブロックの診断CSV（その時点の全記録）を入れる → PCのハブは置くだけでカルテを作れる */
+let zipJob = null;
 $("zipBtn").onclick = ()=> openZipDlg(false);
 function openZipDlg(all){
   const key = sumKey();
   const psAll = photoMetas.filter(m => m.key === key).sort((a,b)=>a.filename < b.filename ? -1 : 1);
   const ps = all ? psAll : psAll.filter(m => !m.exp);
   const csv = buildCsv(key);
-  if(!psAll.length && !csv){ toast("この路線の写真・記録がありません"); return; }
+  if(!psAll.length && !csv){ toast("このブロックの写真・記録がありません"); return; }
   const CHUNK = 50, chunks = [];
   for(let i = 0; i < ps.length; i += CHUNK) chunks.push(ps.slice(i, i + CHUNK));
-  if(!chunks.length) chunks.push([]);          // 新しい写真が無くても、点検CSVだけのZIPを保存できる
-  const d = new Date(), [ko, kr] = key.split("|");
-  const base = ("写真_" + ko + "_" + kr + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds())).replace(/[\\/:*?"<>|]/g,"");
+  if(!chunks.length) chunks.push([]);          // 新しい写真が無くても、診断CSVだけのZIPを保存できる
+  const d = new Date();
+  const base = ("外観写真_" + key + "_" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds())).replace(/[\\/:*?"<>|]/g,"");
   zipJob = {key, chunks, base, total: ps.length, all, st: chunks.map(() => "idle"), ready: null};
   const nOld = psAll.length - psAll.filter(m => !m.exp).length;
   $("zipNote").innerHTML = (all ? "すべての写真 " + ps.length + "枚" : "まだ書き出していない写真 " + ps.length + "枚") +
-    (ps.length ? "（" + chunks.length + "個のZIP）" : "") + "と、点検CSV（" + (csv ? sumRecordsOf(key) + "本" : "記録なし") + "）を保存します。" +
+    (ps.length ? "（" + chunks.length + "個のZIP）" : "") + "と、診断CSV（" + (csv ? records.filter(r => r.block === key).length + "本" : "記録なし") + "）を保存します。" +
     (chunks.length > 1 ? "［保存する］を1個ずつ押してください（iPadでは続けて自動で保存できません）。" : "") +
-    "<br>保存先は「ファイル」→ OneDrive の <b>街路樹診断システム／iPadから</b> にすると、PCのハブで［iPadから取り込んで点検表を作成］を押すだけになります。" +
+    "<br>保存先は「ファイル」→ OneDrive の <b>街路樹診断システム／iPadから</b> にすると、PCのハブで［外観診断カルテを作成］を押すだけで取り込めます。" +
     (!all && nOld ? '<br><a href="#" id="zipAll">書き出し済みの写真（' + nOld + '枚）も含めて、すべて書き出し直す</a>' : "");
   if($("zipAll")) $("zipAll").onclick = e => { e.preventDefault(); openZipDlg(true); };
   renderZipDlg();
   $("zipDlg").classList.add("show");
   prepZip(0);
 }
-function sumRecordsOf(key){ return records.filter(r => (r.office + "|" + r.route) === key).length; }
 function zipName(J, ci){ return J.chunks.length > 1 ? J.base + "_" + (ci + 1) + ".zip" : J.base + ".zip"; }
 function renderZipDlg(){
   const J = zipJob; if(!J) return;
@@ -2627,9 +2000,8 @@ function renderZipDlg(){
   $("zipList").innerHTML = J.chunks.map((c, ci) => {
     const a = ci * 50 + 1, b = ci * 50 + c.length, st = J.st[ci];
     const lab = st === "building" ? "準備中…" : st === "ready" ? "保存する" : st === "done" ? "✓ 保存済み" : "準備する";
-    return '<div class="zipRow"><div class="zl"><b>' + (c.length ? (NUM[ci] || (ci + 1)) + ' 写真 ' + a + '〜' + b + '枚目' : '新しい写真なし（点検CSVだけ）') +
-      '</b><br><small>' + (c.length ? esc(c[0].filename) + ' 〜 ' + esc(c[c.length - 1].filename) + '　＋点検CSV' : '記録のバックアップ用') +
-      (ci === 0 ? '　＋点検結果の図面PDF' : '') + '</small></div>' +
+    return '<div class="zipRow"><div class="zl"><b>' + (c.length ? (NUM[ci] || (ci + 1)) + ' 写真 ' + a + '〜' + b + '枚目' : '新しい写真なし（診断CSVだけ）') +
+      '</b><br><small>' + (c.length ? esc(c[0].filename) + ' 〜 ' + esc(c[c.length - 1].filename) + '　＋診断CSV' : '記録のバックアップ用') + '</small></div>' +
       '<button type="button" data-ci="' + ci + '" class="' + st + '"' + (st === "building" ? " disabled" : "") + '>' + lab + '</button></div>';
   }).join("");
   $("zipList").querySelectorAll("button[data-ci]").forEach(b => b.onclick = () => saveZip(+b.dataset.ci));
@@ -2646,11 +2018,6 @@ async function prepZip(ci){
     for(const m of J.chunks[ci]) files.push({name: m.filename, blob: await getPhotoBlob(m.id)});
     const c = buildCsv(J.key);
     if(c) files.push({name: c.fname, blob: new Blob([c.csv], {type: "text/csv"})});
-    // 1個目のZIPには、点検結果を描いた図面のPDFも入れる（PCのハブが 出力\点検図面 に出す）
-    if(ci === 0 && window.SysZumen && SysZumen.routePdf){
-      try{ const pdf = await SysZumen.routePdf(J.key); if(pdf) files.push({name: pdf.name, blob: pdf}); }
-      catch(e){ toast("図面PDFは入れられませんでした（" + e.message + "）"); }
-    }
     const zip = await makeZip(files);
     if(zipJob !== J) return;
     J.ready = {ci, file: new File([zip], zipName(J, ci), {type: "application/zip"})};
@@ -2670,9 +2037,9 @@ async function saveZip(ci){
   if(zipJob !== J) return;
   if(ok){
     J.st[ci] = "done"; J.ready = null; toast(f.name + " を保存しました");
-    // この写真は書き出し済み（次からは出さない）。撮り直すと新しい写真になるので、また書き出される
     const now = Date.now();
     for(const m of J.chunks[ci]){ m.exp = now; try{ await preq(ptx("meta","readwrite").put(m)); }catch(_){} }
+    renderStoreInfo();
   }
   renderZipDlg();
   const nx = J.st.findIndex(st => st !== "done");
@@ -2680,10 +2047,8 @@ async function saveZip(ci){
   else if(ok) toast("すべてのZIP（" + J.total + "枚）を保存しました");
 }
 $("zipClose").onclick = ()=>{ $("zipDlg").classList.remove("show"); zipJob = null; };
-$("koji").addEventListener("change", ()=>{ settings.koji = $("koji").value.trim(); store("gj_settings", settings); });
-$("tno").addEventListener("input", updatePhotoButtons);
-$("hojo").addEventListener("input", updatePhotoButtons);
 
+/* ===== トースト・起動 ===== */
 let toastTimer;
 function toast(msg){
   const t = $("toast"); t.textContent = msg; t.classList.add("show");
@@ -2692,18 +2057,25 @@ function toast(msg){
 
 $("inspector").value = settings.inspector || "";
 $("koji").value = settings.koji || "";
-$("office").value = last.office || ""; $("route").value = last.route || "";
+$("block").value = settings.block || "";
 $("dt").value = nowStr();
-routeChanged(); calc(); girthWarnUpd();
+renderHeader(); renderCnt(); renderProgress();
 setTimeout(()=>{ markClean(); guardOn = true; }, 800);   // 起動時の状態を「保存済み」とみなしてから、保存し忘れの確認を始める
-if(!settings.inspector || !$("office").value || !$("route").value) $("setPanel").open = true;
+if(!settings.inspector || !$("block").value) $("setPanel").open = true;
 openPdb().then(async db=>{
   pdb = db;
   photoMetas = await preq(ptx("meta","readonly").getAll()) || [];
-  updatePhotoButtons(); renderSummary();
+  updatePhotoHint(); renderSummary();
 });
 if(navigator.storage && navigator.storage.persist) navigator.storage.persist();
-
+{
+  const st = listState();
+  if(st && st.items.length) fillFromList();
+  else {
+    const rr = blockRecords();
+    if(rr.length){ $("tno").value = nextNo(rr[rr.length-1].no); noteAuto(rr[rr.length-1].no); }
+  }
+}
 if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
 </script>
 
@@ -2712,75 +2084,31 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js"); }
 <script src="../common/keypad.js"></script>
 <script src="../common/backup.js"></script>
 <script>
-/* 幹周りは事前調査と同じテンキーで入力する。株立ちは「＋幹」で各幹を続けて入力し、
-   これまでの株立ち欄（チェック＋幹ごとの入力欄）に値を流し込んで、保存・計算は従来の処理を使う */
+/* 寸法の入力は事前調査と同じテンキーで（樹高 → 幹周 → 枝張 の順に「次へ」で進む） */
 (function(){
-  if(!window.SysKeypad) return;          // 読めなかったときは従来の入力のまま
-  const g = document.getElementById("girth"), chk = document.getElementById("kabuChk");
-  document.body.classList.add("padGirth");
-  SysKeypad.attach(g, {
-    label: "今回の幹周り", unit: "cm", kabu: true,
-    canEdit: () => !document.body.classList.contains("noTree"),
-    get: () => chk.checked ? stemVals().join("+") : g.value,
-    set: (raw, info) => {
-      const stems = document.querySelectorAll(".stem");
-      if(info.kabu){
-        stems.forEach((inp, i) => { inp.value = info.stems[i] != null ? info.stems[i] : ""; });
-        if(!chk.checked){ chk.checked = true; chk.dispatchEvent(new Event("change")); }
-        else kabuCalc();
-      } else {
-        if(chk.checked){ stems.forEach(inp => { inp.value = ""; }); chk.checked = false; chk.dispatchEvent(new Event("change")); }
-        g.value = raw.replace(/\+$/, "").replace(/\.$/, "");
-      }
-      girthWarnUpd(); girthDiffUpd();
-    }
-  });
+  if(!window.SysKeypad) return;
+  const $k = id => document.getElementById(id);
+  SysKeypad.attach($k("th"), {label: "樹高H", unit: "m", next: $k("tc")});
+  SysKeypad.attach($k("tc"), {label: "幹周C", unit: "m", next: $k("tw")});
+  SysKeypad.attach($k("tw"), {label: "枝張W", unit: "m"});
+  SysKeypad.attach($k("fukyu1"), {label: "腐朽空洞率①", unit: "%", next: $k("fukyu2")});
+  SysKeypad.attach($k("fukyu2"), {label: "腐朽空洞率②", unit: "%"});
 })();
 </script>
-<script src="zumen.js"></script>
 <script>
-SysProject.attachBar("tenken", {
+SysProject.attachBar("gaikan", {
   apply: function(p){
     SysProject.setField("inspector", p.inspector, "change");
-    SysProject.setField("office", p.office, "change");
     SysProject.setField("koji", p.koji, "change");
-    // 路線名の候補は「この案件の路線」だけにする（前に開いた別の案件の路線が混ざらないように）
+    // ブロック名の候補は「この案件の路線」にする（統合ハブの外観診断リストは路線ごとのファイル）
     try{
-      // 外観診断だけを行う路線（gaikanOnly）は樹木点検の路線にしない
-      var rs = (p.routes || []).filter(function(r){ return !(r && (r.gaikanOnly || r.gaikan_only)); })
-                 .map(function(r){ return typeof r === "string" ? r : (r && r.name) || ""; })
-                 .filter(Boolean);
-      // この事務所で点検リストを取り込んだ路線・点検記録がある路線も候補に入れる
-      // （iPadの案件情報が古く路線名が載っていなくても、起動のたびに路線名を消さないように）
-      var off = String(p.office || $("office").value || "").trim();
-      var mine = Object.keys(typeof imports !== "undefined" ? imports : {})
-        .concat(typeof records !== "undefined" ? records.map(function(r){ return r.office + "|" + r.route; }) : [])
-        .filter(function(k){ return off && k.indexOf(off + "|") === 0; })
-        .map(function(k){ return k.slice(off.length + 1); });
-      mine.forEach(function(n){ if(n && rs.indexOf(n) < 0) rs.push(n); });
-      if(rs.length && typeof recents !== "undefined"){
-        recents.route = rs.slice();
-        store("gj_recents", recents);
-        // 路線名の欄が別の案件の路線のままなら、この案件で最後に使った路線に戻す（無ければ空にして選んでもらう）
-        var lastP = load("gj_last_p", {});
-        var cur = $("route").value.trim();
-        if(rs.indexOf(cur) < 0){
-          var back = (lastP[p.id] && rs.indexOf(lastP[p.id]) > -1) ? lastP[p.id] : "";
-          if(!back && typeof records !== "undefined"){      // 最後に点検を保存した路線に戻す
-            var rec = records.filter(function(r){ return r.office === off && rs.indexOf(r.route) > -1; })
-                             .sort(function(a, b){ return (b.created || 0) - (a.created || 0); })[0];
-            if(rec) back = rec.route;
-          }
-          $("route").value = back;
-          routeChanged();
-          if(!back){ $("setPanel").open = true; toast("この案件の路線名を選んでください（路線名の欄をタップすると候補が出ます）"); }
-        }
-        $("route").addEventListener("change", function(){
-          var v = $("route").value.trim();
-          if(rs.indexOf(v) > -1){ var lp = load("gj_last_p", {}); lp[p.id] = v; store("gj_last_p", lp); }
-        });
+      var rs = (p.routes || []).map(function(r){ return typeof r === "string" ? r : (r && r.name) || ""; }).filter(Boolean);
+      if(rs.length){
+        var own = recents.block.filter(function(b){ return rs.indexOf(b) > -1; });
+        recents.block = own.concat(rs.filter(function(b){ return own.indexOf(b) < 0; }));
+        store("gk_recents", recents);
       }
-    }catch(e){ console.warn("路線候補の反映に失敗:", e); }
+    }catch(e){ console.warn("ブロック候補の反映に失敗:", e); }
   }
 });
 </script>

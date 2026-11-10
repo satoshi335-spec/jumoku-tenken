@@ -486,6 +486,17 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
   </div>
 </div>
 
+<!-- 未調査に戻す（番号を変えた木） -->
+<div class="dlg" id="undoDlg">
+  <div class="dlgBox">
+    <h3 id="undoTitle"></h3>
+    <p class="note" id="undoNote"></p>
+    <button class="btn" id="undoBoth"></button>
+    <button class="btn sub" id="undoKeep"></button>
+    <button class="btn sub" id="undoNo">やめる</button>
+  </div>
+</div>
+
 <!-- 天候（1日に1回） -->
 <div class="dlg" id="wxDlg">
   <div class="dlgBox">
@@ -598,7 +609,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 26;
+const APP_VER = 27;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -1319,6 +1330,11 @@ function endNudge(ok){
   if(ok && t){
     const p = posOf(t), moved = Math.hypot(p.x - nudge.start.x, p.y - nudge.start.y) > 0.05;
     if(moved){ const r = rec(t.id); r.posT = Date.now(); if(!r.st) r.st = "done"; stamp(r); }
+    // 図面の位置に戻したとき：事務所PCに取り込み済みの「直した位置」も、次の取り込みで消す（R.unmoved）
+    if(!t.added){
+      if(R.moved[t.id]){ if(R.unmoved) delete R.unmoved[t.id]; }
+      else if(moved) (R.unmoved = R.unmoved || {})[t.id] = Date.now();
+    }
     saveR(); toast(moved ? "位置を直しました（" + $("nOff").textContent + "）" : "位置はそのままです");
   }
   nudge = null;
@@ -1625,9 +1641,11 @@ function touch(r){ stamp(r); saveR(); scheduleMarks(); updProg(); renderMiss(); 
 /* ［未調査に戻す］／［未点検に戻す］は、入力のある木だけに出す */
 function updUndo(){
   if(!selId) return;
-  const r = R.trees[selId], t = S.phase === "t";
-  $("undoBtn").textContent = t ? "↺ 未点検に戻す（点検の入力を消す）" : "↺ 未調査に戻す（入力を消す）";
-  $("undoBtn").style.display = (t ? !!(r && r.tk) : !!r) ? "block" : "none";
+  const r = R.trees[selId], t = S.phase === "t", tr = treeById(selId), ren = !!tr && renOf(tr);
+  $("undoBtn").textContent = t ? "↺ 未点検に戻す（点検の入力を消す）" :
+    ren && !r ? "↺ 番号を元の " + (tr.no || "番号なし") + " に戻す" :
+    ren ? "↺ 未調査に戻す（入力を消す・番号も元に戻せます）" : "↺ 未調査に戻す（入力を消す）";
+  $("undoBtn").style.display = (t ? !!(r && r.tk) : !!r || ren) ? "block" : "none";
 }
 
 $("stSeg").querySelectorAll("button").forEach(b => b.onclick = ()=>{
@@ -1945,7 +1963,14 @@ $("prevTree").onclick = ()=>{
 $("renoLink").onclick = e => { e.preventDefault(); const t = treeById(selId); openNoDlg({kind: t.src === "circle" && !R.renamed[t.id] ? "assign" : "reno", id: selId}); };
 $("moveLink").onclick = e => { e.preventDefault(); startNudge(); };
 /* その番号の写真を iPad から消す（一覧からも消す） */
+/* iPad で消した写真のうち、事務所PCに送ってあった写真の名前を残す（R.photoDel）。
+   次の調査結果の取り込みで、事務所PCの「写真」フォルダからも外れる（「iPadで消した写真」フォルダへ移る） */
+function noteDel(ms){
+  const n = ms.filter(m => m.sent).map(m => m.name);
+  if(n.length){ (R.photoDel = R.photoDel || []).push({t: Date.now(), n}); saveR(); }
+}
 async function dropPhotos(no){
+  noteDel(photosOf(no));
   for(const m of photosOf(no)){ if(!m.gone){ try{ await idbDel("photos", m.key); }catch(e){} } }
   photoMeta = photoMeta.filter(m => m.no !== no); savePhotoMeta(); thumbKey = "";
 }
@@ -1965,15 +1990,75 @@ async function revertTenken(){
   renderSheet(); toast(no + " を未点検に戻しました");
 }
 /* 調査済み（入力した木）を未調査に戻す。樹木点検の画面では点検の入力だけを消して未点検に戻す */
+/* 番号を変えてある木（違う番号の札・新しい札・番号なしの丸に付けた番号・振り直し）か。新木は番号が自分のものなので入らない */
+function renOf(t){ return !t.added && R.renamed[t.id] != null && R.renamed[t.id] !== (t.no || ""); }
+/* v27：番号を変えた木は、番号も図面の番号（入力前）に戻す。v26 までは入力だけが消えて番号は変えたままで、
+   ［未調査に戻す］のボタンも消えるので直せなかった（そうして残った番号も、このボタンで戻せる）。
+   戻したことは R.undone に残し、事務所PCに取り込み済みの記録も次の取り込みで消す */
 async function undoTree(){
   if(S.phase === "t"){ revertTenken(); return; }
-  const no = noOf(treeById(selId));
-  if(!R.trees[selId]){ toast("この木はまだ入力していません"); return; }
-  if(!confirm((no || "この樹木") + " の入力（毎木調査・樹木点検）をすべて消して、未調査に戻しますか？")) return;
-  const drop = askDropPhotos(no);
-  delete R.trees[selId]; saveR();
+  const t = treeById(selId); if(!t) return;
+  const no = noOf(t), has = !!R.trees[selId];
+  if(!renOf(t)){
+    if(!has){ toast("この木はまだ入力していません"); return; }
+    if(!confirm((no || "この樹木") + " の入力（毎木調査・樹木点検）をすべて消して、未調査に戻しますか？")) return;
+    doUndo(t, false); return;
+  }
+  const orig = t.no || "", origTxt = orig || "番号なし";
+  // 元の番号をほかの木が使っている（番号を振り直したあと）ときは、同じ番号が2本になるので戻さない
+  const holder = orig ? allTrees().find(x => x.id !== t.id && noOf(x) === orig && distOf(x) === distOf(t)) : null;
+  $("undoTitle").textContent = has ? no + " を未調査に戻す" : no + " の番号を元に戻す";
+  $("undoNote").textContent = "この木の番号は、図面の " + origTxt + " から " + no + " に変えてあります。" +
+    (holder ? "元の番号 " + orig + " は、いま " + treeLabel(holder) + " に付いているので、番号は戻せません（番号を直すときは、下の［番号を変える］）。" :
+     has ? "入力を消すときに、番号も入力前に戻せます。" : "入力はもう消してあります。");
+  $("undoBoth").textContent = (has ? "入力を消して、番号も " : "番号を ") + origTxt + " に戻す";
+  $("undoBoth").style.display = holder ? "none" : "";
+  $("undoKeep").textContent = "入力だけ消す（番号は " + no + " のまま）";
+  $("undoKeep").style.display = has ? "" : "none";
+  $("undoDlg").classList.add("show");
+}
+$("undoNo").onclick = ()=> $("undoDlg").classList.remove("show");
+$("undoBoth").onclick = ()=>{ $("undoDlg").classList.remove("show"); const t = treeById(selId); if(t) doUndo(t, true); };
+$("undoKeep").onclick = ()=>{ $("undoDlg").classList.remove("show"); const t = treeById(selId); if(t) doUndo(t, false); };
+/* back＝番号も図面の番号に戻す。残す写真は名前を元の番号に直す（元の番号に同じ名前の写真があれば、被害部は続きの番号にし、
+   プレート・全景は元の番号の写真を残して、変えた番号で撮った方を消す） */
+async function doUndo(t, back){
+  const no = noOf(t), orig = t.no || "";
+  const n = no ? photosOf(no).length : 0;
+  const drop = n > 0 && confirm(no + " で撮った写真 " + n + " 枚も消しますか？\n［キャンセル］写真は残す" +
+    (!back ? "" : orig ? "（名前を " + orig + " に直します。写真の中の黒板は " + no + " のままです）" :
+     "（" + no + " の写真のまま残ります。次に " + no + " を付けた木の写真になります）"));
   if(drop) await dropPhotos(no);
-  renderSheet(); scheduleMarks(); updProg(); toast((no || "この樹木") + " を未調査に戻しました");
+  let lost = 0;
+  if(back){
+    if(!drop && orig && n){
+      const pairs = [], gone = [];
+      for(const m of photosOf(no)){
+        let name = m.name.replace(no + "_", orig + "_");
+        if(photoMeta.some(x => x !== m && x.name === name)){
+          if(m.kind !== "2"){ gone.push(m); continue; }
+          let k = 2; while(photoMeta.some(x => x.name === orig + "_" + k + ".jpg")) k++;
+          name = orig + "_" + k + ".jpg";
+        }
+        pairs.push([m.name, name]); m.no = orig; m.name = name;
+      }
+      for(const m of gone){ if(!m.gone){ try{ await idbDel("photos", m.key); }catch(e){} } }
+      if(gone.length){ noteDel(gone); photoMeta = photoMeta.filter(m => !gone.includes(m)); lost = gone.length; }
+      if(pairs.length) (R.photoRen = R.photoRen || []).push({t: Date.now(), m: pairs});
+      savePhotoMeta();
+    }
+    delete R.renamed[t.id];
+  }
+  delete R.trees[t.id];
+  (R.undone = R.undone || {})[t.id] = Date.now();
+  thumbKey = "";
+  reindex(); saveR();
+  renderSheet(); scheduleMarks(); updProg();
+  const now = noOf(t) || "番号なし";
+  if(back) alert((no || "この樹木") + " を未調査に戻し、番号を " + now + " に戻しました。" +
+    (lost ? "\n" + orig + " に同じ種類の写真があったので、" + no + " で撮った写真 " + lost + " 枚は消しました。" : "") +
+    (isNewNo(no) ? "\n次の新しい札：" + nextNoStr() : ""));
+  else toast((no || "この樹木") + " を未調査に戻しました");
 }
 $("undoLink").onclick = e => { e.preventDefault(); undoTree(); };
 $("undoBtn").onclick = ()=> undoTree();
@@ -1982,7 +2067,7 @@ $("delLink").onclick = async e => {
   const no = noOf(treeById(selId));
   if(!confirm("この新木（" + no + "）を削除しますか？\n（間違えて追加したとき用。入力も消えます）")) return;
   const drop = askDropPhotos(no);
-  R.added = R.added.filter(a => a.id !== selId); delete R.trees[selId]; reindex(); saveR();
+  R.added = R.added.filter(a => a.id !== selId); delete R.trees[selId]; (R.undone = R.undone || {})[selId] = Date.now(); reindex(); saveR();
   if(drop) await dropPhotos(no);
   closeSheet(); updProg(); toast(no + " を削除しました");
 };
@@ -2048,7 +2133,7 @@ function renderPhotos(){
     const b = m.gone ? null : await idbGet("photos", m.key);
     if(b && thumbKey === tk){ const u = URL.createObjectURL(b); thumbUrls.push(u); d.querySelector("img").src = u; }
     d.querySelector("img").onclick = ()=>{ if(!b) return; const u = URL.createObjectURL(b); window.open(u); setTimeout(()=> URL.revokeObjectURL(u), 60000); };
-    d.querySelector("button").onclick = async ()=>{ if(!confirm(m.name + " を削除しますか？")) return; await idbDel("photos", m.key); photoMeta = photoMeta.filter(x => x.key !== m.key); savePhotoMeta(); renderPhotos(); };
+    d.querySelector("button").onclick = async ()=>{ if(!confirm(m.name + " を削除しますか？")) return; noteDel([m]); await idbDel("photos", m.key); photoMeta = photoMeta.filter(x => x.key !== m.key); savePhotoMeta(); renderPhotos(); };
   });
 }
 let thumbKey = "", thumbUrls = [];
@@ -2299,7 +2384,8 @@ async function openJk(){
     box.querySelectorAll(".jk").forEach(async d => {
       const m = ps[+d.dataset.i];
       d.querySelector("button").onclick = async ()=>{
-        if(!confirm(m.name + " を削除しますか？" + (m.sent ? "\n（事務所PCに送った写真も、事務所PCの「写真」フォルダから消してください）" : ""))) return;
+        if(!confirm(m.name + " を削除しますか？" + (m.sent ? "\n（事務所PCに送った写真は、次に調査結果を取り込んだときに「写真」フォルダから外れます）" : ""))) return;
+        noteDel([m]);
         if(!m.gone){ try{ await idbDel("photos", m.key); }catch(_){} }
         photoMeta = photoMeta.filter(x => x.key !== m.key); savePhotoMeta(); updJk(); openJk();
       };
@@ -2514,9 +2600,20 @@ function renderWx(){
 $("distSel").onchange = ()=>{
   if(!leaveOk()){ $("distSel").value = S.dist; renderMiss(); return; }
   S.dist = $("distSel").value; saveS(); closeSheet(); fitView(); applyView(); updProg(); toast(S.dist + "の図面を表示しました"); };
+/* 前回の書き出しのあとに入力・変更した木の数（書き出し忘れの注意）。old＝きのうまでに入れた分だけ。
+   S.lastBkT は v27 から。v26 までに書き出しただけのときは、次に書き出すまで数えない */
+function unsentRecs(old){
+  if(S.lastBk && !S.lastBkT) return 0;
+  const t0 = S.lastBkT || 0, mid = new Date().setHours(0, 0, 0, 0);
+  let n = 0;
+  for(const r of Object.values(R.trees)){ const t = r.t || 0; if(t > t0 && (!old || t < mid)) n++; }
+  for(const [id, t] of Object.entries(R.undone || {})) if(!R.trees[id] && t > t0 && (!old || t < mid)) n++;   // 未調査に戻した木・消した新木
+  return n;
+}
 function updProg(){
   if(!pkg){ $("prog").textContent = ""; return; }
   updJk();
+  $("menuBtn").classList.toggle("due", unsentRecs(true) > 0);   // きのうまでの入力をまだ書き出していない
   let done = 0, tot = 0, need = 0, insp = 0, newP = 0;
   for(const t of allTrees()){
     const st = stateOf(t), r = recOf(t.id);
@@ -2688,7 +2785,7 @@ function renderList(){
   ts.slice(0, 800).forEach(t => {
     const r = recOf(t.id), st = stateOf(t), g = girthOf(r.c);
     const kan = r.kanri ? [["senS", "剪定推薦"], ["sen", "要剪定"], ["basS", "伐採推薦"], ["bas", "要伐採"]].filter(x => r.kanri[x[0]]).map(x => x[1]).join("・") : "";
-    h += '<tr data-id="' + esc(t.id) + '" class="' + (st || "") + '"><td><b>' + esc(noOf(t) || "番号なし") + "</b></td><td>" + esc(distOf(t)) +
+    h += '<tr data-id="' + esc(t.id) + '" class="' + (st || "") + '"><td><b>' + esc(noOf(t) || "番号なし") + "</b>" + (renOf(t) ? '<br><small style="color:var(--tx2)">図面 ' + esc(t.no || "番号なし") + "</small>" : "") + "</td><td>" + esc(distOf(t)) +
       "</td><td>" + ST[st] + (r.kin ? ' <b style="color:var(--ng)">緊急</b>' : "") + "</td><td>" + esc(r.sp || (t.past && t.past.sp) || "") +
       '</td><td class="n">' + esc(r.h || "") + '</td><td class="n">' + (g.c != null ? g.c : "") + "</td><td>" + (r.tenken ? "●" : "") +
       "</td><td>" + (r.tenken && tkDone(r) ? esc(tkResult(r).txt) : "") + "</td><td>" + esc(kan) + "</td><td>" + photosOf(noOf(t)).length + (st && photoLack(t) ? ' <b style="color:var(--ng)">不足</b>' : "") +
@@ -2701,6 +2798,37 @@ function renderList(){
 $("listBtn").onclick = ()=>{ if(!pkg) return; renderList(); $("listM").classList.add("show"); };
 
 /* ================= 集計 ================= */
+/* 日ごとの本数（日報・工程の確認用）。毎木調査は調査した日、樹木点検は点検した日で数える。
+   残りは調査範囲の中の未調査の本数で、1日平均（調査した日だけの平均）からあと何日かの目安を出す */
+function dailyCard(){
+  const days = {}, day = d => days[d] || (days[d] = {mm: 0, ex: 0, tk: 0, np: 0});
+  let left = 0, need = 0;
+  for(const t of allTrees()){
+    const r = recOf(t.id), st = stateOf(t);
+    if(!st){ if(!t.out) left++; continue; }
+    if(st === "need") need++;
+    if(r.date){
+      const d = day(r.date);
+      if(st === "gone" || st === "skip") d.ex++; else d.mm++;
+      if(r.plate === "new" || t.added) d.np++;
+    }
+    if(tkDone(r)) day(r.tk.date || r.date || "").tk++;
+  }
+  const ks = Object.keys(days).filter(k => k).sort();
+  if(!ks.length) return "";
+  const wd = d => "日月火水木金土"[new Date(d + "T00:00:00").getDay()] || "";
+  const avg = k => { const v = ks.map(d => days[d][k]).filter(x => x > 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; };
+  const am = avg("mm"), at = avg("tk");
+  let h = '<div class="card"><h3>日ごとの本数</h3><table><tr><th>日</th><th>毎木調査</th><th>消失・対象外</th><th>新しい札・新木</th><th>樹木点検</th></tr>';
+  ks.forEach(d => { const x = days[d];
+    h += "<tr><td>" + (+d.split("-")[1]) + "/" + (+d.split("-")[2]) + "（" + wd(d) + '）</td><td class="n">' + (x.mm || "") + '</td><td class="n">' + (x.ex || "") +
+         '</td><td class="n">' + (x.np || "") + '</td><td class="n">' + (x.tk || "") + "</td></tr>"; });
+  h += '</table><p class="note">' +
+    (am ? "毎木調査：1日平均 " + Math.round(am) + " 本。" + (left ? "未調査の残り " + left + " 本（2地区の調査範囲の中）→ あと約 " + Math.ceil(left / am) + " 日" : "未調査の残りはありません") + "<br>" : "") +
+    (need || at ? "樹木点検：" + (at ? "1日平均 " + Math.round(at) + " 本。" : "") + (need ? "要点検の残り " + need + " 本" + (at ? " → あと約 " + Math.ceil(need / at) + " 日" : "") : "要点検の残りはありません") : "") +
+    "</p></div>";
+  return h;
+}
 function openSum(){
   const by = {};
   pkg.project.districts.forEach(d => by[d] = {done: 0, gone: 0, skip: 0, tenken: 0, insp: 0, kin: 0, plate: 0, add: 0, sen: 0, bas: 0, res: {}});
@@ -2727,6 +2855,7 @@ function openSum(){
       '<div class="big">毎木 ' + tot.done + ' 本　／　点検 ' + tot.insp + " 本（要点検 " + tot.tenken + "）</div>" +
       '<p class="note">設計：毎木調査 3.87ha（510本/haで約1,974本）・樹木点検 217本（57本/ha）・樹木番号札 130枚/ha（約503枚）<br>' +
       "新しい札 " + tot.plate + " 枚。樹木点検の本数が変わる場合は設計変更の対象です（特記仕様書 第10条）。</p></div>" + h;
+  h += dailyCard();
   $("sumBody").innerHTML = h;
   $("sumM").classList.add("show");
 }
@@ -2741,6 +2870,8 @@ $("menuBtn").onclick = ()=>{
   const nmi = missCount();
   $("bkInfo").innerHTML = (nmi ? '<b style="color:var(--ng)">⚠ 入力漏れ・写真不足 ' + nmi + " 本（上の赤い件数を押すと一覧）</b><br>" : "") + "写真 " + photoMeta.length + " 枚（未送信 " + unsent + " 枚" + (gone ? "・送信済みで iPad から消した " + gone + " 枚" : "") + "）。" +
     (S.lastBk ? "前回の書き出し：" + esc(S.lastBk) : "まだ書き出していません") +
+    (unsentRecs(false) ? '<br><b style="color:' + (unsentRecs(true) ? "var(--ng)" : "inherit") + '">' + (S.lastBkT ? "前回の書き出しのあとに" : "") + "入力・変更した木 " + unsentRecs(false) + " 本" +
+      (unsentRecs(true) ? "（うち、きのうまでの分 " + unsentRecs(true) + " 本。書き出して事務所PCへ送ってください）" : "") + "</b>" : "") +
     "<br>書き出したファイルを AirDrop・OneDrive などで事務所PCへ送り、システムの［iPadの結果を取り込む］で読み込みます。" +
     '<br><span id="stoInfo"></span>';
   if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => {
@@ -2798,10 +2929,12 @@ $("bkBtn").onclick = async ()=>{
   if(wd.length){ askWx(wd[0], true); toast("先に天候を選んでください（" + wd.join("・") + "）"); return; }
   const nm = missCount();
   if(nm && !confirm("⚠ 入力漏れ・写真不足の木が " + nm + " 本あります（一覧の［入力漏れ・写真不足］で確かめられます）。\nこのまま書き出しますか？")) return;
+  if(saveRT) flushR();
+  const t0 = Date.now();          // 書き出した内容の時刻（共有の画面を開いている間に入力した分は、次の書き出しに回る）
   const out = {type: "nagano-res", version: 1, exported: new Date().toISOString(), pkg: pkg ? pkg.id : "", settings: S, res: R,
                photos: photoMeta.map(m => ({name: m.name, no: m.no, kind: m.kind, t: m.t, cmt: m.cmt || "", dist: m.dist || ""}))};
   const blob = new Blob([JSON.stringify(out)], {type: "application/json"});
-  if(await share(blob, "長野公園_調査結果_" + stampName() + ".json")){ S.lastBk = new Date().toLocaleString("ja-JP"); saveS(); toast("書き出しました"); }
+  if(await share(blob, "長野公園_調査結果_" + stampName() + ".json")){ S.lastBk = new Date().toLocaleString("ja-JP"); S.lastBkT = t0; saveS(); updProg(); toast("書き出しました"); }
 };
 /* 無圧縮ZIP */
 const CRC_T = (()=>{ const t = new Uint32Array(256); for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c; } return t; })();
