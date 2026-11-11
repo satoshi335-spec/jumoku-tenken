@@ -5,7 +5,7 @@
    index.html の関数（listState, showListItem, routeKey, routeRecords, judgeOf …）をそのまま使う */
 (function(){
 "use strict";
-const ZVER = 3;
+const ZVER = 4;
 
 /* ================= 保存（IndexedDB） ================= */
 let zdbP = null;
@@ -192,7 +192,7 @@ function allPos(){
     const f = fx[k];
     return f ? {z: f.z, m: p.m, h: p.h, x: f.x, y: f.y, k, moved: true} : Object.assign({k}, p);
   });
-  Object.keys(fx).forEach(k => { if(!seen.has(k)){ const f = fx[k]; out.push({z: f.z, m: f.m, h: f.h, x: f.x, y: f.y, k, moved: !f.add, added: !!f.add}); } });
+  Object.keys(fx).forEach(k => { if(!seen.has(k)){ const f = fx[k]; out.push({z: f.z, m: f.m, h: f.h, x: f.x, y: f.y, k, moved: !f.add, added: !!f.add, u: !!f.u}); } });
   return out;
 }
 /* 現場で追加した樹木（図面・リストに無かった樹木）。点検データを取り込み直しても残すため別に持つ
@@ -326,7 +326,7 @@ function renderMarks(){
   const box = $z("zMarks");
   if(!R || !dz){ box.innerHTML = ""; $z("zLegend").innerHTML = ""; return; }
   const st = listState();
-  const done = new Map(routeRecords().map(r => [r.no, r]));
+  const done = recMap(routeRecords());       // 番号を直して保存した記録（listNo）も、リストの元の番号の印に出す
   let incNos = new Set();     // 要確認の樹木（index.html の issuesOf）→ 印に赤い輪
   try{ incNos = new Set(issuesOf(routeKey()).map(x => x.no)); }catch(_){}
   const cur = st ? st.idx : -1;
@@ -366,7 +366,7 @@ function renderMarks(){
     const gShort = p.g && !tags && !isCur && !isSel && V.s >= 0.28;
     if(tags || isCur || isSel || gShort){
       const it = st.items[i];
-      const lbl = gShort ? (it.hojo || treeLabel(it, false)) : treeLabel(it, false);
+      const lbl = gShort ? (it.hojo || treeLabel(it, false)) : labelOf(it, done.get(it.no));
       html += '<div class="ztag" style="transform:translate(' + (q.x + dd / 2) + 'px,' + (q.y - dd / 2 - 8) + 'px)">' + esc(lbl) + '</div>';
     }
   });
@@ -389,6 +389,11 @@ function renderMarks(){
 }
 
 /* 印・一覧に出す番号。「左27#2」（同じ桝の2本目）は「左27（2本目）」と書く。many … 同じ桝の樹木が並ぶ一覧 */
+/* 印の番号：番号を直して保存した木（リストの左17 の欄を左15 として保存＝同じ木）は、保存した番号を出す */
+function labelOf(it, rec, many){
+  if(rec && rec.listNo && rec.listNo === it.no && rec.no !== it.no) return (rec.masu || rec.no) + (rec.hojo ? "-" + rec.hojo : "");
+  return treeLabel(it, many);
+}
 function treeLabel(it, many){
   const b = String(it.base != null ? it.base : it.no);
   const m = b.match(/^(.*)#(\d+)$/);
@@ -422,7 +427,7 @@ function chooseNear(sx, sy, done){
   // 同じ桝の樹木（同じ位置に並べた印）はまとめて選べるようにする
   const group = near.filter(x => x.k === near[0].k || x.dist <= best + 12);
   if(group.length === 1){ done(group[0].i); return true; }
-  const st = listState(), recs = new Map(routeRecords().map(r => [r.no, r]));
+  const st = listState(), recs = recMap(routeRecords());
   const baseOf = it => String(it.base != null ? it.base : it.no).replace(/#\d+$/, "");
   const bases = {};
   group.forEach(x => { const b = baseOf(st.items[x.i]); bases[b] = (bases[b] || 0) + 1; });
@@ -532,6 +537,7 @@ function placeFix(sx, sy){
   if(ip.x < 0 || ip.y < 0 || ip.x > V.w || ip.y > V.h){ toast("図面の中をタップしてください"); return; }
   const f = FIX[rKey] || {}, old = f[fixSel.k] || {};
   f[fixSel.k] = Object.assign({}, old, {z: dz, x: Math.round(ip.x * 10) / 10, y: Math.round(ip.y * 10) / 10, m: fixSel.m, h: fixSel.h, t: Date.now()});
+  delete f[fixSel.k].u;
   FIX[rKey] = f; store("gj_zfix", FIX);
   toast(treeLabel(fixSel.it, false) + " の位置を保存しました");
   fixSel = null; updateBar(); schedule();
@@ -617,6 +623,35 @@ function commitAdd(){
   fillSel();
   pick(at);
   toast(treeLabel(it, false) + " を追加しました。続けて点検を入力できます");
+}
+/* ③ リストに無い番号で保存した樹木を、リストの欄 ni の次に足す。位置は ni の樹木と同じ所（印は横にずらして並ぶ・点線＝位置未確定）。
+   ＋樹木と同じ仕組み（FIX の add・ADD）なので、点検データを取り込み直しても残り、［位置を直す］で動かせる */
+function addSaved(o, ni){
+  const st = listState(); if(!st || !o || !o.base) return false;
+  const near = ni >= 0 ? st.items[ni] : null;
+  const zumen = o.zumen || (near && near.zumen) || dz;
+  const k = keyOf(zumen, o.base, o.hojo || "");
+  if(idxOf.has(k)) return false;
+  const it = {no: "", base: o.base, hojo: o.hojo || "", sp: o.sp || "", zumen, city: o.city || (near ? near.city : ""), town: o.town || (near ? near.town : ""),
+              bikou: "現場で追加", girth: "", added: true, solo: false};
+  it.no = composeNo(zumen, it.base, it.hojo, st.zumenKey);
+  if(st.items.some(x => x.no === it.no)) return false;
+  const at = near ? ni + 1 : st.items.length;
+  st.items.forEach(x => { if(String(x.base != null ? x.base : x.no).replace(/#\d+$/, "") === it.base) x.solo = false; });
+  st.items.splice(at, 0, it);
+  if(st.idx >= at) st.idx++;
+  store("gj_imports", imports);
+  const np = near ? allPos().find(p => p.k === itemKey(near).k) : null;
+  if(np){
+    const f = FIX[rKey] || {};
+    f[k] = {z: np.z, x: np.x, y: np.y, m: it.base, h: it.hojo, t: Date.now(), add: 1, u: 1};
+    FIX[rKey] = f; store("gj_zfix", FIX);
+  }
+  const a = ADD[rKey] || {};
+  a[k] = {item: it, after: near ? itemKey(near).k : ""};
+  ADD[rKey] = a; store("gj_zadd", ADD);
+  buildIndex(); fillSel(); schedule();
+  return true;
 }
 async function removeAdded(sel){
   const st = listState(); if(!st || !sel) return;
@@ -905,7 +940,7 @@ async function routeCtx(key){
     const h = it.base != null ? (it.hojo || "") : splitHojo(it.no).hojo;
     idx.set(keyOf(it.zumen, b, h), i);
   });
-  const done = new Map(records.filter(r => (r.office + "|" + r.route) === key).map(r => [r.no, r]));
+  const done = recMap(records.filter(r => (r.office + "|" + r.route) === key));
   // 位置（現場で直した位置・追加した樹木を含む。allPos と同じ）
   const fx = FIX[key] || {}, seen = new Set();
   const pos = (Rk.pos || []).map(p => {
@@ -913,7 +948,7 @@ async function routeCtx(key){
     const f = fx[k];
     return f ? {z: f.z, m: p.m, h: p.h, x: f.x, y: f.y, k} : Object.assign({k}, p);
   });
-  Object.keys(fx).forEach(k => { if(!seen.has(k)){ const f = fx[k]; pos.push({z: f.z, m: f.m, h: f.h, x: f.x, y: f.y, k}); } });
+  Object.keys(fx).forEach(k => { if(!seen.has(k)){ const f = fx[k]; pos.push({z: f.z, m: f.m, h: f.h, x: f.x, y: f.y, k}); } });   // u（位置未確定）は PDF では区別しない
   return {key, R: Rk, st, idx, done, pos};
 }
 function statusIn(C, i){
@@ -966,7 +1001,7 @@ async function drawResultSheet(cv, d, C){
     g.beginPath(); g.arc(x, y, r0, 0, Math.PI * 2);
     if(fill){ g.fillStyle = fill; g.fill(); }
     g.lineWidth = u * 1.1; g.strokeStyle = col; g.stroke();
-    if((s && s !== "ok") || p.g) tags.push({x, y, t: treeLabel(it, false), col});
+    if((s && s !== "ok") || p.g) tags.push({x, y, t: labelOf(it, rec, false), col});
     if(rec && rec.bassai){ cnt.cut++; cuts.push({x, y}); }
   });
   // 番号（良好・未点検以外）：白い縁取りで図面の線と区別する
@@ -1195,7 +1230,7 @@ window.applyImport = function(items){ _import(items); buildIndex(); schedule(); 
 $("office").addEventListener("change", ()=> loadRoute());
 $("route").addEventListener("change", ()=> loadRoute());
 
-window.SysZumen = {VERSION: ZVER, reload: loadRoute, sync, routePdf: (key) => makeRoutePdf(key, null)};
+window.SysZumen = {VERSION: ZVER, reload: loadRoute, sync, routePdf: (key) => makeRoutePdf(key, null), addSaved};
 layoutTop();
 loadRoute().then(()=> sync());
 })();

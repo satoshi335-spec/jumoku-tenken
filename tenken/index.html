@@ -877,6 +877,17 @@ $("sumRoute").addEventListener("change", ()=>{
 function routeChanged(){
   last = {office:$("office").value, route:$("route").value}; store("gj_last", last);
   listPage = 0;
+  // 別の路線の保存済みの樹木を開いたまま（「上書きされます」）だと、その番号のまま写真が撮れ、上書き保存で
+  // 記録が新しい路線へ移ってしまう（2026-10-19 江の木町で、下新田の右285-1 が左2 の写真で上書きされた）→ 閉じて入力欄を空にする
+  if(editingId){
+    const er = records.find(x => x.id === editingId);
+    if(!er || (er.office + "|" + er.route) !== routeKey()){
+      const was = er ? er.no : "";
+      endEdit(true); clearTreeFields();
+      if(was) toast("路線を切り替えたので、開いていた " + was + " を閉じました");
+    }
+  }
+  if(insertMode && !editingId){ insertMode = false; $("insertBanner").style.display = "none"; }
   updateModeUI();
   if(!editingId && !insertMode){
     if(getMode() === "list"){ fillFromList(); }
@@ -1209,7 +1220,9 @@ async function parseXlsxList(f){
 }
 
 function listState(){ return imports[routeKey()] || null; }
-function savedNos(){ return new Set(routeRecords().map(r => r.no)); }
+function savedNos(){ const s = new Set(); routeRecords().forEach(r => { s.add(r.no); if(r.listNo) s.add(r.listNo); }); return s; }
+/* 番号 → 記録（番号を直して保存した記録は、リストの元の番号でも引ける）。図面の印にも使う */
+function recMap(recs){ const m = new Map(); (recs || routeRecords()).forEach(r => { m.set(r.no, r); }); (recs || routeRecords()).forEach(r => { if(r.listNo && !m.has(r.listNo)) m.set(r.listNo, r); }); return m; }
 function nextListIndex(from){
   const st = listState(); if(!st) return -1;
   const done = savedNos();
@@ -1241,7 +1254,7 @@ function showListItem(i, noGuard){
   const sh = it.base != null ? {base: it.base, hojo: it.hojo || ""} : splitHojo(it.no);
 
   // その番号がすでに保存済みなら編集モードで開く
-  const saved = routeRecords().find(r => r.no === it.no);
+  const saved = routeRecords().find(r => r.no === it.no) || routeRecords().find(r => r.listNo === it.no);
   if(saved){
     startEdit(saved.id, true);
   } else {
@@ -1355,7 +1368,7 @@ $("insertBtn").onclick = ()=>{
   if(getMode() !== "list"){ toast("Excelリストモードで使うボタンです"); return; }
   insertMode = true;
   $("insertBanner").style.display = "block";
-  $("tno").value = ""; $("hojo").value = ""; $("sp").value = "";
+  $("tno").value = ""; $("hojo").value = ""; $("sp").value = ""; $("girthPrev").value = ""; girthWarnUpd();
   $("tnoNote").textContent = "リスト外の樹木番号を入力してください";
   $("tnoNote").className = "note manual";
   $("tno").focus();
@@ -1443,6 +1456,9 @@ $("edaBtn").onclick = ()=>{
   const h = $("hojo").value.trim();
   $("hojo").value = /^\d+$/.test(h) ? nextHojo(h) : "1";
   $("tno").dispatchEvent(new Event("input"));
+  const b = $("tno").value.trim();
+  const r = !editingId && routeRecords().filter(x => (x.masu || splitHojo(x.no).base) === b && Date.now() - (x.created || 0) < 3600 * 1000).pop();
+  if(r){ const t = new Date(r.created); toast("同じ桝の " + r.no + " を " + t.getHours() + ":" + String(t.getMinutes()).padStart(2, "0") + " に保存しています。別の木か確かめてください"); }
 };
 $("edaKanaBtn").onclick = ()=>{
   const h = $("hojo").value.trim();
@@ -1728,6 +1744,56 @@ function saveAndMove(move){
   const startIdx = findListIndex($("tno").value.trim(), $("hojo").value.trim());
   const dup = routeRecords().find(r => r.no === no && r.id !== editingId);
   if(dup){ toast("樹木番号 " + no + " はこの路線で保存済みです"); return; }
+  const editRec = editingId ? records.find(r => r.id === editingId) : null;
+  if(editRec && (editRec.office + "|" + editRec.route) !== routeKey()){
+    alert("開いている " + editRec.no + " は「" + editRec.route + "」の樹木です。\nいまの路線（" + $("route").value.trim() + "）には保存できません。［編集を取り消す］で閉じてください。");
+    return;
+  }
+  // ② リストの欄と違う番号で保存するとき（2026-10-19 江の木町：リストの左17 の欄で「左15」と打って保存し、
+  //    左17 の前回幹周62 が左15 に入った）。別の木なら前回幹周を入れず、③図面とリストに印を足す。同じ木なら番号だけ直す
+  const tnoV = $("tno").value.trim(), hojoV = $("hojo").value.trim();
+  const st0 = listState(), inListMode = getMode() === "list" && st0 && st0.items.length;
+  let listNo = editRec ? (editRec.listNo || "") : "", addItem = false, prevOverride = null;
+  if(!editingId && inListMode){
+    const cur = st0.items[st0.idx];
+    const hit = st0.items.findIndex(it => it.no === no || (it.base === tnoV && (it.hojo || "") === hojoV));
+    const lbl = it => (it.base != null ? String(it.base).replace(/#\d+$/, "") + (it.hojo ? "-" + it.hojo : "") : it.no);
+    const newLbl = tnoV + (hojoV ? "-" + hojoV : "");
+    if(hit >= 0){
+      // リストの別の樹木の番号を打った → 前回幹周はその樹木の値にする
+      if(cur && hit !== st0.idx && (st0.items[hit].girth || "") !== $("girthPrev").value.trim()){
+        prevOverride = st0.items[hit].girth || "";
+        toast("前回幹周を " + lbl(st0.items[hit]) + " の値（" + (prevOverride || "なし") + "）にしました");
+      }
+    } else if(insertMode){
+      addItem = true; prevOverride = "";
+    } else if(cur && !no.startsWith(cur.no + "-")){
+      const cl = lbl(cur), cg = cur.girth ? cur.girth + "cm" : "なし";
+      if(confirm("⚠ いまはリストの「" + cl + "」（前回幹周 " + cg + "）の欄です。\n番号を「" + newLbl + "」に変えて保存しようとしています。\n\n" +
+                 "［OK］別の木として保存する\n　（" + cl + " は未点検のまま残します。前回幹周は入れません。図面とリストに「" + newLbl + "」を足します）\n" +
+                 "［キャンセル］ほかを選ぶ")){
+        addItem = true; prevOverride = "";
+      } else if(confirm("「" + cl + "」と同じ木で、番号だけ「" + newLbl + "」に直しますか？\n\n" +
+                        "［OK］同じ木（前回幹周 " + cg + " を引き継ぎ、リストの " + cl + " を点検済みにします）\n" +
+                        "［キャンセル］保存をやめて番号を確かめる")){
+        listNo = cur.no;
+      } else return;
+    }
+  }
+  // ④ 同じ桝の樹木を2回入れていないか（2026-10-19 江の木町：左15 を保存した9分後に、同じ木を左15-1 として保存）。
+  //    リストに無い番号で、同じ桝の樹木を1時間以内に保存していて、幹周が近いときに確かめる
+  if(!editingId && (!inListMode || addItem || insertMode || st0.items.findIndex(it => it.no === no) < 0)){
+    const g = parseFloat($("girth").value);
+    const twin = isFinite(g) && routeRecords().find(r => {
+      const rb = r.masu != null && r.masu !== "" ? r.masu : splitHojo(r.no).base, rg = parseFloat(r.girth);
+      return r.no !== no && rb === tnoV && isFinite(rg) && Math.abs(rg - g) <= Math.max(3, rg * 0.05) &&
+             Date.now() - (r.created || 0) < 3600 * 1000;
+    });
+    if(twin){
+      const tm = new Date(twin.created), hm = tm.getHours() + ":" + String(tm.getMinutes()).padStart(2, "0");
+      if(!confirm("⚠ 同じ桝の " + twin.no + "（幹周 " + twin.girth + "cm、" + hm + " に保存）と幹周が近いです。\n同じ木を2回入れていませんか？\n\n［OK］別の木として保存する\n［キャンセル］保存をやめて確かめる")) return;
+    }
+  }
   // 画面の並びと保存の並びが違うので、ボタンに持たせた番号で並べる
   const items = new Array(ITEMS.length).fill("");
   document.querySelectorAll(".itm").forEach(b => { if(b.classList.contains("on")) items[+b.dataset.i] = "○"; });
@@ -1742,7 +1808,8 @@ function saveAndMove(move){
     zumen: $("zumen").value.trim(), city: $("city").value.trim(), town: $("town").value.trim(),
     no, masu: $("tno").value.trim(), hojo: $("hojo").value.trim(),
     sp: $("sp").value.trim(), girth: $("girth").value.trim(),
-    girthPrev: $("girthPrev").value.trim(),
+    girthPrev: prevOverride != null ? prevOverride : $("girthPrev").value.trim(),
+    listNo,             // リストのこの欄の樹木を、番号を直して保存した（同じ木）。リストの済の判定・図面の印に使う
     kabu: stems, kabuNote: (kabuOn && stems.length) ? kabuText(stems, $("girth").value) : "",
     dt: $("dt").value, items, memo: $("memo").value.trim(),
     lv: Object.fromEntries(Object.entries(lv).filter(([i]) => items[i] === "○")),
@@ -1765,7 +1832,12 @@ function saveAndMove(move){
   bump("office", rec.office); bump("route", rec.route); bump("sp", rec.sp); bump("memo", rec.memo);
   bump("zumen", rec.zumen); bump("city", rec.city); bump("town", rec.town);
 
-  const wasInsert = insertMode;
+  // ③ リストに無い番号で保存した樹木は、図面とリストに足す（印が無いと未点検に見えて、もう一度入れてしまう）
+  if(addItem && window.SysZumen && SysZumen.addSaved){
+    try{ if(SysZumen.addSaved({base: rec.masu, hojo: rec.hojo, sp: rec.sp, zumen: rec.zumen, city: rec.city, town: rec.town}, st0.idx))
+           toast(no + " を保存し、図面とリストに足しました（印は点線。［位置を直す］で正しい位置へ）"); }catch(e){ console.warn(e); }
+  }
+  const wasInsert = insertMode || addItem;     // 足した樹木の次は、元のリストの欄に戻る（その欄の樹木はまだ未点検）
   if(insertMode){ insertMode = false; $("insertBanner").style.display = "none"; }
   const st = listState();
   const listMode = getMode() === "list" && st && st.items.length;
