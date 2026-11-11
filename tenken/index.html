@@ -163,6 +163,16 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 @media(min-width:700px){ .grid2{grid-template-columns:repeat(3,1fr)} main{padding:16px 24px} }
 /* ===== 小黒板カメラ ===== */
 #photoRow{display:flex;gap:8px;margin-top:10px}
+/* 撮った写真の見本（押すと画面いっぱいで見る）。右端は直前に保存した木の全体写真（同じ木を2回撮っていないか見比べる） */
+#thumbs{display:flex;gap:8px;margin-top:8px;overflow-x:auto;padding-bottom:2px}
+#thumbs:empty{display:none}
+#thumbs .th{position:relative;flex:0 0 auto;width:78px;height:104px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#E9E8E2;padding:0;font-family:inherit}
+#thumbs .th img{width:100%;height:100%;object-fit:cover;display:block}
+#thumbs .th span{position:absolute;left:0;right:0;bottom:0;font-size:11px;background:rgba(0,0,0,.6);color:#fff;padding:1px 3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#thumbs .th.prev{border:2px dashed #E8A33D;opacity:.9}
+#thumbs .th.prev span{background:rgba(160,100,10,.85)}
+#thumbs .sep{flex:0 0 auto;align-self:center;font-size:11px;color:var(--tx2);writing-mode:vertical-rl;letter-spacing:1px}
+.sumPh{border:none;background:none;font:inherit;color:inherit;text-decoration:underline;padding:0;cursor:pointer}
 .pbtn{flex:1;min-height:52px;font-size:15px;font-weight:600;border-radius:12px;border:1px solid var(--g);background:#fff;color:var(--g);font-family:inherit}
 .pbtn.done{background:var(--ok-bg);color:var(--ok-tx);border-color:var(--ok-tx)}
 #camModal{display:none;position:fixed;inset:0;background:#000;z-index:40;flex-direction:column}
@@ -412,6 +422,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
       <button type="button" class="pbtn" id="shot1">📷 全体</button>
       <button type="button" class="pbtn" id="shot2" style="display:none">📷 被害部</button>
     </div>
+    <div id="thumbs"></div>
     <div id="saveRow">
       <button id="savePrev" class="btn nav" type="button">← 前の樹木</button>
       <button id="saveHere" class="btn" type="button">この樹木</button>
@@ -573,6 +584,7 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 <div id="toast" class="toast"></div>
 
 <script src="../common/treemeasure.js"></script>
+<script src="../common/photoview.js"></script>
 <script src="comments.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -1999,9 +2011,16 @@ function renderSummary(){
       '<td style="color:var(--tx2)">' + esc(r.girthPrev || "—") + "</td>" +
       '<td><span class="rjudge" style="' + cls + '">' +
         (isNoTree(r.sp) ? esc(r.sp) : j === JUDGE_OBS ? "経過観察" : j.startsWith("概ね") ? "良好" : j.startsWith("維持") ? "維持管理" : "外観診断") + "</span></td>" +
-      '<td style="' + pCls + '">' + (needP === 0 ? (haveP ? haveP + "枚" : "—")
-        : (haveP >= needP ? "" : "⚠") + haveP + "/" + needP + "枚") + "</td>" +
+      '<td style="' + pCls + '">' + (haveP ? '<button type="button" class="sumPh">' : "") + (needP === 0 ? (haveP ? haveP + "枚" : "—")
+        : (haveP >= needP ? "" : "⚠") + haveP + "/" + needP + "枚") + (haveP ? "</button>" : "") + "</td>" +
       '<td class="memoCell' + (r.bassai ? " cut" : "") + '">' + (r.bassai ? "【要伐採】" : "") + esc(fullMemo(r)) + "</td>";
+    const phB = tr.querySelector(".sumPh");
+    if(phB) phB.onclick = ()=>{
+      if(!window.PhotoView) return;
+      const k = r.office + "|" + r.route, mine = photosFor(k, r.no).sort((a, b) => a.branch - b.branch);
+      const up = i > 0 ? photosFor(k, rr[i - 1].no).sort((a, b) => a.branch - b.branch) : [];
+      PhotoView.open(mine.map(m => pvItem(m)).concat(up.map(m => pvItem(m, "一覧で1つ上の木"))), 0);
+    };
     const td = document.createElement("td");
     const eb = document.createElement("button"); eb.className = "miniBtn"; eb.textContent = "編集";
     eb.onclick = () => startEdit(r.id);
@@ -2123,6 +2142,47 @@ function updatePhotoButtons(){
     : "📷 必要" + req + "枚・撮影済" + ps.length + "枚";
   $("photoHint").style.color = ps.length >= req ? "var(--ok-tx)" : "var(--ng-tx)";
   $("photoHint").style.fontWeight = "600";
+  renderThumbs(no, key, ps);
+}
+/* ---- 撮った写真の見本と、画面いっぱいの表示（common/photoview.js） ---- */
+const BR_TXT = {1: "全体", 2: "被害部"};
+let thumbKey = "", thumbUrls = [];
+function pvItem(m, tag){
+  return {title: String(m.no).replace(/^[^|]*\|/, ""), sub: BR_TXT[m.branch] || "", tag, load: () => getPhotoBlob(m.id)};
+}
+/* 直前に保存した木（この路線で、いまの木より前に保存した中でいちばん新しいもの）と、その全体写真 */
+function prevTreePhoto(no, key){
+  const cur = routeRecords().find(r => r.no === no);
+  const t0 = cur ? cur.created : Infinity;
+  const prev = routeRecords().filter(r => r.no !== no && (r.created || 0) < t0).sort((a, b) => (a.created || 0) - (b.created || 0)).pop();
+  if(!prev) return null;
+  const ps = photosFor(key, prev.no).sort((a, b) => a.branch - b.branch);
+  return ps.length ? {rec: prev, m: ps[0], all: ps} : null;
+}
+function renderThumbs(no, key, ps){
+  const box = $("thumbs"); if(!box) return;
+  ps = (ps || []).slice().sort((a, b) => a.branch - b.branch);
+  const pv = no && ps.length ? prevTreePhoto(no, key) : null;
+  const tk = no + "|" + ps.map(m => m.id).join(",") + "|" + (pv ? pv.m.id : "");
+  if(tk === thumbKey) return;
+  thumbKey = tk;
+  thumbUrls.forEach(u => URL.revokeObjectURL(u)); thumbUrls = [];
+  box.innerHTML = "";
+  if(!ps.length) return;
+  const list = ps.map(m => pvItem(m)).concat(pv ? pv.all.map(m => pvItem(m, "直前の木")) : []);
+  const add = (m, i, cls, label) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "th" + (cls ? " " + cls : "");
+    b.innerHTML = '<img alt=""><span>' + esc(label) + "</span>";
+    b.onclick = () => { if(window.PhotoView) PhotoView.open(list, i); };
+    box.appendChild(b);
+    getPhotoBlob(m.id).then(bl => { if(thumbKey !== tk || !bl) return; const u = URL.createObjectURL(bl); thumbUrls.push(u); b.querySelector("img").src = u; }).catch(() => {});
+  };
+  ps.forEach((m, i) => add(m, i, "", BR_TXT[m.branch] || "写真"));
+  if(pv){
+    const s = document.createElement("span"); s.className = "sep"; s.textContent = "見比べ"; box.appendChild(s);
+    add(pv.m, ps.length, "prev", "直前 " + String(pv.rec.no).replace(/^[^|]*\|/, ""));
+  }
 }
 
 const CAM_AR = 3/4, CAM_MAXH = 1280;

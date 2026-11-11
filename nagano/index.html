@@ -175,6 +175,9 @@ body.selOpen #sheet{display:block}
 .thumbs img{width:74px;height:98px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
 .thumbs span{position:absolute;left:2px;bottom:2px;font-size:10px;background:rgba(0,0,0,.6);color:#fff;padding:0 3px;border-radius:3px}
 .thumbs button{position:absolute;right:1px;top:1px;border:none;background:rgba(0,0,0,.55);color:#fff;border-radius:50%;width:22px;height:22px;font-size:12px;padding:0}
+.thumbs .prev img{border:2px dashed #E8A33D;opacity:.9}
+.thumbs .prev span{background:rgba(160,100,10,.85)}
+.thumbs .sep{align-self:center;font-size:11px;color:#888;writing-mode:vertical-rl;letter-spacing:1px}
 .tk{margin-top:10px;border:2px solid var(--pur);border-radius:12px;padding:8px 10px;background:var(--pur-bg)}
 .tk h4{margin:0 0 4px;font-size:14px;color:var(--pur)}
 .tkres{font-size:13px;font-weight:700;color:var(--pur)}
@@ -623,11 +626,12 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <div id="toast" class="toast"></div>
 
 <script src="../common/treemeasure.js"></script>
+<script src="../common/photoview.js"></script>
 <script src="comments.js"></script>
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 30;
+const APP_VER = 31;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -1137,7 +1141,7 @@ function tapAt(sx, sy){
     select(t.id, false, true);       // 位置だけ直すので、前の木の入力が足りなくても確かめない
     posMode = true; startNudge(); return;
   }
-  if(mode === "add"){ setMode(null); const p = toImage(sx, sy); openNoDlg({kind: "add", x: Math.round(p.x), y: Math.round(p.y)}); return; }
+  if(mode === "add"){ setMode(null); const p = toImage(sx, sy); if(addNearOk(p)) openNoDlg({kind: "add", x: Math.round(p.x), y: Math.round(p.y)}); return; }
   if(mode === "move"){ setPos(treeById(selId), toImage(sx, sy)); return; }
   const t = nearestTree(sx, sy, Math.max(26, markSize() * 1.1));
   if(t) select(t.id, false);
@@ -1147,7 +1151,38 @@ function longPress(sx, sy){
   const near = nearestTree(sx, sy, 14);
   if(near){ select(near.id, false); return; }
   const p = toImage(sx, sy);
-  openNoDlg({kind: "add", x: Math.round(p.x), y: Math.round(p.y)});
+  if(addNearOk(p)) openNoDlg({kind: "add", x: Math.round(p.x), y: Math.round(p.y)});
+}
+/* 新木を置こうとした所の 2m 以内に木があれば、その木と同じではないか確かめる（図面の木を新木としてもう1本入れないように） */
+function addNearOk(p){
+  const ppm = pkg.map.ppm;
+  let near = null, nd = 2 * ppm;
+  for(const t of allTrees()){ const q = posOf(t), d = Math.hypot(q.x - p.x, q.y - p.y); if(d < nd){ nd = d; near = t; } }
+  if(!near) return true;
+  const st = stateOf(near), stTxt = st ? "調査済" : "未調査";
+  if(confirm("すぐ近く（約 " + (nd / ppm).toFixed(1) + "m）に " + treeLabel(near) + "（" + stTxt + "）があります。\nその木と同じ木ではありませんか？\n\n［OK］別の木として新木を追加する\n［キャンセル］やめて " + treeLabel(near) + " を開く")) return true;
+  select(near.id, true);
+  return false;
+}
+/* 新木・番号を変えた木から離れるとき：4m 以内で1時間以内に入力した木に、樹種が同じで幹周が近い（±3cm か 5%）木があれば確かめる */
+const twinAsked = {};
+function twinOk(id){
+  const t = treeById(id), r = R.trees[id];
+  if(!t || !r || r.st !== "done" || !(t.added || renOf(t))) return true;
+  const g = girthOf(r.c).c; if(g == null) return true;
+  const sig = r.c + "|" + (r.sp || ""); if(twinAsked[id] === sig) return true;
+  const ppm = pkg.map.ppm, p = posOf(t), now = Date.now();
+  const twin = allTrees().find(x => {
+    if(x.id === id) return false;
+    const q = R.trees[x.id]; if(!q || q.st !== "done" || !q.t || now - q.t > 3600 * 1000) return false;
+    const xp = posOf(x); if(Math.hypot(xp.x - p.x, xp.y - p.y) > 4 * ppm) return false;
+    const xg = girthOf(q.c).c; if(xg == null || Math.abs(xg - g) > Math.max(3, xg * 0.05)) return false;
+    return !r.sp || !q.sp || r.sp === q.sp;
+  });
+  twinAsked[id] = sig;
+  if(!twin) return true;
+  const tw = R.trees[twin.id], tm = new Date(tw.t);
+  return confirm("⚠ " + treeLabel(t) + " のすぐ近くの " + treeLabel(twin) + "（幹周 " + tw.c + "cm、" + tm.getHours() + ":" + String(tm.getMinutes()).padStart(2, "0") + " に入力）と、樹種と幹周が同じくらいです。\n同じ木を2回入れていませんか？\n\n［OK］別の木なのでこのまま進む\n［キャンセル］戻って確かめる");
 }
 function setMode(m, msg){
   if(mode === "move" && m !== "move") endNudge(false);
@@ -1549,7 +1584,7 @@ function leaveOk(){
 }
 function missCount(){ let n = 0; for(const t of allTrees()) if(missingOf(t).length) n++; return n; }
 function select(id, center, noGuard){
-  if(!noGuard && selId && selId !== id && !leaveOk()){ renderMiss(); return; }
+  if(!noGuard && selId && selId !== id && (!leaveOk() || !twinOk(selId))){ renderMiss(); return; }
   const t = treeById(id); if(!t) return;
   if(nudge && nudge.id !== id){ mode = null; endNudge(true); }
   setMode(null);
@@ -2289,24 +2324,66 @@ function renderPhotos(){
   }
   $("phHint").innerHTML = need.length ? '<span style="color:var(--ng);font-weight:700">未撮影：' + need.join("・") + "</span>" : (ps.length ? ps.length + "枚" : "");
   // 見本の画像は写真が変わったときだけ作り直す（入力のたびに作り直すとメモリがたまって落ちる）
-  const tk = selId + "|" + ps.map(m => m.key + (m.gone ? "g" : "")).join(",");
+  const pv = ps.length ? prevTreePhotos(selId) : null;
+  const tk = selId + "|" + ps.map(m => m.key + (m.gone ? "g" : "")).join(",") + "|" + (pv ? pv.ps[0].key : "");
   if(tk === thumbKey) return;
   thumbKey = tk;
   thumbUrls.forEach(u => URL.revokeObjectURL(u)); thumbUrls = [];
   const box = $("thumbs"); box.innerHTML = "";
-  ps.forEach(async m => {
+  // 押すと画面いっぱいで見る（左右にスワイプで次の写真・2本指で拡大）。右端は直前に入力した木の写真（同じ木を2回撮っていないか見比べる）
+  const list = ps.map(m => pvItem(m, "", true)).concat(pv ? pv.ps.map(m => pvItem(m, "直前の木")) : []);
+  const add = async (m, i, prev) => {
     const d = document.createElement("div");
-    d.innerHTML = '<img alt=""><span>' + esc(m.name.replace(/\.jpg$/, "")) + (m.gone ? "（送信済）" : "") + '</span><button>✕</button>';
+    if(prev) d.className = "prev";
+    d.innerHTML = '<img alt=""><span>' + esc(prev ? "直前 " + m.no : m.name.replace(/\.jpg$/, "")) + (m.gone ? "（送信済）" : "") + "</span>" + (prev ? "" : "<button>✕</button>");
     box.appendChild(d);
+    d.querySelector("img").onclick = ()=>{ if(window.PhotoView) PhotoView.open(list, i); };
+    if(!prev) d.querySelector("button").onclick = async ()=>{ if(!confirm(m.name + " を削除しますか？")) return; await delPhoto(m); renderPhotos(); };
     const b = m.gone ? null : await idbGet("photos", m.key);
     if(b && thumbKey === tk){ const u = URL.createObjectURL(b); thumbUrls.push(u); d.querySelector("img").src = u; }
-    d.querySelector("img").onclick = ()=>{ if(!b) return; const u = URL.createObjectURL(b); window.open(u); setTimeout(()=> URL.revokeObjectURL(u), 60000); };
-    d.querySelector("button").onclick = async ()=>{ if(!confirm(m.name + " を削除しますか？")) return; noteDel([m]); await idbDel("photos", m.key); photoMeta = photoMeta.filter(x => x.key !== m.key); savePhotoMeta(); renderPhotos(); };
-  });
+  };
+  ps.forEach((m, i) => add(m, i, false));
+  if(pv){ const s = document.createElement("span"); s.className = "sep"; s.textContent = "見比べ"; box.appendChild(s); add(pv.ps[0], ps.length, true); }
+}
+async function delPhoto(m){
+  noteDel([m]);
+  if(!m.gone){ try{ await idbDel("photos", m.key); }catch(_){} }
+  photoMeta = photoMeta.filter(x => x.key !== m.key); savePhotoMeta(); thumbKey = "";
+}
+/* 画面いっぱいで見る写真の1枚分。del＝［この写真を削除］を出す */
+function pvItem(m, tag, del){
+  const kindTxt = m.kind === "2" ? "被害部" : (KIND_TXT[m.kind] || "");
+  return {title: m.no || m.name.replace(/\.jpg$/, ""), sub: kindTxt + (m.cmt ? "　" + m.cmt : ""), tag,
+          load: () => m.gone ? Promise.resolve(null) : idbGet("photos", m.key),
+          onDelete: del ? async ()=>{ if(!confirm(m.name + " を削除しますか？")) return false; await delPhoto(m); renderPhotos(); return true; } : null};
+}
+/* 直前に入力した木（いまの木より前に入力した中でいちばん新しい木）と、その写真（プレート・全景を先に） */
+function prevTreePhotos(id){
+  const cur = R.trees[id], t0 = cur && cur.t ? cur.t : Infinity;
+  let best = null, bt = 0;
+  for(const [k, r] of Object.entries(R.trees)){
+    if(k === id || !r.t || r.t >= t0 || r.t <= bt) continue;
+    const t = treeById(k); if(!t || !noOf(t)) continue;
+    if(!photosOf(noOf(t)).length) continue;
+    best = t; bt = r.t;
+  }
+  if(!best) return null;
+  const order = {"1": 0, P: 1, "2": 2};
+  return {t: best, ps: photosOf(noOf(best)).slice().sort((a, b) => (order[a.kind] ?? 3) - (order[b.kind] ?? 3))};
 }
 let thumbKey = "", thumbUrls = [];
 const KIND_TXT = {P: "樹木プレート", "1": "全景・主要部", "2": "被害部", S: "調査状況"};
 let cam = {stream: null, kind: "1", no: "", sp: "", cmts: [], z: 1, track: null, hw: null};
+/* GPS が取れていて（誤差 15m 以内）、選んでいる木から 25m（または誤差の2倍）以上離れていたら確かめる。1本につき1回だけ */
+let camFarAsked = "";
+function camFarOk(t){
+  if(!gps || !(gps.acc <= 15) || !t || distOf(t) !== S.dist || camFarAsked === t.id) return true;
+  const g = gpsPx(); if(!g) return true;
+  const p = posOf(t), d = Math.hypot(g.x - p.x, g.y - p.y) / pkg.map.ppm;
+  if(d < Math.max(25, gps.acc * 2)) return true;
+  camFarAsked = t.id;
+  return confirm("⚠ 現在地が、選んでいる " + treeLabel(t) + " から約 " + Math.round(d) + "m 離れています（GPS の誤差 ±" + Math.round(gps.acc) + "m）。\n別の木を選んだままになっていませんか？\n\n［OK］" + treeLabel(t) + " の写真を撮る\n［キャンセル］やめて木を選び直す");
+}
 function photoName(no, kind){
   if(kind === "P") return no + "_P.jpg";
   if(kind === "1") return no + "_1.jpg";
@@ -2322,6 +2399,7 @@ async function openCam(kind){
   const t = treeById(selId);
   const no = kind === "S" ? "" : noOf(t);
   if(kind !== "S" && !no){ toast("先に番号を付けてください"); return; }
+  if(kind !== "S" && !camFarOk(t)) return;
   const r = recOf(selId);
   cam.kind = kind; cam.no = no; cam.sp = kind === "S" ? "" : (r.sp || (t.past && t.past.sp) || "");
   cam.cmts = kind === "1" ? ["全景"] : kind === "S" ? [S.phase === "t" ? "樹木点検状況" : "毎木調査状況"] : [];
@@ -2558,8 +2636,8 @@ async function openJk(){
         photoMeta = photoMeta.filter(x => x.key !== m.key); savePhotoMeta(); updJk(); openJk();
       };
       const b = m.gone ? null : await idbGet("photos", m.key);
-      if(b){ const u = URL.createObjectURL(b); jkUrls.push(u); d.querySelector("img").src = u;
-             d.querySelector("img").onclick = ()=> window.open(u); }
+      if(b){ const u = URL.createObjectURL(b); jkUrls.push(u); d.querySelector("img").src = u; }
+      d.querySelector("img").onclick = ()=>{ if(window.PhotoView) PhotoView.open(ps.map(x => pvItem(x)), +d.dataset.i); };
     });
   }
   $("jkM").classList.add("show");

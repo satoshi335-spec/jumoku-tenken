@@ -1,6 +1,6 @@
-const VERSION = "nagano-v30";
+const VERSION = "nagano-v31";
 // 画面(HTML/JS)は新しい版を優先（古い版が残る事故を防ぐ）。ネットが無いときはキャッシュ
-const CORE = ["./", "./index.html", "./manifest.webmanifest", "./comments.js", "../common/backup.js", "../common/treemeasure.js", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
+const CORE = ["./", "./index.html", "./manifest.webmanifest", "./comments.js", "../common/backup.js", "../common/treemeasure.js", "../common/photoview.js", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(VERSION).then(c => Promise.all(CORE.map(u => c.add(u).catch(() => null)))).then(() => self.skipWaiting()));   // 1つ取れなくても入れる
 });
