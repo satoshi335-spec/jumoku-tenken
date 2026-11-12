@@ -138,6 +138,27 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 /* 要確認（幹周り未入力・写真不足・写真だけで点検が未保存） */
 #issueBar{display:none;background:var(--ng-bg);color:var(--ng-tx);border:1px solid var(--ng-bd);border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:13px;font-weight:600}
 #issueBar.show{display:block}
+/* 現場で確かめる木（再確認リスト） */
+#rcCard{display:none;background:#EEF4FB;border:1px solid #9CBEE3;border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:13px}
+#rcCard.show{display:block}
+#rcCard .rcHd{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-weight:700;color:#185FA5}
+#rcCard .rcHd span{flex:1;min-width:150px}
+#rcCard button{font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid #9CBEE3;background:#fff;color:#185FA5;font-family:inherit;font-weight:600}
+#rcCard .rcIt{background:#fff;border:1px solid #D3E2F2;border-radius:9px;padding:7px 9px;margin-top:7px}
+#rcCard .rcIt.done{opacity:.55}
+#rcCard .rcIt.cur{border:2px solid #185FA5}
+#rcCard .rcNo{font-size:15px;font-weight:700;color:var(--tx)}
+#rcCard .rcRt{font-size:11px;color:var(--tx2);margin-left:6px}
+#rcCard .rcWhy{margin:3px 0;color:var(--tx)}
+#rcCard .rcTodo{color:#8A4B00;font-weight:600}
+#rcCard .rcNote{color:var(--ok-tx);font-weight:600}
+#rcCard .rcBtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+#rcCard .rcBtns .del{color:var(--ng-tx);border-color:var(--ng-bd)}
+#rcNow{display:none;background:#185FA5;color:#fff;border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:13px}
+#rcNow.show{display:block}
+#rcNow b{font-size:15px}
+#rcNow button{font-size:13px;padding:6px 10px;margin:6px 6px 0 0;border-radius:8px;border:none;background:#fff;color:#185FA5;font-family:inherit;font-weight:700}
+#rcNow button.del{color:var(--ng-tx)}
 #issueBar button,#issueList button{font-size:13px;padding:6px 10px;margin:4px 6px 0 0;border-radius:8px;border:1px solid var(--ng-bd);background:#fff;color:var(--ng-tx);font-family:inherit;font-weight:600}
 #issueList button small{font-weight:400;color:var(--tx2)}
 /* 要確認の樹木ごとの［未点検に戻す］ */
@@ -288,6 +309,18 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
     <div class="card"><div id="sysBackup" data-app="樹木点検"></div></div>
   </details>
 
+  <details id="rcPanel">
+    <summary>現場で確かめる木（再確認リスト）</summary>
+    <div class="card">
+      <p class="note" style="margin-top:0">点検したあとで見つかった「同じ木を2回入れた」「番号の取り違え」などの木を並べ、現場で写真の撮り直し・番号や幹周の直し・不要な記録の削除をします。
+        直し終えたら、その路線の［写真ZIP］を書き出し直して事務所PCで取り込みます。</p>
+      <button type="button" class="miniBtn" id="rcFind">疑わしい記録を探す（この iPad の記録から）</button>
+      <button type="button" class="miniBtn" id="rcImpBtn">事務所PCで作ったリストを読み込む</button>
+      <input type="file" id="rcImpFile" accept=".json,application/json" style="display:none">
+      <button type="button" class="miniBtn" id="rcAddCur">いま開いている木を入れる</button>
+      <button type="button" class="miniBtn" id="rcClear" style="color:var(--ng-tx)">済んだ木をリストから外す</button>
+    </div>
+  </details>
   <details id="cfgPanel">
     <summary>入力の設定（リスト取込・点検日時・市名/町名）</summary>
     <div class="card">
@@ -329,6 +362,8 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
   </details>
 
   <div class="card">
+    <div id="rcCard"></div>
+    <div id="rcNow"></div>
     <div id="issueBar"></div>
     <div id="editBanner"></div>
     <div id="insertBanner">リスト外の樹木を入力中。保存するとリストに戻ります</div>
@@ -1628,6 +1663,184 @@ function csvMemo(r){
 }
 function fullMemo(r){ return (r.kabuNote ? r.kabuNote + (r.memo ? "。" : "") : "") + (r.memo || ""); }
 
+/* ================= 現場で確かめる木（再確認リスト） =================
+   gj_recheck：[{id, key: "事務所|路線", no, pair: 見比べる相手の番号, why: 疑わしい理由, todo: 現場ですること, done, note, at}]
+   2026-10-19 の R423 江の木町（左15・左15-1／左2・右285-1）を現場で確かめ直すために作った */
+let RC = load("gj_recheck", []);
+let rcHideDone = false, rcExpanded = true;      // 木を開くとリストは畳む（入力欄が下に押し出されないように）
+function rcSave(){ store("gj_recheck", RC); renderRecheck(); }
+function rcRoute(k){ return String(k).split("|")[1] || ""; }
+function rcAdd(o){
+  if(!o || !o.key || !o.no) return false;
+  const x = RC.find(e => e.key === o.key && e.no === o.no);
+  if(x){ if(!x.done){ x.why = o.why || x.why; x.todo = o.todo || x.todo; x.pair = o.pair || x.pair; } return false; }
+  RC.push({id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), key: o.key, no: o.no, pair: o.pair || "",
+           why: o.why || "", todo: o.todo || "", done: false, note: "", at: Date.now()});
+  return true;
+}
+function rcRec(e){ return records.find(r => (r.office + "|" + r.route) === e.key && r.no === e.no); }
+function rcPhotos(key, no){ return pdb ? photosFor(key, no).sort((a, b) => a.branch - b.branch) : []; }
+function renderRecheck(){
+  const card = $("rcCard"); if(!card) return;
+  const list = RC.filter(e => !(rcHideDone && e.done));
+  const nd = RC.filter(e => e.done).length;
+  card.classList.toggle("show", RC.length > 0);
+  const curK = routeKey(), curNo = fullNo();
+  card.innerHTML = RC.length ? '<div class="rcHd"><span>🔍 現場で確かめる木　済 ' + nd + " / " + RC.length + "本</span>" +
+      (rcExpanded ? '<button type="button" data-a="hide">' + (rcHideDone ? "済も出す" : "済を隠す") + "</button>" : "") +
+      '<button type="button" data-a="exp">' + (rcExpanded ? "たたむ" : "一覧を開く") + "</button></div>" +
+    (!rcExpanded ? "" : list.map(e => {
+      const r = rcRec(e), nPh = rcPhotos(e.key, e.no).length;
+      return '<div class="rcIt' + (e.done ? " done" : "") + (e.key === curK && e.no === curNo ? " cur" : "") + '" data-id="' + e.id + '">' +
+        '<span class="rcNo">' + (e.done ? "✔ " : "") + esc(e.no) + "</span>" + (e.pair ? '<span class="rcRt">⇔ ' + esc(e.pair) + "</span>" : "") +
+        '<span class="rcRt">' + esc(rcRoute(e.key)) + "　" + (r ? "記録あり・写真" + nPh + "枚" : "この iPad に記録なし") + "</span>" +
+        (e.why ? '<div class="rcWhy">' + esc(e.why) + "</div>" : "") +
+        (e.todo ? '<div class="rcTodo">→ ' + esc(e.todo) + "</div>" : "") +
+        (e.note ? '<div class="rcNote">結果：' + esc(e.note) + "</div>" : "") +
+        '<div class="rcBtns"><button type="button" data-a="open">開く</button>' +
+        (nPh || (e.pair && rcPhotos(e.key, e.pair).length) ? '<button type="button" data-a="ph">📷 写真' + (e.pair ? "を見比べる" : "") + "</button>" : "") +
+        '<button type="button" data-a="done">' + (e.done ? "未済に戻す" : "済にする") + "</button>" +
+        '<button type="button" data-a="rm" class="del">✕</button></div></div>';
+    }).join("")) : "";
+  card.querySelectorAll("button[data-a]").forEach(b => b.onclick = ()=>{
+    const a = b.dataset.a, it = b.closest(".rcIt"), e = it && RC.find(x => x.id === it.dataset.id);
+    if(a === "hide"){ rcHideDone = !rcHideDone; renderRecheck(); return; }
+    if(a === "exp"){ rcExpanded = !rcExpanded; renderRecheck(); return; }
+    if(!e) return;
+    if(a === "open") rcOpen(e);
+    else if(a === "ph") rcView(e);
+    else if(a === "done") rcDone(e);
+    else if(a === "rm"){ if(confirm(e.no + " をリストから外しますか？（記録・写真はそのまま）")){ RC = RC.filter(x => x !== e); rcSave(); } }
+  });
+  renderRcNow();
+}
+/* いま開いている木がリストにあれば、上に「再確認中」を出す */
+function renderRcNow(){
+  const box = $("rcNow"); if(!box) return;
+  const e = RC.find(x => !x.done && x.key === routeKey() && x.no === fullNo());
+  box.classList.toggle("show", !!e);
+  if(!e){ box.innerHTML = ""; return; }
+  const r = rcRec(e);
+  box.innerHTML = "🔍 再確認中　<b>" + esc(e.no) + "</b>" + (e.pair ? "（⇔ " + esc(e.pair) + "）" : "") + "<br>" + esc(e.todo || e.why || "") +
+    '<br><button type="button" data-a="ph">📷 写真を見比べる</button><button type="button" data-a="done">確かめた（済にする）</button>' +
+    (r ? '<button type="button" data-a="del" class="del">この記録と写真を消す</button>' : "");
+  box.querySelector('[data-a="ph"]').onclick = () => rcView(e);
+  box.querySelector('[data-a="done"]').onclick = () => rcDone(e);
+  const d = box.querySelector('[data-a="del"]'); if(d) d.onclick = () => rcDelete(e);
+}
+function rcView(e){
+  if(!window.PhotoView) return;
+  const mine = rcPhotos(e.key, e.no).map(m => pvItem(m)), other = e.pair ? rcPhotos(e.key, e.pair).map(m => pvItem(m, "見比べ " + e.pair)) : [];
+  if(!mine.length && !other.length){ toast("写真がありません"); return; }
+  PhotoView.open(mine.concat(other), 0);
+}
+function rcDone(e){
+  if(e.done){ e.done = false; rcSave(); return; }
+  const n = prompt(e.no + " を確かめた結果（任意。例：同じ木だったので左15-1 を消した／前回幹周を72 に直した）", e.note || "");
+  if(n === null) return;
+  e.done = true; e.note = n.trim(); e.doneAt = Date.now(); rcSave();
+  toast(e.no + " を済にしました。直し終えたら［写真ZIP］を書き出し直してください");
+}
+async function rcDelete(e){
+  const r = rcRec(e); if(!r) return;
+  const n = rcPhotos(e.key, e.no).length;
+  if(!confirm2(e.no + " の記録" + (n ? "と写真 " + n + "枚" : "") + "を消しますか？", "「" + rcRoute(e.key) + "」の " + e.no + " が点検結果から消えます。\n（同じ木の別の記録が残っているか確かめてから消してください。取り消せません）")) return;
+  if(editingId === r.id) endEdit(true);
+  await revertCore(e.key, e.no);
+  e.done = true; e.note = (e.note ? e.note + "。" : "") + "記録と写真を消した"; e.doneAt = Date.now();
+  rcSave(); clearTreeFields(); renderCnt(); renderSummary(); renderProgress(); updatePhotoButtons();
+  if(getMode() === "list") fillFromList();
+  toast(e.no + " の記録を消しました。［写真ZIP］を書き出し直すと事務所PCにも反映されます");
+}
+/* その木を開く：路線が違えば切り替え、記録があれば編集で、無ければリストの欄（無ければ番号だけ）を出す */
+function rcOpen(e){
+  if(!guardLeave()) return;
+  const [office, route] = e.key.split("|");
+  if($("office").value.trim() !== office || $("route").value.trim() !== route){
+    $("office").value = office; $("route").value = route; routeChanged();
+  }
+  setView("input");
+  const r = rcRec(e);
+  if(!routeRecords().length) alert("この iPad には「" + route + "」の点検記録がありません。\n写真を撮り直すだけにして、この路線の CSV・写真ZIP は書き出さないでください（事務所PCの点検結果が足りない CSV で置き換わります）。\n撮った写真は［写真ZIP］ではなく、写真アプリなどで事務所へ送ってください。");
+  if(r) startEdit(r.id, true);
+  else {
+    const st = listState(), i = st ? st.items.findIndex(it => it.no === e.no) : -1;
+    if(i >= 0 && getMode() === "list") showListItem(i, true);
+    else { if(editingId) endEdit(true); clearTreeFields(); const sh = splitHojo(e.no); $("tno").value = sh.base; $("hojo").value = sh.hojo; markClean(); }
+  }
+  rcExpanded = false;
+  updatePhotoButtons(); renderRecheck();
+  try{ if(window.SysZumen) SysZumen.sync(); }catch(_){}
+  $("tnoNote").textContent = "再確認リストから開きました" + (r ? "（保存済み。直して上書きできます）" : ""); $("tnoNote").className = "note manual";
+  setTimeout(()=> window.scrollTo({top: Math.max(0, $("rcCard").getBoundingClientRect().top + window.scrollY - 70), behavior: "smooth"}), 50);   // 上の案件バーに隠れないように
+}
+/* この iPad の記録から疑わしいものを探す（事務所PCの照合と同じ考え方。写真の照合はしない） */
+function rcFind(){
+  let n = 0;
+  const keys = [...new Set(records.map(r => r.office + "|" + r.route))];
+  for(const key of keys){
+    const recs = records.filter(r => (r.office + "|" + r.route) === key), st = imports[key];
+    const items = st && st.items ? st.items : [];
+    const zs = new Set(items.map(i => nzNo(i.zumen))), towns = new Set(items.map(i => i.town).filter(Boolean));
+    const inList = new Set(items.map(i => i.no));
+    for(const r of recs){
+      // 別の路線の木（図面番号・町名がこの路線のリストに無い）
+      if(items.length && ((r.zumen && !zs.has(nzNo(r.zumen))) || (r.town && towns.size && !towns.has(r.town)))){
+        if(rcAdd({key, no: r.no, why: "図面" + (r.zumen || "?") + "・" + (r.town || "") + " はこの路線のリストに無い（別の路線の木を開いたまま撮った疑い）",
+                  todo: "写真が本当にこの木か確かめる。別の木の写真なら記録と写真を消す"})) n++;
+      }
+      // リストに無い番号なのに前回幹周が入っている（リストの別の欄で番号を書き換えて保存した疑い）
+      if(items.length && !inList.has(r.no) && !r.listNo && r.girthPrev){
+        const src = items.filter(i => i.girth === r.girthPrev).map(i => i.no).slice(0, 3).join("・");
+        if(rcAdd({key, no: r.no, why: "リストに無い番号なのに前回幹周 " + r.girthPrev + " が入っている（リストの " + (src || "別の木") + " の値）",
+                  todo: "番号と前回幹周（台帳の値）を確かめて直す"})) n++;
+      }
+    }
+    // 同じ桝・1時間以内・幹周が近い（同じ木を2回入れた疑い）
+    for(let i = 0; i < recs.length; i++) for(let j = i + 1; j < recs.length; j++){
+      const a = recs[i], b = recs[j];
+      const ba = a.masu || splitHojo(a.no).base, bb = b.masu || splitHojo(b.no).base;
+      const ga = parseFloat(a.girth), gb = parseFloat(b.girth);
+      if(ba !== bb || !isFinite(ga) || !isFinite(gb) || Math.abs(ga - gb) > Math.max(3, ga * 0.05)) continue;
+      if(Math.abs((a.created || 0) - (b.created || 0)) > 3600 * 1000) continue;
+      if(inList.has(a.no) && inList.has(b.no)) continue;          // どちらもリストの木（1つの桝に数本）は除く
+      const why = "同じ桝の " + a.no + "（" + a.girth + "cm）と " + b.no + "（" + b.girth + "cm）を続けて保存（同じ木を2回入れた疑い）";
+      const todo = "桝の本数を確かめ、1本なら片方の記録と写真を消す。写真を見比べる";
+      if(rcAdd({key, no: a.no, pair: b.no, why, todo})) n++;
+      if(rcAdd({key, no: b.no, pair: a.no, why, todo})) n++;
+    }
+  }
+  rcSave();
+  $("rcPanel").open = false;
+  alert(n ? "疑わしい木を " + n + " 本リストに入れました（上の「🔍 現場で確かめる木」）" : "この iPad の記録からは見つかりませんでした" + (RC.length ? "（リストには " + RC.length + " 本あります）" : ""));
+}
+function nzNo(z){ z = String(z == null ? "" : z).trim(); return /^\d+$/.test(z) ? String(parseInt(z, 10)) : z; }
+$("rcFind").onclick = rcFind;
+$("rcImpBtn").onclick = ()=> $("rcImpFile").click();
+$("rcImpFile").addEventListener("change", async ev => {
+  const f = ev.target.files[0]; ev.target.value = ""; if(!f) return;
+  try{
+    const j = JSON.parse(await f.text());
+    if(j.type !== "gairoju-recheck") throw new Error("再確認リストのファイルではありません");
+    let n = 0;
+    (j.items || []).forEach(o => { if(rcAdd({key: o.office + "|" + o.route, no: o.no, pair: o.pair, why: o.why, todo: o.todo})) n++; });
+    rcSave(); $("rcPanel").open = false;
+    alert((j.name ? j.name + "\n" : "") + n + " 本をリストに入れました（上の「🔍 現場で確かめる木」）");
+  }catch(err){ alert("読み込めませんでした\n" + err.message); }
+});
+$("rcAddCur").onclick = ()=>{
+  const no = fullNo(); if(!no || !$("route").value.trim()){ toast("先に樹木を開いてください"); return; }
+  const why = prompt(no + " を再確認リストに入れます。理由・現場ですること（任意）", "");
+  if(why === null) return;
+  rcAdd({key: routeKey(), no, why: why.trim(), todo: ""}) ? toast(no + " をリストに入れました") : toast(no + " はもうリストにあります");
+  rcSave(); $("rcPanel").open = false;
+};
+$("rcClear").onclick = ()=>{
+  const n = RC.filter(e => e.done).length; if(!n){ toast("済んだ木はありません"); return; }
+  if(!confirm("済んだ " + n + " 本をリストから外しますか？")) return;
+  RC = RC.filter(e => !e.done); rcSave();
+};
+
 /* ================= 保存し忘れの防止と「要確認」 ================= */
 /* 画面に出している樹木の入力（保存した時・開いた時の状態と比べて、変わっていれば未保存） */
 let formBase = "", guardOn = false;
@@ -1810,7 +2023,7 @@ function saveAndMove(move){
   const items = new Array(ITEMS.length).fill("");
   document.querySelectorAll(".itm").forEach(b => { if(b.classList.contains("on")) items[+b.dataset.i] = "○"; });
   // 撮り忘れチェック: 必要枚数（異常あり2枚/なし1枚）に足りなければ警告
-  const needP = photosOf(items, $("sp").value), haveP = pdb ? photosFor(routeKey(), no).length : 0;
+  const needP = photosOf(items, $("sp").value), haveP = pdb ? photosFor(routeKey(), editRec && editRec.no !== no ? editRec.no : no).length : 0;   // 番号を直すときは直す前の番号の写真（保存で付け替える）
   if(pdb && haveP < needP && !confirm("⚠ 写真が " + haveP + "/" + needP + " 枚です。\n撮影せずに保存しますか？\n（キャンセル→📷ボタンで撮影できます）")) return;
   const kabuOn = $("kabuChk").checked;
   const stems = kabuOn ? stemVals() : [];
@@ -1833,7 +2046,9 @@ function saveAndMove(move){
   const wasEdit = !!editingId;
   if(wasEdit){
     const i = records.findIndex(r => r.id === editingId);
+    const oldNo = i > -1 ? records[i].no : "";
     if(i > -1) records[i] = rec;
+    if(oldNo && oldNo !== rec.no) renameRecPhotos(routeKey(), oldNo, rec.no);
     endEdit(true);           // 位置を動かさずに編集状態だけ解除する
     toast(no + " を更新しました");
   } else {
@@ -2106,6 +2321,23 @@ async function addPhotoBlob(key, no, branch, blob){
   photoMetas.push(meta);
   return meta;
 }
+/* 記録の番号を変えたとき、その写真の番号と名前も変える（同じ枠の写真が新しい番号にもあれば、古い方を消して置き換える） */
+async function renameRecPhotos(key, from, to){
+  if(!pdb) return;
+  const ms = photosFor(key, from);
+  for(const m of ms){
+    for(const o of photoMetas.filter(x => x.key === key && x.no === to && x.branch === m.branch)){
+      await preq(ptx("blobs","readwrite").delete(o.id)); await preq(ptx("meta","readwrite").delete(o.id));
+      photoMetas = photoMetas.filter(x => x !== o);
+    }
+    m.no = to; m.filename = to + "_" + m.branch + ".jpeg";
+    await preq(ptx("meta","readwrite").put(m));
+  }
+  RC.forEach(e => { if(e.key === key && e.no === from) e.no = to; if(e.key === key && e.pair === from) e.pair = to; });
+  store("gj_recheck", RC);
+  thumbKey = ""; updatePhotoButtons();
+  if(ms.length) toast("写真 " + ms.length + " 枚も " + to + " の名前にしました");
+}
 async function deletePhotosOf(key, no){
   for(const m of photosFor(key, no)){
     await preq(ptx("blobs","readwrite").delete(m.id));
@@ -2143,6 +2375,7 @@ function updatePhotoButtons(){
   $("photoHint").style.color = ps.length >= req ? "var(--ok-tx)" : "var(--ng-tx)";
   $("photoHint").style.fontWeight = "600";
   renderThumbs(no, key, ps);
+  try{ renderRecheck(); }catch(_){}
 }
 /* ---- 撮った写真の見本と、画面いっぱいの表示（common/photoview.js） ---- */
 const BR_TXT = {1: "全体", 2: "被害部"};
