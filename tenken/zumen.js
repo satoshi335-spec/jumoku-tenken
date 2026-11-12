@@ -721,15 +721,16 @@ function revealInput(){
 }
 
 /* 入力中の樹木が見えるように（別の図面なら切り替える） */
-async function sync(){
+async function sync(force){
   if(!R) return;
+  if(!vsize().w) return;           // 一覧・集計を見ている間（図面が隠れている）は合わせられない。入力に戻ったときに setView から呼ぶ
   const it = curItem(); if(!it) { schedule(); return; }
   const b = it.base != null ? it.base : splitHojo(it.no).base;
   const p = allPos().find(x => x.k === keyOf(it.zumen, b, it.hojo || ""));
   if(!p){ schedule(); return; }
   if(nz(p.z) !== nz(dz)) await showDrawing(p.z, false);
   const q = toScreen(p.x, p.y), vs = vsize(), m = 50;
-  if(q.x < m || q.y < m || q.x > vs.w - m || q.y > vs.h - m) centerOnPos(p, null);
+  if(force || q.x < m || q.y < m || q.x > vs.w - m || q.y > vs.h - m) centerOnPos(p, force ? 0.35 : null);   // 一覧などから開いたときは、樹木の番号が読める大きさまで拡大
   else schedule();
 }
 
@@ -1223,7 +1224,18 @@ async function importPack(f){
 
 /* ================= 既存の処理につなぐ ================= */
 const _show = window.showListItem;
-window.showListItem = function(i){ _show(i); if(fixing) setFixing(false); sync(); };
+window.showListItem = function(i, noGuard){ _show(i, noGuard); if(fixing) setFixing(false); sync(); };
+const _edit = window.startEdit;
+window.startEdit = function(id, quiet){
+  _edit(id, quiet);
+  const r = (typeof records !== "undefined") ? records.find(x => x.id === id) : null, st = listState();
+  if(r && st && (r.office + "|" + r.route) === routeKey()){
+    const i = st.items.findIndex(it => it.no === r.no || (r.listNo && it.no === r.listNo));
+    if(i >= 0 && st.idx !== i){ st.idx = i; store("gj_imports", imports); }
+  }
+  if(fixing) setFixing(false);
+  sync(!quiet);
+};
 const _save = window.saveAndMove;
 window.saveAndMove = function(m){ _save(m); schedule(); };
 const _route = window.routeChanged;

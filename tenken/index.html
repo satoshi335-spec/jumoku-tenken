@@ -963,6 +963,7 @@ function setView(v){
   $("view-sum").style.display = v === "sum" ? "block" : "none";
   $("tab-input").classList.toggle("on", v === "input");
   $("tab-sum").classList.toggle("on", v === "sum");
+  if(v === "input" && window.SysZumen) setTimeout(()=>{ try{ SysZumen.sync(true); }catch(_){} }, 60);
   if(v === "sum") renderSummary();
 }
 
@@ -996,7 +997,7 @@ function jumpTo(i){
   st.idx = i; store("gj_imports", imports);
   if(editingId) endEdit();
   insertMode = false; $("insertBanner").style.display = "none";
-  updateModeUI(); fillFromList(); setView("input");
+  updateModeUI(); setView("input"); showListItem(i, true);
   window.scrollTo({top:0, behavior:"smooth"});
 }
 function renderListTable(){
