@@ -74,6 +74,10 @@ body.zOn #zCard{display:block}
 #zChoose button:active{background:#E6F1FB}
 #zShowBtn{display:none;margin:0 0 10px}
 .zmk.moved::after{content:"";position:absolute;right:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:#185FA5;border:1px solid #fff}
+/* 要確認（index.html の #issueBar）：図面を出しているときは図面の上部に重ねる。位置を直す・樹木を追加している間は隠す */
+#zView #issueBar{position:absolute;left:6px;right:6px;top:6px;z-index:6;margin:0;max-height:40%;overflow:auto;box-shadow:0 2px 8px rgba(0,0,0,.18);font-size:12px;padding:6px 9px}
+#zView #issueBar button{font-size:12px;padding:5px 8px;margin:3px 5px 0 0}
+body.zFixing #zView #issueBar,body.zAdding #zView #issueBar{display:none}
 #zFixBar{display:none;position:absolute;left:6px;right:6px;top:6px;z-index:7;background:#185FA5;color:#fff;border-radius:9px;padding:8px 10px;font-size:13px;align-items:center;gap:8px;flex-wrap:wrap}
 body.zAdding #zFixBar{display:flex;background:#3B6D11}
 body.zAdding #zView{outline:3px solid #3B6D11;cursor:crosshair}
@@ -230,6 +234,7 @@ async function loadRoute(){
   R = d || null;
   document.body.classList.toggle("zHas", !!(R && R.drawings && R.drawings.length));
   document.body.classList.toggle("zOn", !!(R && R.drawings && R.drawings.length) && !opt.hide);
+  placeIssueBar();
   buildIndex();
   fillSel();
   if(!R || !R.drawings.length){ return; }
@@ -785,7 +790,7 @@ function rotBtnTap(){
 }
 function vpos(e){ const r = view.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
 view.addEventListener("pointerdown", e => {
-  if(e.target.closest("#zChoose")) return;
+  if(e.target.closest("#zChoose,#issueBar")) return;
   if(e.isPrimary) ptrs.clear();           // 離した通知が抜けて残った指を消す
   try{ view.setPointerCapture(e.pointerId); }catch(_){}
   if(ptrs.size >= 3){ ptrs.clear(); gest = null; }   // 4本目が来たら数え直し
@@ -870,8 +875,15 @@ $z("zInpBtn").onclick = ()=>{
   setTimeout(()=>{ fitView(); applyView(); sync(); if(!opt.noInp) revealInput(); }, 60);
 };
 applyInp();
-$z("zHide").onclick = ()=>{ opt.hide = true; store("gj_zopt", opt); document.body.classList.remove("zOn"); };
-showBtn.onclick = ()=>{ opt.hide = false; store("gj_zopt", opt); document.body.classList.add("zOn"); layoutTop(); setTimeout(()=>{ fitView(); applyView(); sync(); }, 50); };
+/* 要確認の帯：図面を出しているときは図面の上部、図面が無い・隠したときは入力欄の上（元の場所） */
+const issueHome = (()=>{ const b = document.getElementById("issueBar"); return b ? {parent: b.parentNode, next: b.nextSibling} : null; })();
+function placeIssueBar(){
+  const b = document.getElementById("issueBar"); if(!b || !issueHome) return;
+  if(document.body.classList.contains("zOn")){ if(b.parentNode !== $z("zView")) $z("zView").appendChild(b); }
+  else if(b.parentNode !== issueHome.parent) issueHome.parent.insertBefore(b, issueHome.next);
+}
+$z("zHide").onclick = ()=>{ opt.hide = true; store("gj_zopt", opt); document.body.classList.remove("zOn"); placeIssueBar(); };
+showBtn.onclick = ()=>{ opt.hide = false; store("gj_zopt", opt); document.body.classList.add("zOn"); placeIssueBar(); layoutTop(); setTimeout(()=>{ fitView(); applyView(); sync(); }, 50); };
 
 /* 入力欄を押したとき、図面（縦向き・狭い画面では上に固定）やヘッダーの下に隠れていたら見える所までスクロール。
    iPad が自分でスクロールした後や、テンキーが出た後に直す */
