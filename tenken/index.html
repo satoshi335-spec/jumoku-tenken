@@ -1771,7 +1771,7 @@ function rcOpen(e){
   }
   rcExpanded = false;
   updatePhotoButtons(); renderRecheck();
-  try{ if(window.SysZumen) SysZumen.sync(); }catch(_){}
+  try{ if(window.SysZumen) SysZumen.sync(true); }catch(_){}
   $("tnoNote").textContent = "再確認リストから開きました" + (r ? "（保存済み。直して上書きできます）" : ""); $("tnoNote").className = "note manual";
   setTimeout(()=> window.scrollTo({top: Math.max(0, $("rcCard").getBoundingClientRect().top + window.scrollY - 70), behavior: "smooth"}), 50);   // 上の案件バーに隠れないように
 }
@@ -1947,6 +1947,10 @@ function openIssue(x, key){
   if(!guardLeave()) return;
   setView("input");
   if(x.id){ startEdit(x.id, false); return; }
+  if(key && key !== routeKey()){
+    const [o, r] = key.split("|");
+    $("office").value = o; $("route").value = r; routeChanged();
+  }
   const st = imports[key];
   const i = st && st.items ? st.items.findIndex(it => it.no === x.no) : -1;
   if(i >= 0 && getMode() === "list"){ showListItem(i, true); }

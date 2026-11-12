@@ -224,7 +224,14 @@ function statusOf(i, doneMap){
 }
 
 /* ================= 路線の図面を読む ================= */
-async function loadRoute(){
+/* 路線（区間）の図面を読む。読み終わる前に樹木を合わせようとしても前の区間の図面のままなので、sync は読み終わるのを待つ */
+let loadP = null;
+function loadRoute(){
+  const p = loadRouteCore(); loadP = p;
+  p.finally(()=>{ if(loadP === p) loadP = null; });
+  return p;
+}
+async function loadRouteCore(){
   const k = routeKey();
   if(k !== rKey){ if(fixing) setFixing(false); if(addMode) setAdding(false); }
   rKey = k;
@@ -722,12 +729,22 @@ function revealInput(){
 
 /* 入力中の樹木が見えるように（別の図面なら切り替える） */
 async function sync(force){
+  // 入力中の樹木と図面をいつも合わせる（v61）：別の区間（路線）の樹木なら、その区間の図面を読み終えてから合わせる
+  if(loadP){ try{ await loadP; }catch(_){} }
+  if(rKey !== routeKey()){ try{ await loadRoute(); }catch(_){} }
   if(!R) return;
   if(!vsize().w) return;           // 一覧・集計を見ている間（図面が隠れている）は合わせられない。入力に戻ったときに setView から呼ぶ
   const it = curItem(); if(!it) { schedule(); return; }
   const b = it.base != null ? it.base : splitHojo(it.no).base;
   const p = allPos().find(x => x.k === keyOf(it.zumen, b, it.hojo || ""));
-  if(!p){ schedule(); return; }
+  if(!p){
+    // 図面上の位置が分からない樹木：せめてその樹木の図面番号の図面を出す
+    if(it.zumen && R.drawings.some(x => nz(x.zumen) === nz(it.zumen)) && nz(it.zumen) !== nz(dz)){
+      await showDrawing(it.zumen, true);
+      if(force) toast(treeLabel(it, false) + " は図面上の位置が分かりません（図面 " + it.zumen + " を出しています。［位置を直す］で置けます）");
+    }
+    schedule(); return;
+  }
   if(nz(p.z) !== nz(dz)) await showDrawing(p.z, false);
   const q = toScreen(p.x, p.y), vs = vsize(), m = 50;
   if(force || q.x < m || q.y < m || q.x > vs.w - m || q.y > vs.h - m) centerOnPos(p, force ? 0.35 : null);   // 一覧などから開いたときは、樹木の番号が読める大きさまで拡大
