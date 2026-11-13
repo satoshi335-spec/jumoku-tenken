@@ -633,7 +633,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 32;
+const APP_VER = 33;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -1590,12 +1590,15 @@ function select(id, center, noGuard){
   const t = treeById(id); if(!t) return;
   if(nudge && nudge.id !== id){ mode = null; endNudge(true); }
   setMode(null);
+  const changed = selId !== id;
   selId = id;
   const d = distOf(t);
   if(d && d !== S.dist && pkg.project.districts.includes(d)){ S.dist = d; $("distSel").value = d; saveS(); updProg(); }
   document.body.classList.add("selOpen");
   curField = "h";
   renderSheet();
+  // 別の木を開いたら、入力のいちばん上（番号・前回の値）から見せる（v33。いままでは前の木で下へ送った位置のままだった）
+  if(changed){ const sh = $("sheet"); sh.scrollTo ? sh.scrollTo({top: 0, behavior: "smooth"}) : (sh.scrollTop = 0); }
   setTimeout(()=>{ const p = posOf(t); if(center) centerOn(p, 0.9); else ensureVisible(p); renderMarks(); }, 0);
   lsSet("nagano_last", id);
 }
