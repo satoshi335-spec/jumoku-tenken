@@ -665,6 +665,20 @@ function addSaved(o, ni){
   buildIndex(); fillSel(); schedule();
   return true;
 }
+/* 現場で追加した樹木を番号でリストと図面から外す（桝の番号をずらしたあと、古い番号の印が残らないように） */
+function removeAddedNo(no){
+  const st = listState(); if(!st) return false;
+  const i = st.items.findIndex(x => x.no === no && x.added); if(i < 0) return false;
+  const k = itemKey(st.items[i]).k;
+  st.items.splice(i, 1);
+  if(st.idx > i) st.idx--;
+  if(st.idx >= st.items.length) st.idx = st.items.length - 1;
+  store("gj_imports", imports);
+  const f = FIX[rKey] || {}; delete f[k]; FIX[rKey] = f; store("gj_zfix", FIX);
+  const a = ADD[rKey] || {}; delete a[k]; ADD[rKey] = a; store("gj_zadd", ADD);
+  buildIndex(); fillSel(); schedule();
+  return true;
+}
 async function removeAdded(sel){
   const st = listState(); if(!st || !sel) return;
   const it = st.items[sel.i];
@@ -1271,7 +1285,7 @@ window.applyImport = function(items){ _import(items); buildIndex(); schedule(); 
 $("office").addEventListener("change", ()=> loadRoute());
 $("route").addEventListener("change", ()=> loadRoute());
 
-window.SysZumen = {VERSION: ZVER, reload: loadRoute, sync, routePdf: (key) => makeRoutePdf(key, null), addSaved};
+window.SysZumen = {VERSION: ZVER, reload: loadRoute, sync, routePdf: (key) => makeRoutePdf(key, null), addSaved, removeAddedNo};
 layoutTop();
 loadRoute().then(()=> sync());
 })();

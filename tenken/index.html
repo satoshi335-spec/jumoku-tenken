@@ -154,6 +154,25 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
 #rcCard .rcNote{color:var(--ok-tx);font-weight:600}
 #rcCard .rcBtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
 #rcCard .rcBtns .del{color:var(--ng-tx);border-color:var(--ng-bd)}
+/* 桝の番号をまとめてずらす */
+#shBox{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;padding:20px 12px;overflow:auto}
+#shBox.show{display:flex}
+#shBox .in{background:#fff;border-radius:14px;padding:14px;width:100%;max-width:760px}
+#shBox h3{margin:0 0 6px;font-size:17px}
+#shBox .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+#shBox .row input{width:70px;font-size:17px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;text-align:center}
+#shBox .row input.side{width:56px}
+#shBox .seg button{font-size:14px;padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;font-family:inherit}
+#shBox .seg button.on{background:var(--g);color:#fff;border-color:var(--g)}
+#shBox table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+#shBox th,#shBox td{border-bottom:1px solid #eee;padding:5px 4px;text-align:left;vertical-align:middle}
+#shBox td input{width:64px;font-size:15px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;text-align:center}
+#shBox td input.h{width:44px}
+#shBox .warn{color:var(--ng-tx);font-weight:600}
+#shBox .ok{color:var(--ok-tx)}
+#shBox .vac label{display:inline-flex;align-items:center;gap:4px;margin:6px 12px 0 0;font-size:15px;white-space:nowrap;font-weight:600}
+#shBox .vac input{width:20px;height:20px}
+#shBox .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 #rcNow{display:none;background:#185FA5;color:#fff;border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:13px}
 #rcNow.show{display:block}
 #rcNow b{font-size:15px}
@@ -546,6 +565,10 @@ table.sum td.memoCell.cut{color:var(--ng-tx);font-weight:600}
         <button id="bulkNashiBtn" class="miniBtn pri">「桝無し」で記録</button>
         <button id="bulkZumiBtn" class="miniBtn pri">「伐採済」で記録</button>
         <button id="bulkMasshoBtn" class="miniBtn pri">「番号抹消」で記録</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">
+        <button id="shiftBtn" class="miniBtn">🔢 桝の番号をまとめてずらす</button>
+        <span class="note" style="margin:0">調査のあとで「1桝ずれていた」と分かったとき（37→36、38→37…）。点検結果・写真ごと番号を付け替えます</span>
       </div>
     </div>
 
@@ -1125,6 +1148,174 @@ function bulkNoTree(label){
 $("prevPage").onclick = ()=>{ listPage--; renderListTable(); };
 $("nextPage").onclick = ()=>{ listPage++; renderListTable(); };
 function confirm2(msg1, msg2){ return confirm(msg1) && confirm(msg2); }
+
+/* ================= 桝の番号をまとめてずらす（gj-v62） =================
+   例：八尾茨木線 図5 の右37・38・39 を調べたあとで、1桝ずれていたと分かった → 37→36、38→37、39→38、39 は空桝。
+   ・選んだ桝の範囲の記録を、樹木No（補助番号）はそのままで桝No だけ ±1 する（1行ずつ番号を直すこともできる）
+   ・写真の名前も新しい番号にする（入れ替わりがあるので、いったん仮の名前にしてから付け替える）
+   ・前回幹周は、新しい番号のリスト（台帳）の値にする。リストに無い番号は図面とリストに足す（点線の印）
+   ・記録が無くなるリストの樹木は「空桝」で記録できる（はじめは、まるごと空いた桝の樹木だけにチェック） */
+const shState = {side: "", from: "", to: "", d: -1, rows: [], vac: []};
+function shParse(base){ const m = String(base || "").replace(/#\d+$/, "").match(/^(.*?)(\d+)$/); return m ? {pre: m[1], n: parseInt(m[2], 10), w: m[2].length} : null; }
+function shBase(pre, n, w){ return pre + String(n).padStart(w, "0"); }
+function shOpen(){
+  const st = sumListState(); if(!st){ toast("取込リストがありません"); return; }
+  if(!$("shBox")){
+    const d = document.createElement("div"); d.id = "shBox";
+    d.innerHTML = '<div class="in"><h3>🔢 桝の番号をまとめてずらす</h3>' +
+      '<p class="note" style="margin:0" id="shRoute"></p>' +
+      '<div class="row">桝 <input class="side" id="shSide" placeholder="右"><input id="shFrom" inputmode="numeric">〜<input id="shTo" inputmode="numeric"> を' +
+      '<span class="seg"><button type="button" data-d="-1">1つ前の桝へ（37→36）</button><button type="button" data-d="1">1つ後の桝へ（37→38）</button></span></div>' +
+      '<div id="shBody"></div>' +
+      '<div class="btns"><button type="button" class="miniBtn" id="shNo">やめる</button><button type="button" class="miniBtn pri" id="shGo">この内容で直す</button></div></div>';
+    document.body.appendChild(d);
+    ["shSide", "shFrom", "shTo"].forEach(id => $(id).addEventListener("input", shBuild));
+    d.querySelectorAll(".seg button").forEach(b => b.onclick = ()=>{ shState.d = +b.dataset.d; shBuild(); });
+    $("shNo").onclick = ()=> d.classList.remove("show");
+    $("shGo").onclick = shRun;
+  }
+  // はじめの値：いま入力している樹木の桝
+  const cur = st.items[st.idx], p = cur ? shParse(cur.base != null ? cur.base : splitHojo(cur.no).base) : null;
+  if(p && !$("shSide").value){ $("shSide").value = p.pre; $("shFrom").value = p.n; $("shTo").value = p.n; }
+  $("shRoute").textContent = sumKey().split("|")[1] + " の記録を直します（一覧で選んでいる路線）。直す前に［CSV書き出し］で控えを取っておくと安心です。";
+  shBuild();
+  $("shBox").classList.add("show");
+}
+function shBuild(){
+  const key = sumKey(), st = sumListState(); if(!st) return;
+  const side = $("shSide").value.trim(), from = parseInt($("shFrom").value, 10), to = parseInt($("shTo").value, 10), d = shState.d;
+  $("shBox").querySelectorAll(".seg button").forEach(b => b.classList.toggle("on", +b.dataset.d === d));
+  const body = $("shBody");
+  if(!(from >= 0) || !(to >= from)){ body.innerHTML = '<p class="note">桝の番号の範囲を入れてください（例：右 37〜39）</p>'; shState.rows = []; return; }
+  const recs = records.filter(r => (r.office + "|" + r.route) === key);
+  const rows = [];
+  recs.forEach(r => {
+    const b = r.masu != null && r.masu !== "" ? r.masu : splitHojo(r.no).base, p = shParse(b);
+    if(!p || p.pre !== side || p.n < from || p.n > to) return;
+    rows.push({r, newBase: shBase(p.pre, p.n + d, p.w), newHojo: r.hojo || "", n: p.n});
+  });
+  rows.sort((a, b) => a.n - b.n || String(a.newHojo).localeCompare(String(b.newHojo), "ja", {numeric: true}));
+  shState.rows = rows;
+  // 記録が無くなるリストの樹木（範囲の中で、新しい番号のどれにも当たらない樹木）
+  const newNos = new Set(rows.map(x => composeNo(x.r.zumen, x.newBase, x.newHojo, st.zumenKey)));
+  const targetN = new Set(rows.map(x => x.n + d));
+  const vac = st.items.filter(it => {
+    const p = shParse(it.base != null ? it.base : splitHojo(it.no).base);
+    return p && p.pre === side && p.n >= from && p.n <= to && !newNos.has(it.no);
+  });
+  shState.vac = vac.map(it => { const p = shParse(it.base != null ? it.base : splitHojo(it.no).base); return {it, on: !targetN.has(p.n)}; });
+  if(!rows.length){ body.innerHTML = '<p class="warn">この範囲（' + esc(side + from + "〜" + side + to) + '）に保存した記録がありません</p>'; return; }
+  let h = '<table><tr><th>いまの番号</th><th></th><th>新しい桝No</th><th>樹木No</th><th>樹種・幹周</th><th>写真</th><th>メモ</th></tr>';
+  rows.forEach((x, i) => {
+    const nph = pdb ? photosFor(key, x.r.no).length : 0;
+    h += '<tr data-i="' + i + '"><td><b>' + esc(x.r.no) + '</b></td><td>→</td><td><input data-f="b" value="' + esc(x.newBase) + '"></td><td><input class="h" data-f="h" value="' + esc(x.newHojo) + '"></td>' +
+         "<td>" + esc(x.r.sp || "") + (x.r.girth ? " " + esc(x.r.girth) + "cm" : "") + "</td><td>" + nph + '枚</td><td class="msg"></td></tr>';
+  });
+  h += "</table>";
+  if(shState.vac.length) h += '<div class="vac" style="margin-top:10px"><b>記録が無くなるリストの樹木</b>（チェックした樹木は「空桝」で記録します）<br>' +
+    shState.vac.map((v, i) => '<label><input type="checkbox" data-v="' + i + '"' + (v.on ? " checked" : "") + ">" + esc(v.it.no) + (v.it.added ? '<small style="font-weight:400;color:var(--tx2)">（現場で追加）</small>' : "") + "</label>").join("") +
+    '<p class="note" style="margin:4px 0 0">チェックしない樹木は未点検に戻ります。現場で追加した樹木（ずらす前の番号で足した樹木）は、チェックしなければリストと図面から外します。</p></div>';
+  body.innerHTML = h;
+  body.querySelectorAll("input[data-f]").forEach(inp => inp.addEventListener("input", ()=>{
+    const x = shState.rows[+inp.closest("tr").dataset.i];
+    if(inp.dataset.f === "b") x.newBase = inp.value.trim(); else x.newHojo = inp.value.trim();
+    shCheck();
+  }));
+  body.querySelectorAll("input[data-v]").forEach(c => c.onchange = ()=>{ shState.vac[+c.dataset.v].on = c.checked; });
+  shCheck();
+}
+/* 各行の注意：上書きになる・リストに無い・同じ番号が2つ */
+function shCheck(){
+  const key = sumKey(), st = sumListState(), rows = shState.rows, ids = new Set(rows.map(x => x.r.id));
+  const cnt = {};
+  rows.forEach(x => { x.newNo = composeNo(x.r.zumen, x.newBase, x.newHojo, st.zumenKey); cnt[x.newNo] = (cnt[x.newNo] || 0) + 1; });
+  let bad = 0;
+  rows.forEach((x, i) => {
+    const td = $("shBody").querySelector('tr[data-i="' + i + '"] .msg'); if(!td) return;
+    const other = records.find(r => (r.office + "|" + r.route) === key && r.no === x.newNo && !ids.has(r.id));
+    const it = st.items.find(t => t.no === x.newNo);
+    x.over = other || null; x.item = it || null;
+    if(!x.newBase){ td.innerHTML = '<span class="warn">桝No が空です</span>'; bad++; }
+    else if(cnt[x.newNo] > 1){ td.innerHTML = '<span class="warn">新しい番号が重なっています</span>'; bad++; }
+    else if(other) td.innerHTML = '<span class="warn">' + esc(x.newNo) + " の今の記録（" + esc(other.sp || "") + "）は消えます</span>";
+    else if(it) td.innerHTML = '<span class="ok">前回幹周 ' + esc(it.girth || "なし") + "（台帳）</span>";
+    else td.innerHTML = "リストに無い番号（図面に点線で足します）";
+  });
+  $("shGo").disabled = !!bad || !rows.length;
+}
+async function shRun(){
+  const key = sumKey(), st = sumListState(), rows = shState.rows.filter(x => x.newNo && x.newNo !== x.r.no);
+  // 一覧で別の路線を選んでいるときは、その路線に切り替えてから直す（図面とリストを一緒に直すため）
+  if(key !== routeKey()){ const [o, r] = key.split("|"); $("office").value = o; $("route").value = r; routeChanged(); try{ if(window.SysZumen) await SysZumen.reload(); }catch(_){} }
+  if(!rows.length){ toast("番号が変わる記録がありません"); return; }
+  const vac = shState.vac.filter(v => v.on);
+  const overs = rows.filter(x => x.over);
+  if(!confirm(rows.length + " 本の番号を付け替えます（点検結果・写真ごと）。\n\n" +
+              rows.slice(0, 10).map(x => x.r.no + " → " + x.newNo).join("\n") + (rows.length > 10 ? "\nほか" : "") +
+              (vac.length ? "\n\n「空桝」で記録：" + vac.map(v => v.it.no).join("、") : "") +
+              (overs.length ? "\n\n⚠ 今の記録が消える番号：" + overs.map(x => x.newNo).join("、") : "") + "\n\nよろしいですか？")) return;
+  if(editingId) endEdit(true);
+  // 1) 上書きになる記録（と写真）を消す
+  for(const x of overs){ records = records.filter(r => r.id !== x.over.id); if(pdb){ try{ await deletePhotosOf(key, x.newNo); }catch(_){} } }
+  // 2) 写真：仮の名前 → 新しい番号（37→36・38→37 のような入れ替わりで消し合わないように）
+  if(pdb){
+    const tmp = rows.map((x, i) => "__shift" + i + "__");
+    for(let i = 0; i < rows.length; i++) await shMovePhotos(key, rows[i].r.no, tmp[i]);
+    for(let i = 0; i < rows.length; i++) await shMovePhotos(key, tmp[i], rows[i].newNo);
+  }
+  // 3) 記録の番号・前回幹周（新しい番号の台帳の値）
+  // 印を置く所：行き先の桝にリストの樹木があればそのそば、無ければ元の番号の樹木の所（点線＝位置未確定）
+  const nearNo = {};
+  rows.forEach(x => {
+    const same = st.items.filter(t => !t.added && (t.base != null ? t.base : splitHojo(t.no).base) === x.newBase);
+    nearNo[x.newNo] = same.length ? same[same.length - 1].no : x.r.no;
+  });
+  rows.forEach(x => {
+    const r = x.r, it = x.item;
+    RC.forEach(e => { if(e.key === key && e.no === r.no) e.no = x.newNo; if(e.key === key && e.pair === r.no) e.pair = x.newNo; });
+    r.memo = r.memo || "";
+    r.no = x.newNo; r.masu = x.newBase; r.hojo = x.newHojo; delete r.listNo;
+    r.girthPrev = it ? (it.girth || "") : "";
+    if(it){ if(it.zumen) r.zumen = it.zumen; if(it.town) r.town = it.town; if(it.city) r.city = it.city; }
+  });
+  store("gj_recheck", RC);
+  // 4) 「空桝」で記録
+  const now = nowStr(), [office, route] = key.split("|");
+  vac.forEach(v => {
+    const it = v.it;
+    if(records.some(r => (r.office + "|" + r.route) === key && r.no === it.no)) return;
+    records.push({id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), created: Date.now(),
+      office, route, zumen: it.zumen || "", city: it.city || "", town: it.town || "",
+      no: it.no, masu: it.base || it.no, hojo: it.hojo || "", sp: "空桝", girth: "", girthPrev: it.girth || "",
+      kabu: [], kabuNote: "", dt: now, items: new Array(ITEMS.length).fill(""), memo: it.bikou ? "台帳備考：" + it.bikou : ""});
+  });
+  store("gj_records", records);
+  // 4b) 現場で追加した樹木で、記録が無くなり空桝にもしないものは、リストと図面から外す（古い番号の印が未点検で残らないように）
+  const gone = shState.vac.filter(v => !v.on && v.it.added).map(v => v.it.no);
+  // 5) リストに無い新しい番号は、図面とリストに足す（元の番号の樹木の位置に点線の印）
+  if(key === routeKey() && window.SysZumen && SysZumen.addSaved){
+    rows.filter(x => !x.item).forEach(x => { try{ const ls = listState(); SysZumen.addSaved({base: x.newBase, hojo: x.newHojo, sp: x.r.sp, zumen: x.r.zumen, city: x.r.city, town: x.r.town}, ls.items.findIndex(t => t.no === nearNo[x.newNo])); }catch(_){} });
+    gone.forEach(no => { try{ SysZumen.removeAddedNo(no); }catch(_){} });
+  }
+  $("shBox").classList.remove("show");
+  thumbKey = "";
+  renderCnt(); renderSummary(); renderProgress(); updatePhotoButtons();
+  try{ if(window.SysZumen) SysZumen.reload().then(()=> SysZumen.sync()); }catch(_){}
+  alert(rows.length + " 本の番号を付け替えました" + (vac.length ? "。" + vac.length + " 本を「空桝」で記録しました" : "") + (gone.length ? "。現場で追加した " + gone.join("・") + " をリストから外しました" : "") +
+        "。\n図面と一覧で確かめてから、この路線の［写真ZIP］を書き出し直してください（事務所PCでは古い番号の写真は「記録の無い写真」へ移ります）。");
+}
+/* 写真の番号と名前を変える（同じ枠の写真が行き先にあれば、それは消して置き換える） */
+async function shMovePhotos(key, from, to){
+  for(const m of photosFor(key, from)){
+    for(const o of photoMetas.filter(x => x.key === key && x.no === to && x.branch === m.branch)){
+      await preq(ptx("blobs","readwrite").delete(o.id)); await preq(ptx("meta","readwrite").delete(o.id));
+      photoMetas = photoMetas.filter(x => x !== o);
+    }
+    m.no = to; m.filename = to + "_" + m.branch + ".jpeg";
+    await preq(ptx("meta","readwrite").put(m));
+  }
+}
+$("shiftBtn").onclick = shOpen;
 $("delAllBtn").onclick = ()=>{
   const k = sumKey(); const [ko, kr] = k.split("|");
   const rr = sumRecords();
