@@ -93,6 +93,11 @@ body.ph-t #mmTgl{display:block}
 .tb{min-width:48px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.95);font-size:13px;color:var(--tx);padding:4px 8px}
 .tb.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 #posBtn{font-size:12px;line-height:1.25}
+#delTreeBtn{font-size:12px;color:var(--ng);border-color:#E3A3A3}
+#delTreeBtn.on{background:var(--ng);color:#fff;border-color:var(--ng)}
+body.delMode #view{outline:3px solid var(--ng);outline-offset:-3px}
+body.delMode #hint{background:var(--ng)}
+#hintRestore{display:none}
 #northBtn{font-size:11px;line-height:1.25;border-color:var(--acc);color:var(--acc)}
 #northIc{display:inline-block;vertical-align:middle;transform-origin:50% 50%}
 .tb.add{background:var(--g);color:#fff;border-color:var(--g);font-weight:700}
@@ -333,13 +338,14 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
     <div id="tools">
       <button class="tb add" id="addBtn">＋新木</button>
       <button class="tb" id="posBtn">位置を<br>直す</button>
+      <button class="tb" id="delTreeBtn">削除</button>
       <button class="tb" id="gpsBtn">現在地</button>
       <button class="tb" id="fitBtn">全体</button>
       <button class="tb" id="northBtn" style="display:none"><svg id="northIc" viewBox="0 0 20 20" width="20" height="20"><path d="M10 1 L16 18 L10 14 L4 18 Z" fill="currentColor"/></svg><br>向きを戻す</button>
       <button class="tb" id="zinBtn">＋</button>
       <button class="tb" id="zoutBtn">－</button>
     </div>
-    <div id="hint"><span id="hintMsg"></span><button id="hintCancel">やめる</button></div>
+    <div id="hint"><span id="hintMsg"></span><button id="hintRestore"></button><button id="hintCancel">やめる</button></div>
     <div id="nudge">
       <div class="nt" id="nTitle"></div>
       <div class="nb">
@@ -633,7 +639,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 33;
+const APP_VER = 34;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -721,7 +727,8 @@ function recOf(id){ return R.trees[id] || {}; }
 
 function allTrees(){
   if(!pkg) return [];
-  return pkg.trees.concat(R.added.map(a => Object.assign({added: true, src: "new", past: null}, a)));
+  const H = R.hidden || {};
+  return pkg.trees.filter(t => !H[t.id]).concat(R.added.map(a => Object.assign({added: true, src: "new", past: null}, a)));
 }
 let treeIdx = new Map();
 function reindex(){ treeIdx = new Map(allTrees().map(t => [t.id, t])); }
@@ -1137,6 +1144,11 @@ function nearestTree(sx, sy, lim){
   return best;
 }
 function tapAt(sx, sy){
+  if(mode === "del"){
+    const t = nearestTree(sx, sy, Math.max(26, markSize() * 1.1));
+    if(!t){ toast("削除する木の印をタップしてください"); return; }
+    delTree(t); return;
+  }
   if(mode === "pick"){
     const t = nearestTree(sx, sy, Math.max(26, markSize() * 1.1));
     if(!t){ toast("木の印をタップしてください"); return; }
@@ -1189,6 +1201,11 @@ function twinOk(id){
 function setMode(m, msg){
   if(mode === "move" && m !== "move") endNudge(false);
   mode = m;
+  document.body.classList.toggle("delMode", m === "del");
+  $("delTreeBtn").classList.toggle("on", m === "del");
+  const nh = Object.keys(R.hidden || {}).length;
+  $("hintRestore").style.display = m === "del" && nh ? "" : "none";
+  $("hintRestore").textContent = "外した図面の木を戻す（" + nh + "本）";
   if(m !== "move" && m !== "pick") posMode = false;
   $("addBtn").classList.toggle("on", m === "add");
   $("posBtn").classList.toggle("on", posMode || m === "pick" || m === "move");
@@ -1196,6 +1213,49 @@ function setMode(m, msg){
   else $("hint").style.display = "none";
 }
 $("hintCancel").onclick = ()=> setMode(null);
+/* ================= 図面で木を選んで削除する（v34） =================
+   ・その木の入力（毎木調査・樹木点検）と写真を消す（事務所PCに送った写真は、次の取り込みで「写真」フォルダから外れる）
+   ・新木は消す（［この新木を削除］と同じ）
+   ・図面の木は地図・一覧・本数から外す（R.hidden。事務所PCにも伝え、進み具合・区割りの本数から外す）。あとで戻せる */
+$("delTreeBtn").onclick = ()=>{
+  if(!pkg) return;
+  if(mode === "del"){ setMode(null); return; }
+  if(nudge){ mode = null; endNudge(true); }
+  setMode("del", "削除する木の印をタップ（入力・写真も消えます）");
+};
+async function delTree(t){
+  const no = noOf(t), lbl = treeLabel(t), r = R.trees[t.id];
+  const nph = no ? photosOf(no).length : 0;
+  const what = [r ? "入力（" + ({done: "調査済", gone: "消失・倒木", skip: "対象外"}[r.st] || "入力途中") + (r.tk ? "・樹木点検" : "") + "）" : "", nph ? "写真 " + nph + "枚" : ""].filter(Boolean).join("と");
+  if(!confirm(lbl + " を削除しますか？\n\n" +
+              (t.added ? "新木なので、地図と一覧から消します。" : "図面の木なので、地図と一覧から外します（あとで戻せます。事務所PCの本数からも外れます）。") +
+              (what ? "\n" + what + "も消します。" : "\n（まだ入力・写真はありません）"))) return;
+  if(what && !confirm("本当に " + lbl + " の" + what + "を消しますか？\n（取り消せません）")) return;
+  if(nph) await dropPhotos(no);
+  const now = Date.now();
+  delete R.trees[t.id]; delete R.renamed[t.id]; delete R.moved[t.id];
+  (R.undone = R.undone || {})[t.id] = now;          // 事務所PCに取り込み済みの記録も消す
+  if(t.added) R.added = R.added.filter(a => a.id !== t.id);
+  else {
+    (R.hidden = R.hidden || {})[t.id] = now;
+    if(R.unhidden) delete R.unhidden[t.id];
+  }
+  if(selId === t.id) closeSheet();
+  setMode(null);
+  reindex(); saveR(); scheduleMarks(); updProg();
+  toast(lbl + " を削除しました");
+}
+$("hintRestore").onclick = ()=>{
+  const ids = Object.keys(R.hidden || {}); if(!ids.length) return;
+  const nos = ids.map(id => { const t = pkg.trees.find(x => x.id === id); return t ? (t.no || "番号なし") : id; });
+  if(!confirm("外した図面の木 " + ids.length + " 本（" + nos.slice(0, 8).join("、") + (ids.length > 8 ? " ほか" : "") + "）を地図と一覧に戻しますか？\n（消した入力・写真は戻りません。未調査になります）")) return;
+  const now = Date.now();
+  ids.forEach(id => { (R.unhidden = R.unhidden || {})[id] = now; });
+  R.hidden = {};
+  setMode(null);
+  reindex(); saveR(); scheduleMarks(); updProg();
+  toast(ids.length + " 本を戻しました");
+};
 /* ［位置を直す］：木を選んでいればその木を、選んでいなければタップした木を直す。
    決定・やめるのあとも続けて次の木をタップできる（位置だけまとめて直すとき）。もう一度押すと終わる */
 function pickNext(msg){ posMode = true; setMode("pick", msg || "位置を直す木をタップしてください"); }
