@@ -81,6 +81,10 @@ body.zFixing #zView #issueBar,body.zAdding #zView #issueBar,body.zDeleting #zVie
 body.zDeleting #zFixBar{display:flex;background:#C62828}
 body.zDeleting #zView{outline:3px solid #C62828;cursor:crosshair}
 #zDelBtn{color:#C62828;border-color:#E3A3A3}
+#zMvBtn.on{background:#6A3D9A;color:#fff;border-color:#6A3D9A}
+body.zMoving #zFixBar{display:flex;background:#6A3D9A}
+body.zMoving #zView{outline:3px solid #6A3D9A;cursor:crosshair}
+body.zMoving #zView #issueBar{display:none}
 #zDelBtn.on{background:#C62828;color:#fff;border-color:#C62828}
 #zFixBar{display:none;position:absolute;left:6px;right:6px;top:6px;z-index:7;background:#185FA5;color:#fff;border-radius:9px;padding:8px 10px;font-size:13px;align-items:center;gap:8px;flex-wrap:wrap}
 body.zAdding #zFixBar{display:flex;background:#3B6D11}
@@ -139,6 +143,7 @@ card.innerHTML =
     '<button type="button" class="miniBtn" id="zPdfBtn" title="点検結果を描いた図面をPDFにしてPCへ">PDF</button>' +
     '<button type="button" class="miniBtn" id="zFixBtn">位置を直す</button>' +
     '<button type="button" class="miniBtn" id="zAddBtn">＋樹木</button>' +
+    '<button type="button" class="miniBtn" id="zMvBtn" title="点検結果・写真を、番号はそのままで別の樹木へ移す（1桝ずれていたとき）">情報を移す</button>' +
     '<button type="button" class="miniBtn" id="zDelBtn">削除</button>' +
     '<button type="button" class="miniBtn del" id="zDelAdd" style="display:none">追加を取り消す</button>' +
     '<button type="button" class="miniBtn" id="zInpBtn">入力を隠す</button>' +
@@ -210,6 +215,7 @@ let ADD = load("gj_zadd", {});
 /* 図面で削除した台帳の樹木（取り込み直しても外したまま）と、削除の操作中か */
 let DEL = load("gj_zdel", {});      // {路線キー: {"図面|桝|補助": {item, after, at}}}
 let delMode = false;
+let mvMode = false, mvSel = null;      // 情報を移す（移す元を選んだら mvSel）
 function itemKey(it){
   const b = it.base != null ? it.base : splitHojo(it.no).base;
   const h = it.base != null ? (it.hojo || "") : splitHojo(it.no).hojo;
@@ -241,7 +247,7 @@ function loadRoute(){
 }
 async function loadRouteCore(){
   const k = routeKey();
-  if(k !== rKey){ if(fixing) setFixing(false); if(addMode) setAdding(false); if(delMode) setDeleting(false); }
+  if(k !== rKey){ if(fixing) setFixing(false); if(addMode) setAdding(false); if(delMode) setDeleting(false); if(mvMode) setMoving(false); }
   rKey = k;
   let d = null;
   try{ d = await zget("routes", k); }catch(e){ d = null; }
@@ -366,7 +372,7 @@ function renderMarks(){
     let q = toScreen(p.x, p.y);
     q = {x: q.x + n * (d * 0.75), y: q.y};
     if(q.x < -40 || q.y < -40 || q.x > vs.w + 40 || q.y > vs.h + 40) return;
-    const isCur = i === cur && !fixing && !addMode, isSel = !!(fixSel && fixSel.k === p.k);
+    const isCur = i === cur && !fixing && !addMode && !mvMode, isSel = !!(fixSel && fixSel.k === p.k) || !!(mvSel && mvSel.k === p.k);
     const isInc = incNos.has(st.items[i].no);
     const dd = (isCur || isSel) ? d + 8 : d;
     html += '<div class="zmk ' + s + (isCur ? " cur" : "") + (isSel ? " sel" : "") + (p.moved ? " moved" : "") +
@@ -470,6 +476,7 @@ function chooseNear(sx, sy, done){
 function tapAt(sx, sy){
   hideChoose();
   if(delMode){ if(!chooseNear(sx, sy, i => deleteTree(i))) toast("削除する樹木の印をタップしてください"); return; }
+  if(mvMode){ if(!chooseNear(sx, sy, i => mvPick(i))) toast(mvSel ? "移す先の樹木の印をタップしてください" : "移す元の樹木の印をタップしてください"); return; }
   if(addMode){ placeAdd(sx, sy); return; }
   if(fixing){
     if(fixSel && swapping){
@@ -490,6 +497,7 @@ let addMode = false, addPt = null;
 function setFixing(on){
   if(on && addMode) setAdding(false);
   if(on && delMode) setDeleting(false);
+  if(on && mvMode) setMoving(false);
   fixing = on; fixSel = null; swapping = false;
   document.body.classList.toggle("zFixing", on);
   $z("zFixBtn").classList.toggle("on", on);
@@ -521,6 +529,11 @@ function updateBar(){
         '<datalist id="zSpList">' + spList().map(v => '<option value="' + esc(v) + '">').join("") + '</datalist>' +
         '<span style="flex:1"></span><button type="button" data-a="addOk">追加する</button><button type="button" data-a="addEnd">やめる</button>';
     }
+  } else if(mvMode){
+    bar.innerHTML = !mvSel
+      ? '<span><b>情報を移す</b>：移す元の樹木の印をタップ（点検結果・写真を、番号はそのままで別の樹木へ。続けて何本でも）</span><span style="flex:1"></span><button type="button" data-a="mvEnd">終わる</button>'
+      : '<span><b>' + esc(treeLabel(mvSel.it, false)) + '</b> の点検結果・写真を移す先の樹木の印をタップ</span><span style="flex:1"></span>' +
+        '<button type="button" data-a="mvRe">元を選び直す</button><button type="button" data-a="mvEnd">終わる</button>';
   } else if(delMode){
     const nh = Object.keys(DEL[rKey] || {}).length;
     bar.innerHTML = '<span><b>樹木を削除</b>：削除する樹木の印をタップ（その樹木の点検結果・写真も消えます）</span><span style="flex:1"></span>' +
@@ -545,6 +558,8 @@ function updateBar(){
   bar.querySelectorAll("button[data-a]").forEach(b => b.onclick = ev => { ev.stopPropagation(); barAction(b.dataset.a); });
 }
 function barAction(a){
+  if(a === "mvEnd"){ setMoving(false); return; }
+  if(a === "mvRe"){ mvSel = null; updateBar(); schedule(); return; }
   if(a === "delEnd"){ setDeleting(false); return; }
   if(a === "delRestore"){ restoreDeleted(); return; }
   if(a === "fixEnd") setFixing(false);
@@ -591,6 +606,7 @@ $z("zFixBar").addEventListener("pointerdown", e => e.stopPropagation());
 /* ================= 樹木を追加（図面・数量表に無い樹木） ================= */
 function setAdding(on){
   if(on && delMode) setDeleting(false);
+  if(on && mvMode) setMoving(false);
   if(on && fixing){ fixing = false; fixSel = null; document.body.classList.remove("zFixing"); $z("zFixBtn").classList.remove("on"); }
   addMode = on; addPt = null;
   $z("zAddBtn").classList.toggle("on", on);
@@ -688,7 +704,7 @@ function addSaved(o, ni){
    ・現場で追加した樹木は、リストと図面から消す
    ・台帳（点検データ）の樹木は、リストと図面から外す（DEL に残すので、点検データを取り込み直しても外したまま。あとで戻せる） */
 function setDeleting(on){
-  if(on){ if(fixing) setFixing(false); if(addMode) setAdding(false); }
+  if(on){ if(fixing) setFixing(false); if(addMode) setAdding(false); if(mvMode) setMoving(false); }
   delMode = on;
   document.body.classList.toggle("zDeleting", on);
   $z("zDelBtn").classList.toggle("on", on);
@@ -727,6 +743,31 @@ async function deleteTree(i){
   schedule();
   toast(lbl + " を削除しました");
 }
+/* ================= 情報を移す（gj-v65）：元を選ぶ → 先を選ぶ → index.html の moveTreeInfo ================= */
+function setMoving(on){
+  if(on){ if(fixing) setFixing(false); if(addMode) setAdding(false); if(delMode) setDeleting(false); }
+  mvMode = on; mvSel = null;
+  document.body.classList.toggle("zMoving", on);
+  $z("zMvBtn").classList.toggle("on", on);
+  updateBar(); schedule();
+}
+async function mvPick(i){
+  const st = listState(); if(!st) return;
+  const it = st.items[i]; if(!it) return;
+  if(!mvSel){
+    if(!recOfItem(routeKey(), it)){ toast(treeLabel(it, false) + " には点検結果がありません。移す元を選んでください"); return; }
+    mvSel = Object.assign({it, i}, itemKey(it)); updateBar(); schedule(); return;
+  }
+  if(itemKey(it).k === mvSel.k){ toast("別の樹木（移す先）の印をタップしてください"); return; }
+  const ok = await moveTreeInfo(routeKey(), mvSel.it, it);
+  mvSel = null;
+  if(ok){ const j = listState().items.findIndex(x => x.no === it.no); if(j >= 0) window.showListItem(j, true); }
+  updateBar(); schedule();
+}
+$z("zMvBtn").onclick = ()=>{
+  if(!listState()){ toast("先に点検データを取り込んでください"); return; }
+  setMoving(!mvMode);
+};
 /* 外した台帳の樹木を戻す（点検結果・写真は戻らない） */
 function restoreDeleted(){
   const st = listState(), d = DEL[rKey] || {}, ks = Object.keys(d);

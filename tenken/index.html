@@ -1304,6 +1304,69 @@ async function shRun(){
   alert(rows.length + " 本の番号を付け替えました" + (vac.length ? "。" + vac.length + " 本を「空桝」で記録しました" : "") + (gone.length ? "。現場で追加した " + gone.join("・") + " をリストから外しました" : "") +
         "。\n図面と一覧で確かめてから、この路線の［写真ZIP］を書き出し直してください（事務所PCでは古い番号の写真は「記録の無い写真」へ移ります）。");
 }
+/* ================= 1本ずつ情報を移す（図面の［情報を移す］、gj-v65） =================
+   移す元の樹木の点検結果と写真を、番号はそのままで移す先の樹木へ（例：右38-4 の結果を右37-1 へ）。
+   ・前回幹周・図面番号・町名は移す先（台帳）の値にする　・写真は名前を移す先の番号にし、黒板の番号は「黒板文字訂正」で残る
+   ・移す先に点検結果があれば、入れ替えるか上書きするか選ぶ
+   ・移したあとの元の樹木：現場で追加した樹木ならリストと図面から消す／台帳の樹木なら「空桝」で記録するか未点検に戻す */
+function recOfItem(key, it){
+  const rr = records.filter(r => (r.office + "|" + r.route) === key);
+  return rr.find(r => r.no === it.no) || rr.find(r => r.listNo === it.no) || null;
+}
+function setRecNo(r, it){
+  r.no = it.no; r.masu = it.base != null ? it.base : splitHojo(it.no).base; r.hojo = it.hojo || "";
+  delete r.listNo;
+  r.girthPrev = it.girth || "";
+  if(it.zumen) r.zumen = it.zumen; if(it.town) r.town = it.town; if(it.city) r.city = it.city;
+}
+async function moveTreeInfo(key, from, to){
+  const A = recOfItem(key, from), B = recOfItem(key, to);
+  const la = from.no, lb = to.no;
+  if(!A){ toast(la + " には点検結果がありません"); return false; }
+  const nA = pdb ? photosFor(key, A.no).length : 0, nB = B && pdb ? photosFor(key, B.no).length : 0;
+  let swap = false;
+  if(B){
+    if(confirm("移す先の " + lb + " にも点検結果（" + (B.sp || "") + (B.girth ? " " + B.girth + "cm" : "") + "）があります。\n\n" +
+               "［OK］入れ替える（" + la + " ⇔ " + lb + "、写真も入れ替え）\n［キャンセル］ほかを選ぶ")) swap = true;
+    else if(!confirm(lb + " の今の点検結果と写真 " + nB + " 枚を消して、" + la + " の点検結果で上書きしますか？\n（取り消せません）")) return false;
+  } else if(!confirm(la + " の点検結果（" + (A.sp || "") + (A.girth ? " " + A.girth + "cm" : "") + "）と写真 " + nA + " 枚を、" + lb + " に移しますか？\n" +
+                     "（番号は " + lb + "、前回幹周は " + lb + " の台帳の値になります）")) return false;
+  if(editingId) endEdit(true);
+  if(B && !swap) await revertCore(key, B.no);
+  if(pdb){
+    if(swap){
+      await shMovePhotos(key, A.no, "__mv_a__"); await shMovePhotos(key, B.no, la); await shMovePhotos(key, "__mv_a__", lb);
+    } else await shMovePhotos(key, A.no, lb);
+  }
+  const aNo = A.no, bNo = B ? B.no : "";
+  setRecNo(A, to);
+  if(swap) setRecNo(B, from);
+  RC.forEach(e => { if(e.key !== key) return;
+    if(e.no === aNo) e.no = lb; else if(swap && e.no === bNo) e.no = la;
+    if(e.pair === aNo) e.pair = lb; else if(swap && e.pair === bNo) e.pair = la; });
+  store("gj_recheck", RC);
+  // 元の樹木のあと始末（入れ替えのときは、元の樹木に移す先の結果が入っているので何もしない）
+  let after = "";
+  if(!swap){
+    if(from.added){
+      if(confirm(la + " は現場で追加した樹木です。リストと図面から消しますか？\n［キャンセル］未点検のまま残す") && window.SysZumen && SysZumen.removeAddedNo){
+        SysZumen.removeAddedNo(la); after = "。" + la + " はリストから消しました";
+      }
+    } else if(confirm("元の " + la + " を「空桝」で記録しますか？\n［キャンセル］未点検に戻す")){
+      const [office, route] = key.split("|");
+      records.push({id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), created: Date.now(),
+        office, route, zumen: from.zumen || "", city: from.city || "", town: from.town || "",
+        no: la, masu: from.base || la, hojo: from.hojo || "", sp: "空桝", girth: "", girthPrev: from.girth || "",
+        kabu: [], kabuNote: "", dt: nowStr(), items: new Array(ITEMS.length).fill(""), memo: from.bikou ? "台帳備考：" + from.bikou : ""});
+      after = "。" + la + " は空桝で記録しました";
+    }
+  }
+  store("gj_records", records);
+  thumbKey = "";
+  renderCnt(); renderSummary(); renderProgress(); updatePhotoButtons();
+  toast((swap ? la + " と " + lb + " の点検結果・写真を入れ替えました" : la + " の点検結果・写真を " + lb + " に移しました") + after);
+  return true;
+}
 /* 写真の番号と名前を変える（同じ枠の写真が行き先にあれば、それは消して置き換える） */
 async function shMovePhotos(key, from, to){
   for(const m of photosFor(key, from)){
