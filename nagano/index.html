@@ -85,7 +85,10 @@ body.ph-t #mmTgl{display:block}
 #tkMsg{margin:8px 0 0}
 #tkMsg:empty{display:none}
 .mk.sel{border-width:4px;border-color:#FF2D55!important;box-shadow:0 0 0 5px rgba(255,45,85,.3)}
-.tag{position:absolute;left:0;top:0;font-size:11px;font-weight:700;padding:0 3px;border-radius:4px;background:rgba(255,255,255,.88);color:#223;white-space:nowrap}
+.tag{position:absolute;left:0;top:0;font-size:11px;line-height:15px;height:15px;box-sizing:border-box;font-weight:700;padding:0 3px;border-radius:4px;background:rgba(255,255,255,.88);color:#223;white-space:nowrap}
+.tag.cur{color:#FF2D55;z-index:2;box-shadow:0 0 0 1px #FF2D55}
+#marks svg.lead{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+#marks svg.lead line{stroke:#334;stroke-width:1;opacity:.7}
 .tag.n{color:var(--acc)}
 #gps{position:absolute;width:18px;height:18px;border-radius:50%;background:#1E88E5;border:3px solid #fff;box-shadow:0 0 0 2px #1E88E5;left:0;top:0;display:none}
 #gpsAcc{position:absolute;border-radius:50%;background:rgba(30,136,229,.12);border:1px solid rgba(30,136,229,.5);left:0;top:0;display:none}
@@ -639,7 +642,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 34;
+const APP_VER = 35;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -956,6 +959,63 @@ function scheduleMarks(){
   markRaf = {a: requestAnimationFrame(run), b: setTimeout(run, 60)};
 }
 function markSize(){ return Math.max(9, Math.min(30, V.s * 16)); }
+/* ================= 番号札を重ならないように置く（v35、街路樹の樹木点検 gj-v67 と同じ考え方） =================
+   木が混んだ所で、印の右上に決まった位置で描く札が重なって読めなかった。
+   札ごとに、印のまわり8か所 → 少し離した所（引出線で印とつなぐ）の順に、ほかの札・印と重ならない所を探す。
+   本数が多いので、置いた札・印は 64px のマスに分けて、近くのものだけ調べる */
+function layoutTags(tags, obst, gap){
+  const G = 64, grid = new Map();
+  const keyOf = (gx, gy) => gx + "," + gy;
+  const add = (b, kind, id) => {
+    for(let gx = Math.floor(b.x1 / G); gx <= Math.floor(b.x2 / G); gx++)
+      for(let gy = Math.floor(b.y1 / G); gy <= Math.floor(b.y2 / G); gy++){
+        const k = keyOf(gx, gy); let a = grid.get(k); if(!a) grid.set(k, a = []); a.push({b, kind, id});
+      }
+  };
+  const area = (a, b) => Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1)) * Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
+  obst.forEach((o, i) => add({x1: o.x - o.r, y1: o.y - o.r, x2: o.x + o.r, y2: o.y + o.r}, 0, i));
+  const order = tags.map((t, i) => i).sort((a, b) => (tags[b].pri || 0) - (tags[a].pri || 0) || tags[a].x - tags[b].x || tags[a].y - tags[b].y);
+  order.forEach(i => {
+    const t = tags[i], r = t.r, w = t.w, h = t.h, g = gap, c = r * 0.72;
+    const cand = [[c, -c - h], [c, c], [-c - w, -c - h], [-c - w, c], [r + g, -h / 2], [-r - g - w, -h / 2], [-w / 2, -r - g - h], [-w / 2, r + g]];
+    const near = cand.length;
+    for(let k = 1; k <= 4; k++){
+      cand.push([-w / 2, -r - g - h - k * (h + g)], [-w / 2, r + g + k * (h + g)],
+                [c + k * (w * 0.6), -c - h - k * (h * 0.7)], [-c - w - k * (w * 0.6), -c - h - k * (h * 0.7)],
+                [c + k * (w * 0.6), c + k * (h * 0.7)], [-c - w - k * (w * 0.6), c + k * (h * 0.7)]);
+    }
+    let best = null, bs = Infinity;
+    for(let ci = 0; ci < cand.length; ci++){
+      const [dx, dy] = cand[ci];
+      const rc = {x1: t.x + dx, y1: t.y + dy, x2: t.x + dx + w, y2: t.y + dy + h};
+      let s = 0; const seen = new Set();
+      for(let gx = Math.floor(rc.x1 / G); gx <= Math.floor(rc.x2 / G); gx++)
+        for(let gy = Math.floor(rc.y1 / G); gy <= Math.floor(rc.y2 / G); gy++)
+          for(const e of (grid.get(keyOf(gx, gy)) || [])){
+            if(seen.has(e)) continue; seen.add(e);
+            if(e.kind === 0 && e.id === t.self) continue;
+            s += area(rc, e.b) * (e.kind ? 10 : 3);
+          }
+      if(s === 0){ best = {rc, ci}; break; }
+      s += ci * w * h * 0.02;                   // 重なりが同じなら、印に近い所
+      if(s < bs){ bs = s; best = {rc, ci}; }
+    }
+    add(best.rc, 1, i);
+    t.lx = best.rc.x1; t.ly = best.rc.y1; t.lead = best.ci >= near;
+  });
+  return tags;
+}
+/* 引出線：印のふちから札のいちばん近い所まで */
+function leadLine(t){
+  const cx = Math.max(t.lx, Math.min(t.x, t.lx + t.w)), cy = Math.max(t.ly, Math.min(t.y, t.ly + t.h));
+  const dx = cx - t.x, dy = cy - t.y, d = Math.hypot(dx, dy) || 1;
+  return {x1: t.x + dx / d * t.r, y1: t.y + dy / d * t.r, x2: cx, y2: cy};
+}
+let tagCtx = null;
+function tagWidth(text){
+  if(!tagCtx){ tagCtx = document.createElement("canvas").getContext("2d"); tagCtx.font = "700 11px sans-serif"; }
+  return Math.ceil(tagCtx.measureText(text).width) + 6;
+}
 function renderMarks(){
   const box = $("marks");
   if(!pkg){ box.innerHTML = ""; return; }
@@ -963,6 +1023,7 @@ function renderMarks(){
   const mx = Math.max(30, vs.w * 0.25), my = Math.max(30, vs.h * 0.25);   // 少し外まで描く（動かしたときに端が空かないように）
   clearTimeout(marksT);
   let h = "";
+  const tagReq = [], obst = [];       // 番号札（あとで重ならない所に置く）と印
   for(const t of allTrees()){
     const p = posOf(t), q = toScreen(p.x, p.y);
     if(q.x < -mx || q.y < -my || q.x > vs.w + mx || q.y > vs.h + my) continue;
@@ -970,11 +1031,26 @@ function renderMarks(){
     const cls = "mk " + (st || (t.gone ? "pg" : t.src === "circle" ? "circ" : t.src === "label" ? "lbl" : "")) +
                 (t.added || R.renamed[t.id] ? " new" : "") + (r.kin ? " kin" : "") + (t.out && !st ? " out" : "") + (S.phase === "t" && !r.tenken ? " dim" : "") + (t.id === selId ? " sel" : "") + (st && missingOf(t).length ? " miss" : "");
     const dd = t.id === selId ? d + 8 : d;
+    obst.push({x: q.x, y: q.y, r: dd / 2});
     h += '<div class="' + cls + '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
     if(showTag){
       const no = noOf(t);
-      if(no || t.src === "circle") h += '<div class="tag' + (t.added || R.renamed[t.id] ? " n" : "") + '" style="transform:translate(' + (q.x + dd / 2) + 'px,' + (q.y - dd / 2 - 5) + 'px)">' + esc(no || "番号なし") + '</div>';
+      if(no || t.src === "circle"){
+        const text = no || "番号なし";
+        tagReq.push({x: q.x, y: q.y, r: dd / 2, w: tagWidth(text), h: 15, self: obst.length - 1, pri: t.id === selId ? 2 : 0,
+                     text, cls: "tag" + (t.added || R.renamed[t.id] ? " n" : "") + (t.id === selId ? " cur" : "")});
+      }
     }
+  }
+  // 番号札：ほかの札・印と重ならない所に置く。離して置いた札は引出線で印とつなぐ
+  if(tagReq.length){
+    layoutTags(tagReq, obst, 2);
+    let lines = "";
+    tagReq.forEach(t => {
+      if(t.lead){ const L = leadLine(t); lines += '<line x1="' + L.x1.toFixed(1) + '" y1="' + L.y1.toFixed(1) + '" x2="' + L.x2.toFixed(1) + '" y2="' + L.y2.toFixed(1) + '"/>'; }
+      h += '<div class="' + t.cls + '" style="transform:translate(' + t.lx.toFixed(1) + 'px,' + t.ly.toFixed(1) + 'px)">' + esc(t.text) + '</div>';
+    });
+    if(lines) h = '<svg class="lead" width="' + vs.w + '" height="' + vs.h + '">' + lines + '</svg>' + h;
   }
   box.innerHTML = h;
   box.style.transform = "";
