@@ -1376,6 +1376,7 @@ async function shMovePhotos(key, from, to){
     }
     if(!m.board) m.board = from;          // 黒板は撮ったときの番号のまま（仮の名前を通るときは、最初の番号が残る）
     m.no = to; m.filename = to + "_" + m.branch + ".jpeg";
+    delete m.exp;                         // 新しい名前ではまだ事務所PCに送っていない（次の［写真ZIP］に入れる）
     await preq(ptx("meta","readwrite").put(m));
   }
 }
@@ -2528,13 +2529,13 @@ function buildCsv(key){
   const rr = records.filter(r => (r.office + "|" + r.route) === key).sort((a,b) => a.created - b.created);
   if(!rr.length) return null;
   const head = ["点検事務所","路線名","図面番号","樹木番号","補助番号","樹木名","幹周り(cm)","前回幹周り(cm)","市名","町名","点検日時","点検者",
-    ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数","要伐採","要経過観察","半枯れ","記録番号","黒板文字訂正"];
+    ...ITEMS.map(i => i.csv), "特記事項","判定","写真枚数","要伐採","要経過観察","半枯れ","記録番号","黒板文字訂正","写真ファイル"];
   const rows = rr.map(r => [r.office, r.route, r.zumen || "",
     (r.masu != null && r.masu !== "") ? r.masu : splitHojo(r.no).base,
     (r.hojo != null && r.hojo !== "") ? r.hojo : splitHojo(r.no).hojo,
     r.sp, r.girth || "", r.girthPrev || "", r.city || "", r.town || "",
     (r.dt || "").replace("T"," "), settings.inspector, ...ITEMS.map((_, i) => r.items[i] || ""), csvMemo(r), judgeOf(r.items, r.sp, r.lv, r.bassai, r.hangare), photosOf(r.items, r.sp), r.bassai ? "○" : "",
-    judgeOf(r.items, r.sp, r.lv, r.bassai, r.hangare) === JUDGE_OBS ? "○" : "", r.hangare ? "○" : "", r.no, boardFix(r)]
+    judgeOf(r.items, r.sp, r.lv, r.bassai, r.hangare) === JUDGE_OBS ? "○" : "", r.hangare ? "○" : "", r.no, boardFix(r), pdb ? photosFor(r.office + "|" + r.route, r.no).map(m => m.filename).sort().join("・") : ""]
     .map(csvField).join(","));
   const csv = "\uFEFF" + [head.map(csvField).join(","), ...rows].join("\r\n");
   const d = new Date();
@@ -2598,6 +2599,7 @@ async function renameRecPhotos(key, from, to){
     }
     if(!m.board) m.board = from;          // 黒板は撮ったときの番号のまま（点検表に「黒板文字訂正」を書くため）
     m.no = to; m.filename = to + "_" + m.branch + ".jpeg";
+    delete m.exp;                         // 新しい名前ではまだ事務所PCに送っていない（次の［写真ZIP］に入れる）
     await preq(ptx("meta","readwrite").put(m));
   }
   RC.forEach(e => { if(e.key === key && e.no === from) e.no = to; if(e.key === key && e.pair === from) e.pair = to; });
