@@ -77,7 +77,11 @@ body.zOn #zCard{display:block}
 /* 要確認（index.html の #issueBar）：図面を出しているときは図面の上部に重ねる。位置を直す・樹木を追加している間は隠す */
 #zView #issueBar{position:absolute;left:6px;right:6px;top:6px;z-index:6;margin:0;max-height:40%;overflow:auto;box-shadow:0 2px 8px rgba(0,0,0,.18);font-size:12px;padding:6px 9px}
 #zView #issueBar button{font-size:12px;padding:5px 8px;margin:3px 5px 0 0}
-body.zFixing #zView #issueBar,body.zAdding #zView #issueBar{display:none}
+body.zFixing #zView #issueBar,body.zAdding #zView #issueBar,body.zDeleting #zView #issueBar{display:none}
+body.zDeleting #zFixBar{display:flex;background:#C62828}
+body.zDeleting #zView{outline:3px solid #C62828;cursor:crosshair}
+#zDelBtn{color:#C62828;border-color:#E3A3A3}
+#zDelBtn.on{background:#C62828;color:#fff;border-color:#C62828}
 #zFixBar{display:none;position:absolute;left:6px;right:6px;top:6px;z-index:7;background:#185FA5;color:#fff;border-radius:9px;padding:8px 10px;font-size:13px;align-items:center;gap:8px;flex-wrap:wrap}
 body.zAdding #zFixBar{display:flex;background:#3B6D11}
 body.zAdding #zView{outline:3px solid #3B6D11;cursor:crosshair}
@@ -135,6 +139,7 @@ card.innerHTML =
     '<button type="button" class="miniBtn" id="zPdfBtn" title="点検結果を描いた図面をPDFにしてPCへ">PDF</button>' +
     '<button type="button" class="miniBtn" id="zFixBtn">位置を直す</button>' +
     '<button type="button" class="miniBtn" id="zAddBtn">＋樹木</button>' +
+    '<button type="button" class="miniBtn" id="zDelBtn">削除</button>' +
     '<button type="button" class="miniBtn del" id="zDelAdd" style="display:none">追加を取り消す</button>' +
     '<button type="button" class="miniBtn" id="zInpBtn">入力を隠す</button>' +
     '<button type="button" class="miniBtn" id="zHide">図面を隠す</button>' +
@@ -202,6 +207,9 @@ function allPos(){
 /* 現場で追加した樹木（図面・リストに無かった樹木）。点検データを取り込み直しても残すため別に持つ
    {路線キー: {"図面|桝|補助": {item: リストの1行, after: "直前の樹木のキー"}}} */
 let ADD = load("gj_zadd", {});
+/* 図面で削除した台帳の樹木（取り込み直しても外したまま）と、削除の操作中か */
+let DEL = load("gj_zdel", {});      // {路線キー: {"図面|桝|補助": {item, after, at}}}
+let delMode = false;
 function itemKey(it){
   const b = it.base != null ? it.base : splitHojo(it.no).base;
   const h = it.base != null ? (it.hojo || "") : splitHojo(it.no).hojo;
@@ -233,7 +241,7 @@ function loadRoute(){
 }
 async function loadRouteCore(){
   const k = routeKey();
-  if(k !== rKey){ if(fixing) setFixing(false); if(addMode) setAdding(false); }
+  if(k !== rKey){ if(fixing) setFixing(false); if(addMode) setAdding(false); if(delMode) setDeleting(false); }
   rKey = k;
   let d = null;
   try{ d = await zget("routes", k); }catch(e){ d = null; }
@@ -461,6 +469,7 @@ function chooseNear(sx, sy, done){
 }
 function tapAt(sx, sy){
   hideChoose();
+  if(delMode){ if(!chooseNear(sx, sy, i => deleteTree(i))) toast("削除する樹木の印をタップしてください"); return; }
   if(addMode){ placeAdd(sx, sy); return; }
   if(fixing){
     if(fixSel && swapping){
@@ -480,6 +489,7 @@ let fixing = false, fixSel = null, swapping = false;
 let addMode = false, addPt = null;
 function setFixing(on){
   if(on && addMode) setAdding(false);
+  if(on && delMode) setDeleting(false);
   fixing = on; fixSel = null; swapping = false;
   document.body.classList.toggle("zFixing", on);
   $z("zFixBtn").classList.toggle("on", on);
@@ -511,6 +521,11 @@ function updateBar(){
         '<datalist id="zSpList">' + spList().map(v => '<option value="' + esc(v) + '">').join("") + '</datalist>' +
         '<span style="flex:1"></span><button type="button" data-a="addOk">追加する</button><button type="button" data-a="addEnd">やめる</button>';
     }
+  } else if(delMode){
+    const nh = Object.keys(DEL[rKey] || {}).length;
+    bar.innerHTML = '<span><b>樹木を削除</b>：削除する樹木の印をタップ（その樹木の点検結果・写真も消えます）</span><span style="flex:1"></span>' +
+      (nh ? '<button type="button" data-a="delRestore">外した台帳の樹木を戻す（' + nh + '本）</button>' : '') +
+      '<button type="button" data-a="delEnd">やめる</button>';
   } else if(fixing){
     if(!fixSel){
       bar.innerHTML = '<span><b>位置を直す</b>：動かす樹木の印をタップ → 正しい位置をタップ（続けて直せます）</span><span style="flex:1"></span>' +
@@ -530,6 +545,8 @@ function updateBar(){
   bar.querySelectorAll("button[data-a]").forEach(b => b.onclick = ev => { ev.stopPropagation(); barAction(b.dataset.a); });
 }
 function barAction(a){
+  if(a === "delEnd"){ setDeleting(false); return; }
+  if(a === "delRestore"){ restoreDeleted(); return; }
   if(a === "fixEnd") setFixing(false);
   else if(a === "fixOther"){ fixSel = null; swapping = false; updateBar(); schedule(); }
   else if(a === "swap"){ swapping = true; updateBar(); }
@@ -573,6 +590,7 @@ $z("zFixBar").addEventListener("pointerdown", e => e.stopPropagation());
 
 /* ================= 樹木を追加（図面・数量表に無い樹木） ================= */
 function setAdding(on){
+  if(on && delMode) setDeleting(false);
   if(on && fixing){ fixing = false; fixSel = null; document.body.classList.remove("zFixing"); $z("zFixBtn").classList.remove("on"); }
   addMode = on; addPt = null;
   $z("zAddBtn").classList.toggle("on", on);
@@ -665,6 +683,76 @@ function addSaved(o, ni){
   buildIndex(); fillSel(); schedule();
   return true;
 }
+/* ================= 図面で樹木を選んで削除する（gj-v64） =================
+   ・その樹木の点検結果と写真を消す
+   ・現場で追加した樹木は、リストと図面から消す
+   ・台帳（点検データ）の樹木は、リストと図面から外す（DEL に残すので、点検データを取り込み直しても外したまま。あとで戻せる） */
+function setDeleting(on){
+  if(on){ if(fixing) setFixing(false); if(addMode) setAdding(false); }
+  delMode = on;
+  document.body.classList.toggle("zDeleting", on);
+  $z("zDelBtn").classList.toggle("on", on);
+  updateBar(); schedule();
+}
+async function deleteTree(i){
+  const st = listState(); if(!st) return;
+  const it = st.items[i]; if(!it) return;
+  const key = routeKey(), no = it.no, lbl = treeLabel(it, false);
+  const rec = routeRecords().find(r => r.no === no) || routeRecords().find(r => r.listNo === no);
+  const pno = rec ? rec.no : no;
+  const nPh = (typeof photosFor === "function" && pdb) ? photosFor(key, pno).length : 0;
+  const what = [rec ? "点検結果（" + (rec.sp || "") + (rec.girth ? " " + rec.girth + "cm" : "") + "）" : "", nPh ? "写真 " + nPh + "枚" : ""].filter(Boolean).join("と");
+  if(!confirm(lbl + " を削除しますか？\n\n" +
+              (it.added ? "現場で追加した樹木なので、リストと図面から消します。" : "台帳の樹木なので、リストと図面から外します（あとで戻せます。点検データを取り込み直しても外したままです）。") +
+              (what ? "\n" + what + "も消します。" : "\n（まだ点検結果・写真はありません）"))) return;
+  if(what && !confirm("本当に " + lbl + " の" + what + "を消しますか？\n（取り消せません）")) return;
+  if(rec || nPh) await revertCore(key, pno);
+  try{ RC = RC.filter(e => !(e.key === key && (e.no === pno || e.no === no))); store("gj_recheck", RC); }catch(_){}
+  const k = itemKey(it).k;
+  if(it.added) removeAddedNo(no);
+  else {
+    const prev = st.items[i - 1];
+    const d = DEL[rKey] || {};
+    d[k] = {item: Object.assign({}, it), after: prev ? itemKey(prev).k : "", at: Date.now()};
+    DEL[rKey] = d; store("gj_zdel", DEL);
+    st.items.splice(i, 1);
+    if(st.idx > i) st.idx--;
+    if(st.idx >= st.items.length) st.idx = Math.max(0, st.items.length - 1);
+    store("gj_imports", imports);
+    buildIndex(); fillSel();
+  }
+  setDeleting(false);
+  if(st.items.length) window.showListItem(st.idx, true);
+  renderCnt(); renderSummary(); renderProgress(); updatePhotoButtons();
+  schedule();
+  toast(lbl + " を削除しました");
+}
+/* 外した台帳の樹木を戻す（点検結果・写真は戻らない） */
+function restoreDeleted(){
+  const st = listState(), d = DEL[rKey] || {}, ks = Object.keys(d);
+  if(!st || !ks.length) return;
+  if(!confirm("外した台帳の樹木 " + ks.length + " 本（" + ks.slice(0, 8).map(k => treeLabel(d[k].item, false)).join("、") + (ks.length > 8 ? " ほか" : "") +
+              "）をリストと図面に戻しますか？\n（消した点検結果・写真は戻りません。未点検になります）")) return;
+  ks.forEach(k => {
+    const e = d[k];
+    if(idxOf.has(k)) return;
+    const j = e.after ? st.items.findIndex(x => itemKey(x).k === e.after) : -1;
+    const it = Object.assign({}, e.item);
+    if(j >= 0) st.items.splice(j + 1, 0, it); else st.items.push(it);
+    if(j >= 0 && st.idx > j) st.idx++;
+    buildIndex();
+  });
+  delete DEL[rKey]; store("gj_zdel", DEL);
+  store("gj_imports", imports);
+  buildIndex(); fillSel(); updateBar(); schedule();
+  renderProgress();
+  toast(ks.length + " 本を戻しました");
+}
+$z("zDelBtn").onclick = ()=>{
+  if(!listState()){ toast("先に点検データを取り込んでください"); return; }
+  setDeleting(!delMode);
+};
+
 /* 現場で追加した樹木を番号でリストと図面から外す（桝の番号をずらしたあと、古い番号の印が残らないように） */
 function removeAddedNo(no){
   const st = listState(); if(!st) return false;
@@ -1228,6 +1316,9 @@ async function importPack(f){
       if(j >= 0) items.splice(j + 1, 0, it); else items.push(it);
     });
     store("gj_zadd", ADD);
+    // 図面で削除した台帳の樹木は、取り込み直しても外したまま（gj-v64）
+    const dels = DEL[key] || {};
+    for(let j = items.length - 1; j >= 0; j--){ if(dels[keyOf(items[j].zumen, items[j].base, items[j].hojo)]) items.splice(j, 1); }
     const zk = detectZumenKey(items);
     const cnt = {};
     items.forEach(it => { const b = it.base || it.no; cnt[b] = (cnt[b] || 0) + 1; });
