@@ -476,20 +476,17 @@ function renderMarks(){
     (cnt.cut ? '<b style="margin-left:8px;color:#fff;background:#C62828;border-radius:3px;padding:0 4px">要伐採</b> ' + cnt.cut : "");
 }
 
-/* 印・一覧に出す番号。「左27#2」（同じ桝の2本目）は「左27（2本目）」と書く。many … 同じ桝の樹木が並ぶ一覧 */
+/* 印・一覧・図面PDFに出す番号。「左27#2」（同じ桝の2本目）は「左27-2」、「左27#2」の補助番号1 は「左27-2-1」と書く
+   （2026-11-14 ユーザー指示。前は「左27（2本目）」）。many … 同じ桝の樹木が並ぶ一覧（今は使わない） */
+function noLabel(base, hojo){ return String(base).replace(/#(\d+)$/, "-$1") + (hojo ? "-" + hojo : ""); }
 /* 印の番号：番号を直して保存した木（リストの左17 の欄を左15 として保存＝同じ木）は、保存した番号を出す */
 function labelOf(it, rec, many){
-  if(rec && rec.listNo && rec.listNo === it.no && rec.no !== it.no) return (rec.masu || rec.no) + (rec.hojo ? "-" + rec.hojo : "");
+  if(rec && rec.listNo && rec.listNo === it.no && rec.no !== it.no) return noLabel(rec.masu || rec.no, rec.hojo);
   return treeLabel(it, many);
 }
 function treeLabel(it, many){
-  const b = String(it.base != null ? it.base : it.no);
-  const m = b.match(/^(.*)#(\d+)$/);
-  let s = m ? m[1] : b;
-  if(it.hojo) s += "-" + it.hojo;
-  if(m) s += "（" + m[2] + "本目）";
-  else if(many && !it.hojo) s += "（1本目）";
-  return s;
+  if(it.base == null) return String(it.no).replace(/#(\d+)/, "-$1");
+  return noLabel(it.base, it.hojo);
 }
 
 /* タップした位置の近くの樹木（同じ桝の数本は一覧から選ぶ） */

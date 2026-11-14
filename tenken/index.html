@@ -2243,7 +2243,7 @@ function saveAndMove(move){
   if(!editingId && inListMode){
     const cur = st0.items[st0.idx];
     const hit = st0.items.findIndex(it => it.no === no || (it.base === tnoV && (it.hojo || "") === hojoV));
-    const lbl = it => (it.base != null ? String(it.base).replace(/#\d+$/, "") + (it.hojo ? "-" + it.hojo : "") : it.no);
+    const lbl = it => (it.base != null ? String(it.base).replace(/#(\d+)$/, "-$1") + (it.hojo ? "-" + it.hojo : "") : String(it.no).replace(/#(\d+)/, "-$1"));
     const newLbl = tnoV + (hojoV ? "-" + hojoV : "");
     if(hit >= 0){
       // リストの別の樹木の番号を打った → 前回幹周はその樹木の値にする
