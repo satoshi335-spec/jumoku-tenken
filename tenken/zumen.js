@@ -64,7 +64,10 @@ body.zOn #zCard{display:block}
 .zFlash{animation:zFl 1.2s ease-out}
 @keyframes zFl{from{box-shadow:0 0 0 4px rgba(24,95,165,.7)}to{box-shadow:0 0 0 0 rgba(24,95,165,0)}}
 .zmk.newpt{border-color:#3B6D11;border-style:dashed;background:rgba(59,109,17,.25)}
-.ztag{position:absolute;left:0;top:0;font-size:11px;font-weight:600;color:#7a2a00;background:rgba(255,255,255,.78);padding:0 3px;border-radius:3px;white-space:nowrap}
+.ztag{position:absolute;left:0;top:0;font-size:11px;line-height:15px;height:15px;font-weight:600;color:#7a2a00;background:rgba(255,255,255,.88);padding:0 3px;border-radius:3px;white-space:nowrap;box-sizing:border-box}
+.ztag.zcurtag{color:#185FA5;z-index:2;box-shadow:0 0 0 1px #185FA5}
+.zlead{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.zlead line{stroke:#7a2a00;stroke-width:1;opacity:.75}
 #zLegend{position:absolute;left:6px;bottom:6px;background:rgba(255,255,255,.9);border-radius:8px;padding:4px 8px;font-size:11px;line-height:1.6;pointer-events:none}
 #zLegend i{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid;vertical-align:-1px;margin:0 3px 0 8px}
 #zLegend i:first-child{margin-left:0}
@@ -348,6 +351,53 @@ function schedule(){
 }
 function markSize(){ return Math.max(14, Math.min(30, V.s * 40)); }
 const CUT_LEAD = 44;     // 「要伐採」の札から印までの引き出し線（px、斜め）
+/* ================= 番号札を重ならないように置く（gj-v67） =================
+   1つの桝に何本も並ぶと、印の右上に決まった位置で描く札が隣どうし重なって読めなかった（八尾茨木線 図5 左34 など）。
+   札ごとに、印のまわり8か所 → 少し離した所（引出線で印とつなぐ）の順に、ほかの札・印と重ならない所を探す。
+   tags：[{x, y, r, w, h, self, pri}]（印の中心・半径・札の幅と高さ・自分の印の番号・先に置く順）
+   obst：[{x, y, r}]（印。札が印にかぶらないように）／boxes：最初から置いてある札など（要伐採の札）
+   返り値は tags に lx, ly（札の左上）と lead（印から離した＝引出線を引く）を入れる */
+function layoutTags(tags, obst, gap, boxes){
+  const placed = (boxes || []).slice();
+  const area = (a, b) => Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1)) * Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
+  const ob = obst.map(o => ({x1: o.x - o.r, y1: o.y - o.r, x2: o.x + o.r, y2: o.y + o.r}));
+  const order = tags.map((t, i) => i).sort((a, b) => (tags[b].pri || 0) - (tags[a].pri || 0) || tags[a].x - tags[b].x || tags[a].y - tags[b].y);
+  order.forEach(i => {
+    const t = tags[i], r = t.r, w = t.w, h = t.h, g = gap, c = r * 0.72;
+    const cand = [[c, -c - h], [c, c], [-c - w, -c - h], [-c - w, c], [r + g, -h / 2], [-r - g - w, -h / 2], [-w / 2, -r - g - h], [-w / 2, r + g]];
+    const near = cand.length;
+    for(let k = 1; k <= 5; k++){
+      cand.push([-w / 2, -r - g - h - k * (h + g)], [-w / 2, r + g + k * (h + g)],
+                [c + k * (w * 0.6), -c - h - k * (h * 0.7)], [-c - w - k * (w * 0.6), -c - h - k * (h * 0.7)],
+                [c + k * (w * 0.6), c + k * (h * 0.7)], [-c - w - k * (w * 0.6), c + k * (h * 0.7)]);
+    }
+    let best = null, bs = Infinity;
+    for(let ci = 0; ci < cand.length; ci++){
+      const [dx, dy] = cand[ci];
+      const rc = {x1: t.x + dx, y1: t.y + dy, x2: t.x + dx + w, y2: t.y + dy + h};
+      let s = 0;
+      for(const p of placed){ s += area(rc, p) * 10; }
+      for(let j = 0; j < ob.length; j++){ if(j !== t.self) s += area(rc, ob[j]) * 3; }
+      if(s === 0){ best = {rc, ci}; break; }
+      s += ci * w * h * 0.02;                   // 重なりが同じなら、印に近い所
+      if(s < bs){ bs = s; best = {rc, ci}; }
+    }
+    placed.push(best.rc);
+    t.lx = best.rc.x1; t.ly = best.rc.y1; t.lead = best.ci >= near;
+  });
+  return tags;
+}
+/* 引出線：印のふちから札のいちばん近い所まで */
+function leadLine(t){
+  const cx = Math.max(t.lx, Math.min(t.x, t.lx + t.w)), cy = Math.max(t.ly, Math.min(t.y, t.ly + t.h));
+  const dx = cx - t.x, dy = cy - t.y, d = Math.hypot(dx, dy) || 1;
+  return {x1: t.x + dx / d * t.r, y1: t.y + dy / d * t.r, x2: cx, y2: cy};
+}
+let tagCtx = null;
+function tagWidth(text){
+  if(!tagCtx){ tagCtx = document.createElement("canvas").getContext("2d"); tagCtx.font = "600 11px sans-serif"; }
+  return Math.ceil(tagCtx.measureText(text).width) + 6;
+}
 function renderMarks(){
   const box = $z("zMarks");
   if(!R || !dz){ box.innerHTML = ""; $z("zLegend").innerHTML = ""; return; }
@@ -359,6 +409,7 @@ function renderMarks(){
   const d = markSize(), vs = vsize(), tags = V.s > 0.55;
   const cnt = {"": 0, ok: 0, warn: 0, ng: 0, obs: 0, none: 0};
   let html = "";
+  const tagReq = [], obst = [];     // 番号札（あとで重ならない所に置く）と印
   const seen = new Map();   // 同じ位置に複数の樹木（1つの桝に数本）→ 少しずらして並べる
   posOnDrawing(dz).forEach(p => {
     const i = idxOf.get(p.k);
@@ -375,6 +426,7 @@ function renderMarks(){
     const isCur = i === cur && !fixing && !addMode && !mvMode, isSel = !!(fixSel && fixSel.k === p.k) || !!(mvSel && mvSel.k === p.k);
     const isInc = incNos.has(st.items[i].no);
     const dd = (isCur || isSel) ? d + 8 : d;
+    obst.push({x: q.x, y: q.y, r: dd / 2});
     html += '<div class="zmk ' + s + (isCur ? " cur" : "") + (isSel ? " sel" : "") + (p.moved ? " moved" : "") +
             (p.added ? " added" : "") + (p.u && !p.moved ? " unsure" : "") + (isInc ? " inc" : "") +
             '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
@@ -393,9 +445,19 @@ function renderMarks(){
     if(tags || isCur || isSel || gShort){
       const it = st.items[i];
       const lbl = gShort ? (it.hojo || treeLabel(it, false)) : labelOf(it, done.get(it.no));
-      html += '<div class="ztag" style="transform:translate(' + (q.x + dd / 2) + 'px,' + (q.y - dd / 2 - 8) + 'px)">' + esc(lbl) + '</div>';
+      tagReq.push({x: q.x, y: q.y, r: dd / 2, w: tagWidth(lbl), h: 15, self: obst.length - 1, pri: (isCur || isSel) ? 2 : 0, text: lbl, cur: isCur || isSel});
     }
   });
+  // 番号札：ほかの札・印と重ならない所に置く。離して置いた札は引出線で印とつなぐ
+  if(tagReq.length){
+    layoutTags(tagReq, obst, 2);
+    let lines = "";
+    tagReq.forEach(t => {
+      if(t.lead){ const L = leadLine(t); lines += '<line x1="' + L.x1.toFixed(1) + '" y1="' + L.y1.toFixed(1) + '" x2="' + L.x2.toFixed(1) + '" y2="' + L.y2.toFixed(1) + '"/>'; }
+      html += '<div class="ztag' + (t.cur ? " zcurtag" : "") + '" style="transform:translate(' + t.lx.toFixed(1) + 'px,' + t.ly.toFixed(1) + 'px)">' + esc(t.text) + '</div>';
+    });
+    if(lines) html = '<svg class="zlead" width="' + vs.w + '" height="' + vs.h + '">' + lines + '</svg>' + html;
+  }
   if(addMode && addPt){
     const q = toScreen(addPt.x, addPt.y), dd = d + 6;
     html += '<div class="zmk newpt" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
@@ -1162,7 +1224,7 @@ async function drawResultSheet(cv, d, C){
   // 印
   const st = C.st, done = C.done;
   const cnt = {"": 0, ok: 0, warn: 0, ng: 0, obs: 0, none: 0, cut: 0};
-  const r0 = u * 4.2, seen = new Map(), cuts = [], tags = [];
+  const r0 = u * 4.2, seen = new Map(), cuts = [], tags = [], marks = [];
   C.pos.filter(p => nz(p.z) === nz(d.zumen)).forEach(p => {
     const i = C.idx.get(p.k);
     if(i == null || !st) return;
@@ -1174,15 +1236,31 @@ async function drawResultSheet(cv, d, C){
     g.beginPath(); g.arc(x, y, r0, 0, Math.PI * 2);
     if(fill){ g.fillStyle = fill; g.fill(); }
     g.lineWidth = u * 1.1; g.strokeStyle = col; g.stroke();
-    if((s && s !== "ok") || p.g) tags.push({x, y, t: labelOf(it, rec, false), col});
+    marks.push({x, y, r: r0});
+    if((s && s !== "ok") || p.g) tags.push({x, y, t: labelOf(it, rec, false), col, self: marks.length - 1});
     if(rec && rec.bassai){ cnt.cut++; cuts.push({x, y}); }
   });
   // 番号（良好・未点検以外）：白い縁取りで図面の線と区別する
-  g.textAlign = "left"; g.textBaseline = "alphabetic"; g.lineJoin = "round";
-  g.font = "700 " + Math.round(u * 6.5) + "px sans-serif";
+  // 重ならない所に置く（gj-v67）。要伐採の札（印の左上）は先に場所を取っておく
+  g.textAlign = "left"; g.textBaseline = "top"; g.lineJoin = "round";
+  const tfs = Math.round(u * 6.5);
+  g.font = "700 " + Math.round(u * 8.5) + "px sans-serif";
+  const cutW = g.measureText("要伐採").width + u * 6, cutH = Math.round(u * 8.5) + u * 4, cutL = u * 16;
+  const cutBoxes = cuts.map(c => { const bx = c.x - r0 * 0.72 - cutL, by = c.y - r0 * 0.72 - cutL; return {x1: bx - cutW, y1: by - cutH, x2: bx, y2: by}; });
+  g.font = "700 " + tfs + "px sans-serif";
+  tags.forEach(t => { t.r = r0; t.w = g.measureText(t.t).width + u * 1.5; t.h = tfs * 1.12; });
+  layoutTags(tags, marks, u * 0.8, cutBoxes);
   tags.forEach(t => {
-    g.lineWidth = u * 2; g.strokeStyle = "#fff"; g.strokeText(t.t, t.x + r0 + u, t.y - r0 * 0.4);
-    g.fillStyle = t.col; g.fillText(t.t, t.x + r0 + u, t.y - r0 * 0.4);
+    if(!t.lead) return;
+    const L = leadLine(t);
+    g.lineCap = "round";
+    g.strokeStyle = "#fff"; g.lineWidth = u * 1.6; g.beginPath(); g.moveTo(L.x1, L.y1); g.lineTo(L.x2, L.y2); g.stroke();
+    g.strokeStyle = t.col; g.lineWidth = u * 0.6; g.beginPath(); g.moveTo(L.x1, L.y1); g.lineTo(L.x2, L.y2); g.stroke();
+  });
+  tags.forEach(t => {
+    const tx = t.lx + u * 0.75, ty = t.ly + tfs * 0.06;
+    g.lineWidth = u * 2; g.strokeStyle = "#fff"; g.strokeText(t.t, tx, ty);
+    g.fillStyle = t.col; g.fillText(t.t, tx, ty);
   });
   // 要伐採：左上に赤い札、引き出し線の矢印で印を指す
   const L = u * 16, fs = Math.round(u * 8.5);
