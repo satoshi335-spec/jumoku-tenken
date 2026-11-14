@@ -1237,10 +1237,11 @@ async function drawResultSheet(cv, d, C){
     if(fill){ g.fillStyle = fill; g.fill(); }
     g.lineWidth = u * 1.1; g.strokeStyle = col; g.stroke();
     marks.push({x, y, r: r0});
-    if((s && s !== "ok") || p.g) tags.push({x, y, t: labelOf(it, rec, false), col, self: marks.length - 1});
+    // 番号：点検した木はすべて（良好＝緑も。2026-11-14 ユーザー指示）。良好以外の札を先に、印の近くに置く
+    if(s || p.g) tags.push({x, y, t: labelOf(it, rec, false), col, self: marks.length - 1, pri: s && s !== "ok" ? 1 : 0});
     if(rec && rec.bassai){ cnt.cut++; cuts.push({x, y}); }
   });
-  // 番号（良好・未点検以外）：白い縁取りで図面の線と区別する
+  // 番号（未点検以外）：白い縁取りで図面の線と区別する
   // 重ならない所に置く（gj-v67）。要伐採の札（印の左上）は先に場所を取っておく
   g.textAlign = "left"; g.textBaseline = "top"; g.lineJoin = "round";
   const tfs = Math.round(u * 6.5);

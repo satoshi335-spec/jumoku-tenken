@@ -1,5 +1,5 @@
 // 古い版のキャッシュだけ消す（同じ場所にある他のアプリのキャッシュは残す）
-const VERSION = "gj-v67";
+const VERSION = "gj-v68";
 const ASSETS = [
   "./",
   "./index.html",
