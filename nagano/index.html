@@ -64,6 +64,8 @@ header select{font-size:15px;padding:7px 6px;border-radius:8px;border:none;backg
 .mk.pg::after{content:"×";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#555;font-weight:700;font-size:12px}
 #rng{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
 #rng path{fill:rgba(220,40,40,.10);stroke:rgba(200,30,30,.75);stroke-width:2px;vector-effect:non-scaling-stroke;fill-rule:evenodd}
+#bnd{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+#bnd path{fill:none;stroke:#11A63A;stroke-width:var(--bw,3px);stroke-linejoin:round;stroke-linecap:round;opacity:.9}
 .plate{margin-top:8px;border:2px solid var(--g);border-radius:12px;padding:6px 9px 9px}
 .plate .lbl{margin-top:4px}
 .plate .seg button{font-size:13px;line-height:1.25}
@@ -334,7 +336,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 
 <div id="main">
   <div id="view">
-    <div id="stage"><img id="ovimg" alt=""><div id="tiles"></div><svg id="rng"></svg></div>
+    <div id="stage"><img id="ovimg" alt=""><div id="tiles"></div><svg id="rng"></svg><svg id="bnd"></svg></div>
     <div id="gpsAcc"></div><div id="gps"></div>
     <div id="marks"></div>
     <div id="mapTL"><div id="legend"></div><div id="missBar"></div></div>
@@ -642,7 +644,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 36;
+const APP_VER = 37;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -857,6 +859,11 @@ async function buildMap(){
   svg.setAttribute("width", m.W); svg.setAttribute("height", m.H); svg.setAttribute("viewBox", "0 0 " + m.W + " " + m.H);
   svg.innerHTML = (m.range || []).map(r => '<path d="' + (r.polys || []).concat(r.holes || []).map(pl => "M" + pl.map(q => q[0] + "," + q[1]).join("L") + "Z").join("") + '"/>').join("");
   svg.style.display = opt.range === false ? "none" : "";
+  // 公園の境界（開設区域。大阪府の管理図の緑の線。v37〜）
+  const bs = $("bnd");
+  bs.setAttribute("width", m.W); bs.setAttribute("height", m.H); bs.setAttribute("viewBox", "0 0 " + m.W + " " + m.H);
+  bs.innerHTML = (m.boundary || []).map(b => '<path d="' + (b.lines || []).map(pl => "M" + pl.map(q => q[0] + "," + q[1]).join("L")).join("") + '"/>').join("");
+  bs.style.display = opt.bnd === false ? "none" : "";
 }
 /* 見えているタイルだけ読み込む（拡大しているとき） */
 let tileBusy = false, tileAgain = false;
@@ -910,6 +917,7 @@ let viewSaveT = 0;
 let marksV = null, marksT = 0;
 function applyView(){
   $("stage").style.transform = "translate(" + V.tx + "px," + V.ty + "px) rotate(" + V.r + "rad) scale(" + V.s + ")";
+  $("bnd").style.setProperty("--bw", (3 / V.s).toFixed(2) + "px");     // 境界の線は拡大しても 3px（図面の縮尺では細くなりすぎる）
   $("northBtn").style.display = Math.abs(V.r) > 0.001 ? "" : "none";
   $("northIc").style.transform = "rotate(" + V.r + "rad)";      // ▲＝図面の上の向き
   if(gest && (gest.mode === "pan" || gest.mode === "pinch" || gest.mode === "rot") && marksV){
@@ -1070,7 +1078,8 @@ function renderLegend(){
     '<i style="border:none;background:var(--ng);width:9px;height:9px"></i>入力漏れ' +
     '<br><i style="border-color:#555;border-style:dashed"></i>前回までに伐採・消失' +
     ((pkg.map.range || []).length ? '<i style="border-radius:2px;border-color:rgba(200,30,30,.75);background:rgba(220,40,40,.1)"></i>調査範囲' +
-      '<i style="border-color:var(--warn);border-style:dotted;opacity:.5"></i>範囲の外' : "");
+      '<i style="border-color:var(--warn);border-style:dotted;opacity:.5"></i>範囲の外' : "") +
+    ((pkg.map.boundary || []).length && opt.bnd !== false ? '<i style="border:none;border-radius:0;height:0;border-top:3px solid #11A63A;width:14px;vertical-align:middle"></i>公園の境界' : "");
 }
 
 /* ---- 指の操作 ---- */
@@ -3293,11 +3302,13 @@ $("menuBtn").onclick = ()=>{
       ((e.quota && e.usage / e.quota > 0.7) ? '　<b style="color:var(--ng)">残りが少なくなっています。送った写真を消してください</b>' : "");
   }).catch(()=>{});
   if(opt.range == null) opt.range = true;
+  if(opt.bnd == null) opt.bnd = true;
   $("optTags").innerHTML = '<button class="' + (opt.tags ? "on" : "") + '" data-o="tags">番号を表示</button>' +
-    '<button class="' + (opt.range ? "on" : "") + '" data-o="range">調査範囲を表示</button>';
+    '<button class="' + (opt.range ? "on" : "") + '" data-o="range">調査範囲を表示</button>' +
+    (pkg && (pkg.map.boundary || []).length ? '<button class="' + (opt.bnd ? "on" : "") + '" data-o="bnd">公園の境界を表示</button>' : "");
   $("optTags").querySelectorAll("button").forEach(b => b.onclick = ()=>{
     opt[b.dataset.o] = !opt[b.dataset.o]; lsSet("nagano_opt", opt); b.classList.toggle("on");
-    $("rng").style.display = opt.range === false ? "none" : ""; scheduleMarks();
+    $("rng").style.display = opt.range === false ? "none" : ""; $("bnd").style.display = opt.bnd === false ? "none" : ""; scheduleMarks(); renderLegend();
   });
   $("calInfo").innerHTML = pkg ? "現在地合わせ：" + regions().filter(r => r.district).map(r => esc(r.district) + " " + (r.geo ? "不要" : calOf(r.district).length + "点")).join("　") +
     "<br>GPS の点が図面に出ない・ずれるときは、番号の分かる木の所で木を選び、［この木の所にいる］を押します（2点以上・20m以上離すと向きも合います）。" : "";
