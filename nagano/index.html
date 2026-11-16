@@ -644,7 +644,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 37;
+const APP_VER = 38;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -2117,6 +2117,18 @@ const OBS_TXT = "（経過観察）", BASSAI_TXT = "伐採が必要。", HANGARE
 const OBS_MEMO = "定期的な枯れ枝剪定、風圧軽減剪定が必要。";
 const SENT_END = /[。．.！!）)]$/;
 let tcUser = lsGet("nagano_tc", {});           // iPad で直した文 {項目: {A:[…], B:[…], C:[…]}}
+/* 以前の「軽微」入りの文が iPad に保存されていれば、いまの文に置き換える（v38〜） */
+(function(){
+  if(typeof CMT_RENAMED === "undefined") return;
+  let ch = false;
+  for(const k in tcUser) for(const g in tcUser[k]){
+    tcUser[k][g] = (tcUser[k][g] || []).map(t => { if(CMT_RENAMED[t]){ ch = true; return CMT_RENAMED[t]; } return t; });
+    const d = (typeof CMT_DEFAULT !== "undefined" && CMT_DEFAULT[k] && CMT_DEFAULT[k][g]) || [];
+    if(JSON.stringify(tcUser[k][g]) === JSON.stringify(d)){ delete tcUser[k][g]; ch = true; }
+  }
+  for(const k in tcUser) if(!Object.keys(tcUser[k]).length) delete tcUser[k];
+  if(ch) lsSet("nagano_tc", tcUser);
+})();
 const tkG = i => pkg.tenkenItems[i].g;
 function cmtKey(i){ const t = pkg.tenkenItems[i].t; return t === "その他" ? (tkG(i) === "①" ? "その他（維持管理）" : "その他（樹木の異常）") : t; }
 function kareI(){ return pkg.tenkenItems.findIndex(x => x.t === "枯死・著しい衰弱"); }
