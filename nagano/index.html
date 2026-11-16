@@ -642,7 +642,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 35;
+const APP_VER = 36;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -2447,6 +2447,18 @@ async function freeSentPhotos(){
   toast(list.length + " 枚を消しました"); if(selId) renderPhotos(); $("menuBtn").onclick();
 }
 function photosOf(no){ return photoMeta.filter(m => m.no === no); }
+/* 写真の黒板に写っている番号＝撮ったときの番号（v36〜は m.board に残す）。
+   それより前の写真は、撮った後の番号の付け替え（R.photoRen）を新しい順にさかのぼって求める */
+function photoNoOf(name){ return String(name || "").replace(/_(P|\d+)\.jpg$/i, ""); }
+function boardOf(m){
+  if(m.board) return m.board;
+  let cur = m.name;
+  const bs = (R.photoRen || []).filter(b => (b.t || 0) > (m.t || 0)).sort((a, b) => (b.t || 0) - (a.t || 0));
+  for(const b of bs){ const p = (b.m || []).find(x => x[1] === cur); if(p) cur = p[0]; }
+  return photoNoOf(cur);
+}
+/* 黒板の番号がいまの番号と違う写真（撮った後に番号を変えた。撮り直すと置き換える） */
+function staleBoard(m){ return m.kind !== "S" && !!m.no && boardOf(m) !== m.no; }
 function renderPhotos(){
   const t = treeById(selId); if(!t) return;
   const no = noOf(t), ps = photosOf(no), r = recOf(selId);
@@ -2463,7 +2475,11 @@ function renderPhotos(){
     if(!has("1")) need.push("全景");
     if(tkResult(r).n23 + tkResult(r).n1 > 0 && !n2) need.push("被害部");
   }
-  $("phHint").innerHTML = need.length ? '<span style="color:var(--ng);font-weight:700">未撮影：' + need.join("・") + "</span>" : (ps.length ? ps.length + "枚" : "");
+  const stale = ps.filter(staleBoard);
+  $("phHint").innerHTML = (need.length ? '<span style="color:var(--ng);font-weight:700">未撮影：' + need.join("・") + "</span>" : (ps.length ? ps.length + "枚" : "")) +
+    (stale.length ? '<br><span style="color:var(--ng);font-weight:700">黒板が前の番号の写真：' +
+      stale.map(m => esc((m.kind === "2" ? "被害部" : KIND_TXT[m.kind] || "") + "（黒板 " + boardOf(m) + "）")).join("・") +
+      '</span><span style="color:#555">　撮り直すと置き換えます</span>' : "");
   // 見本の画像は写真が変わったときだけ作り直す（入力のたびに作り直すとメモリがたまって落ちる）
   const pv = ps.length ? prevTreePhotos(selId) : null;
   const tk = selId + "|" + ps.map(m => m.key + (m.gone ? "g" : "")).join(",") + "|" + (pv ? pv.ps[0].key : "");
@@ -2476,7 +2492,9 @@ function renderPhotos(){
   const add = async (m, i, prev) => {
     const d = document.createElement("div");
     if(prev) d.className = "prev";
-    d.innerHTML = '<img alt=""><span>' + esc(prev ? "直前 " + m.no : m.name.replace(/\.jpg$/, "")) + (m.gone ? "（送信済）" : "") + "</span>" + (prev ? "" : "<button>✕</button>");
+    d.innerHTML = '<img alt=""><span>' + esc(prev ? "直前 " + m.no : m.name.replace(/\.jpg$/, "")) + (m.gone ? "（送信済）" : "") +
+      (!prev && staleBoard(m) ? '<br><b style="color:#fff;background:var(--ng);padding:0 3px;border-radius:3px">黒板 ' + esc(boardOf(m)) + "</b>" : "") +
+      "</span>" + (prev ? "" : "<button>✕</button>");
     box.appendChild(d);
     d.querySelector("img").onclick = ()=>{ if(window.PhotoView) PhotoView.open(list, i); };
     if(!prev) d.querySelector("button").onclick = async ()=>{ if(!confirm(m.name + " を削除しますか？")) return; await delPhoto(m); renderPhotos(); };
@@ -2494,7 +2512,7 @@ async function delPhoto(m){
 /* 画面いっぱいで見る写真の1枚分。del＝［この写真を削除］を出す */
 function pvItem(m, tag, del){
   const kindTxt = m.kind === "2" ? "被害部" : (KIND_TXT[m.kind] || "");
-  return {title: m.no || m.name.replace(/\.jpg$/, ""), sub: kindTxt + (m.cmt ? "　" + m.cmt : ""), tag,
+  return {title: m.no || m.name.replace(/\.jpg$/, ""), sub: kindTxt + (m.cmt ? "　" + m.cmt : "") + (staleBoard(m) ? "　※黒板は " + boardOf(m) : ""), tag,
           load: () => m.gone ? Promise.resolve(null) : idbGet("photos", m.key),
           onDelete: del ? async ()=>{ if(!confirm(m.name + " を削除しますか？")) return false; await delPhoto(m); renderPhotos(); return true; } : null};
 }
@@ -2899,12 +2917,18 @@ $("camShutter").onclick = async ()=>{
     const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.86));
     c.width = c.height = 0;   // Safari は画像用のメモリの上限が低いので、使い終わった画像はすぐ返す
     if(!blob) throw new Error("写真を作れませんでした（iPad のメモリ不足）。アプリを開き直してください");
-    const name = photoName(cam.no, cam.kind);
+    let name = photoName(cam.no, cam.kind);
+    if(cam.kind === "2"){
+      const st = photosOf(cam.no).filter(m => m.kind === "2" && staleBoard(m));
+      if(st.length && confirm("黒板が前の番号（" + boardOf(st[0]) + "）の被害部の写真 " + st[0].name + " があります。\n" +
+                              "いま撮った写真と置き換えますか？\n\n［OK］置き換える（前の写真は消えます）\n［キャンセル］置き換えずに追加する"))
+        name = st[0].name;
+    }
     const old = photoMeta.find(m => m.name === name);
     if(old){ await idbDel("photos", old.key); photoMeta = photoMeta.filter(m => m !== old); }
     const key = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     await idbPut("photos", key, blob);
-    photoMeta.push(Object.assign({key, name, no: cam.no, kind: cam.kind, t: Date.now(), sent: false, cmt: cam.cmts.join("・")},
+    photoMeta.push(Object.assign({key, name, no: cam.no, kind: cam.kind, t: Date.now(), sent: false, cmt: cam.cmts.join("・"), board: cam.no},
                                  cam.kind === "S" ? {dist: S.dist || ""} : {}));
     savePhotoMeta();
     $("camFlash").style.opacity = "0.9"; setTimeout(()=> $("camFlash").style.opacity = "0", 120);
@@ -3320,7 +3344,7 @@ $("bkBtn").onclick = async ()=>{
   if(saveRT) flushR();
   const t0 = Date.now();          // 書き出した内容の時刻（共有の画面を開いている間に入力した分は、次の書き出しに回る）
   const out = {type: "nagano-res", version: 1, exported: new Date().toISOString(), pkg: pkg ? pkg.id : "", settings: S, res: R,
-               photos: photoMeta.map(m => ({name: m.name, no: m.no, kind: m.kind, t: m.t, cmt: m.cmt || "", dist: m.dist || ""}))};
+               photos: photoMeta.map(m => ({name: m.name, no: m.no, kind: m.kind, t: m.t, cmt: m.cmt || "", dist: m.dist || "", board: m.kind === "S" ? "" : boardOf(m)}))};
   const blob = new Blob([JSON.stringify(out)], {type: "application/json"});
   if(await share(blob, "長野公園_調査結果_" + stampName() + ".json")){ S.lastBk = new Date().toLocaleString("ja-JP"); S.lastBkT = t0; saveS(); updProg(); toast("書き出しました"); }
 };
