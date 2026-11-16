@@ -708,6 +708,18 @@ ITEMS.forEach((it,i)=>{
 /* 文の初期値は comments.js（CMT_DEFAULT）。iPadで直した文は gj_tc に保存され、初期値より優先 */
 const LV = {A: "軽度", B: "処置が必要", C: "緊急対応"};
 let tcUser = load("gj_tc", {});            // {点検項目: {A:[文…], B:[…], C:[…]}}
+/* 以前の「軽微」入りの文が iPad に保存されていれば、いまの文に置き換える（v70〜） */
+(function(){
+  if(typeof CMT_RENAMED === "undefined") return;
+  let ch = false;
+  for(const k in tcUser) for(const g in tcUser[k]){
+    tcUser[k][g] = (tcUser[k][g] || []).map(t => { if(CMT_RENAMED[t]){ ch = true; return CMT_RENAMED[t]; } return t; });
+    const d = (typeof CMT_DEFAULT !== "undefined" && CMT_DEFAULT[k] && CMT_DEFAULT[k][g]) || [];
+    if(JSON.stringify(tcUser[k][g]) === JSON.stringify(d)){ delete tcUser[k][g]; ch = true; }
+  }
+  for(const k in tcUser) if(!Object.keys(tcUser[k]).length) delete tcUser[k];
+  if(ch) store("gj_tc", tcUser);
+})();
 let lv = {}, autoTxt = {}, alt = {};       // 入力中の樹木：項目番号 → 程度／特記事項に入れた文／候補の番号
 let bassai = false;                        // 入力中の樹木が「要伐採」か（程度B・Cの項目の［伐採］で切り替え）
 const BASSAI_TXT = "伐採が必要。";          // 要伐採にすると特記事項に入れる文
