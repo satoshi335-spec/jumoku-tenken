@@ -326,6 +326,9 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 #missBar.show{display:block}
 #missBar button{margin:4px 4px 0 0;font-size:13px;padding:5px 9px;border-radius:14px;border:1px solid var(--ng);background:#fff;color:var(--ng);font-weight:700}
 .mk.miss::before{content:"";position:absolute;right:-6px;top:-6px;width:9px;height:9px;border-radius:50%;background:var(--ng);border:1.5px solid #fff}
+#prog .pd{opacity:.75}
+#prog .pd.on{opacity:1}
+#prog .pd b{font-size:13px}
 #prog .miss{display:inline-block;margin-top:2px;background:#fff;color:var(--ng);border-radius:6px;padding:0 5px;font-weight:700}
 .flash{animation:flash .5s 3}
 #wxBtns button{min-height:64px;font-size:22px;border-color:var(--g);color:var(--g)}
@@ -671,7 +674,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 39;
+const APP_VER = 40;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -3201,19 +3204,27 @@ function updProg(){
   if(!pkg){ $("prog").textContent = ""; return; }
   updJk();
   $("menuBtn").classList.toggle("due", unsentRecs(true) > 0);   // きのうまでの入力をまだ書き出していない
-  let done = 0, tot = 0, need = 0, insp = 0, newP = 0;
+  let need = 0, insp = 0, newP = 0;
+  const pd = {};                     // 地区ごとの 済・本数（v40〜。2地区とも進捗率と残りを出す）
+  pkg.project.districts.forEach(d => pd[d] = {done: 0, tot: 0});
   for(const t of allTrees()){
     const st = stateOf(t), r = recOf(t.id);
-    if(distOf(t) === S.dist){
-      if(!t.out || st) tot++;
-      if(st) done++;
+    const p = pd[distOf(t)];
+    if(p){
+      if(!t.out || st) p.tot++;
+      if(st) p.done++;
     }
     if(st === "need") need++; if(st === "insp") insp++;
     if(r.plate === "new" || t.added) newP++;
   }
   const nm = missCount();
+  // 進捗率は切り捨て（全部終わるまで 100% にしない）。残り＝調査範囲の木のうち未調査
+  const distLine = d => {
+    const p = pd[d], rest = Math.max(0, p.tot - p.done), pct = p.tot ? Math.floor(p.done * 100 / p.tot) : 0;
+    return '<span class="pd' + (d === S.dist ? " on" : "") + '">' + esc(d.replace(/地区$/, "")) + " 済 <b>" + p.done + "</b> / " + p.tot + " 本 <b>" + pct + "%</b>　残り <b>" + rest + "</b></span>";
+  };
   $("prog").innerHTML = (S.phase === "t" ? "樹木点検 済 <b>" + insp + "</b> / 要点検 " + (insp + need) + " 本<br>（2地区の合計）"
-    : S.dist + " 済 <b>" + done + "</b> / " + tot + " 本<br>要点検 " + (insp + need) + "　新しい札 " + newP) +
+    : pkg.project.districts.map(distLine).join("<br>") + "<br>要点検 " + (insp + need) + "　新しい札 " + newP) +
     (nm ? '<br><span class="miss">⚠ 入力漏れ ' + nm + " 本</span>" : "") +
     (wxMissingDays().length ? ' <span class="wxm" id="wxMiss">天候未選択 ' + wxMissingDays().map(d => (+d.split("-")[1]) + "/" + (+d.split("-")[2])).join("・") + "</span>" : "");
 }
