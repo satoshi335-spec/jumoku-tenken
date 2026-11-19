@@ -592,9 +592,10 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 </div>
 <!-- 写真ZIPの書き出し（v41〜） -->
 <div id="zipDlg"><div id="zipBox">
-  <h3>写真ZIPの書き出し</h3>
+  <h3 id="zipTitle">写真ZIPの書き出し</h3>
   <p class="note" id="zipNote" style="margin:0 0 6px"></p>
   <div id="zipList"></div>
+  <div id="zipNext"></div>
   <button type="button" class="btn sub" id="zipClose" style="margin-top:12px">閉じる</button>
 </div></div>
 <!-- 削除した写真（v39〜） -->
@@ -693,7 +694,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 41;
+const APP_VER = 42;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -3543,18 +3544,58 @@ async function share(blob, name){
   return true;
 }
 function stampName(){ const d = new Date(); return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + "_" + pad2(d.getHours()) + pad2(d.getMinutes()); }
-$("bkBtn").onclick = async ()=>{
+/* 調査結果（JSON）の書き出し（v42〜）
+   前は［調査結果を書き出す］を押すとすぐ保存の画面を開いていたが、入力漏れの確認（confirm）を挟むと
+   iPad では「ボタンを押した直後」と見なされず、保存の画面が開かないことがあった（何回か押し直していた）。
+   写真ZIPと同じく案内の画面を出し、そこで［保存する］を押してもらう。保存したら、続けて写真ZIPへ進める */
+let bkJob = null;      // {file, t0, st}
+$("bkBtn").onclick = ()=>{
   const wd = wxMissingDays();
   if(wd.length){ askWx(wd[0], true); toast("先に天候を選んでください（" + wd.join("・") + "）"); return; }
-  const nm = missCount();
-  if(nm && !confirm("⚠ 入力漏れ・写真不足の木が " + nm + " 本あります（一覧の［入力漏れ・写真不足］で確かめられます）。\nこのまま書き出しますか？")) return;
   if(saveRT) flushR();
-  const t0 = Date.now();          // 書き出した内容の時刻（共有の画面を開いている間に入力した分は、次の書き出しに回る）
+  const t0 = Date.now();          // 書き出した内容の時刻（保存の画面を開いている間に入力した分は、次の書き出しに回る）
   const out = {type: "nagano-res", version: 1, exported: new Date().toISOString(), pkg: pkg ? pkg.id : "", settings: S, res: R,
                photos: photoMeta.map(m => ({name: m.name, no: m.no, kind: m.kind, t: m.t, cmt: m.cmt || "", dist: m.dist || "", board: m.kind === "S" ? "" : boardOf(m)}))};
-  const blob = new Blob([JSON.stringify(out)], {type: "application/json"});
-  if(await share(blob, "長野公園_調査結果_" + stampName() + ".json")){ S.lastBk = new Date().toLocaleString("ja-JP"); S.lastBkT = t0; saveS(); updProg(); toast("書き出しました"); }
+  const name = "長野公園_調査結果_" + stampName() + ".json";
+  bkJob = {file: new File([JSON.stringify(out)], name, {type: "application/json"}), t0, st: "ready"};
+  zipJob = null;
+  const nm = missCount(), nt = Object.keys(R.trees).length;
+  $("zipTitle").textContent = "調査結果の書き出し";
+  $("zipNote").innerHTML = (nm ? '<b style="color:var(--ng)">⚠ 入力漏れ・写真不足の木が ' + nm + " 本あります（一覧の［入力漏れ・写真不足］で確かめられます）。このまま書き出してもかまいません。</b><br>" : "") +
+    "［保存する］を押して、AirDrop・OneDrive などで事務所PCへ送ってください。保存の画面で［キャンセル］したときは、もう一度押せます。";
+  renderBkDlg();
+  $("zipDlg").classList.add("show");
 };
+function renderBkDlg(){
+  const J = bkJob; if(!J) return;
+  const lab = J.st === "done" ? "✓ 保存済み" : "保存する";
+  $("zipList").innerHTML = '<div class="zipRow"><div class="zl"><b>調査結果（JSON）</b><br><small>' + esc(J.file.name) + "　入力した木 " + Object.keys(R.trees).length + " 本・写真の一覧 " + photoMeta.length + " 枚</small></div>" +
+    '<button type="button" id="bkSave" class="' + (J.st === "done" ? "done" : "ready") + '">' + lab + "</button></div>";
+  $("bkSave").onclick = saveBk;
+  const un = photoMeta.filter(m => !m.gone && !m.sent).length;
+  $("zipNext").innerHTML = J.st === "done" ? (un ? '<button type="button" class="btn" id="bkToZip" style="margin-top:12px">続けて、まだ送っていない写真（' + un + " 枚）を書き出す</button>"
+    : '<p class="note" style="color:var(--ok);font-weight:700">✓ 保存しました。まだ送っていない写真はありません。［閉じる］を押してください</p>') : "";
+  if($("bkToZip")) $("bkToZip").onclick = ()=>{ bkJob = null; openZipDlg(false); };
+}
+async function saveBk(){
+  const J = bkJob; if(!J) return;
+  const f = J.file;
+  let ok = false;
+  if(navigator.canShare && navigator.canShare({files: [f]})){
+    try{ await navigator.share({files: [f], title: f.name}); ok = true; }
+    catch(e){
+      if(e.name === "AbortError") toast("キャンセルしました（もう一度［保存する］を押せます）");
+      else { const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); ok = true; }
+    }
+  } else { const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); ok = true; }
+  if(bkJob !== J) return;
+  if(ok){
+    J.st = "done";
+    S.lastBk = new Date().toLocaleString("ja-JP"); S.lastBkT = J.t0; saveS(); updProg();
+    toast("調査結果を保存しました");
+  }
+  renderBkDlg();
+}
 /* 無圧縮ZIP */
 const CRC_T = (()=>{ const t = new Uint32Array(256); for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c; } return t; })();
 const crc32 = d => { let c = 0xFFFFFFFF; for(let i = 0; i < d.length; i++) c = CRC_T[(c ^ d[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
@@ -3588,6 +3629,7 @@ function openZipDlg(all){
   const chunks = [];
   for(let i = 0; i < list.length; i += ZIP_CH) chunks.push(list.slice(i, i + ZIP_CH));
   zipJob = {chunks, base: "長野公園_写真_" + stampName(), total: list.length, all, st: chunks.map(() => "idle"), ready: null};
+  $("zipTitle").textContent = "写真ZIPの書き出し"; $("zipNext").innerHTML = "";
   $("zipNote").innerHTML = (all ? "すべての写真 " : "まだ送っていない写真 ") + list.length + " 枚を " + chunks.length + " 個のZIPにして保存します。" +
     (chunks.length > 1 ? "<br><b>［保存する］を上から1個ずつ押してください</b>（iPad では続けて自動で保存できません）。" : "") +
     "<br>準備ができると［保存する］が緑になります。保存の画面で［キャンセル］したZIPは、もう一度押せます。";
@@ -3648,7 +3690,7 @@ async function saveZip(ci){
   if(ok && nx >= 0) prepZip(nx);
   else if(ok){ toast("すべてのZIP（" + J.total + " 枚）を保存しました"); $("zipNote").innerHTML += '<br><b style="color:var(--ok)">✓ すべて保存しました。［閉じる］を押してください</b>'; }
 }
-$("zipClose").onclick = ()=>{ $("zipDlg").classList.remove("show"); zipJob = null; };
+$("zipClose").onclick = ()=>{ $("zipDlg").classList.remove("show"); zipJob = null; bkJob = null; if($("menuM").classList.contains("show")) $("menuBtn").onclick(); };
 $("zipBtn").onclick = ()=> openZipDlg(false);
 $("zipAllBtn").onclick = ()=> openZipDlg(true);
 $("freeBtn").onclick = freeSentPhotos;
