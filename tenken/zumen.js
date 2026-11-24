@@ -1420,7 +1420,7 @@ async function importPack(f){
       const base = String(o.masu || "").trim(), hojo = String(o.hojo || "").trim();
       return {no: hojo && !base.endsWith("-" + hojo) ? base + "-" + hojo : base, base, hojo,
               sp: o.sp || "", zumen: o.zumen || "", city: o.city || "", town: o.town || "",
-              bikou: o.bikou || "", girth: o.girth || ""};
+              bikou: o.bikou || "", girth: o.girth || "", jg: o.jg || ""};
     });
     // 現場で追加した樹木は、取り込み直しても残す（リストに同じ番号が入っていれば、そちらを使う）
     const adds = ADD[key] || {};

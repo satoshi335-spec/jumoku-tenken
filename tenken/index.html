@@ -1579,6 +1579,8 @@ function showListItem(i, noGuard){
     $("tno").value = sh.base; $("hojo").value = sh.hojo; $("sp").value = it.sp || "";
     // 台帳の幹周は「前回」に入れ、今回はこれから測って入力する
     $("girthPrev").value = it.girth || "";
+    // 事前調査で幹周りを測ってある木は、その値を今回の幹周りに入れる（点検では測らない）
+    if(it.jg && !isNoTree(it.sp)) putJizenGirth(it.jg);
     girthWarnUpd();
   }
   if(it.zumen) $("zumen").value = it.zumen;
@@ -1606,6 +1608,7 @@ function renderListInfo(it, saved){
   if(sh.hojo) parts.push("樹木No. <b>" + esc(sh.hojo) + "</b>");
   if(it.sp) parts.push("<b>" + esc(it.sp) + "</b>");
   if(it.girth) parts.push("幹周 " + esc(it.girth) + "cm");
+  if(it.jg) parts.push('<span style="color:var(--ok-tx);font-weight:600">事前調査で測定済 ' + esc(String(it.jg).replace(/\+/g, "＋")) + "cm（測り直し不要）</span>");
   let html = parts.join("　｜　");
   if(it.bikou) html += '<br><span class="bikou">備考：' + esc(it.bikou) + "</span>";
   if(saved) html += '<br><span style="color:var(--ok-tx);font-weight:600">✓ 保存済み</span>';
@@ -1822,6 +1825,19 @@ $("kabuChk").addEventListener("change", ()=>{
   if(!on){ $("kabuNote").textContent = ""; $("memoAutoHint").textContent = ""; }
   kabuCalc();
 });
+/* 事前調査で測った幹周り（例 "40"、株立ちは "45+30"）を今回の幹周りに入れる。株立ちは各幹を入れて計算させる */
+function putJizenGirth(jg){
+  const parts = String(jg).split("+").map(s => parseFloat(s)).filter(v => v > 0);
+  if(!parts.length) return;
+  if(parts.length > 1){
+    $("kabuChk").checked = true; $("kabuBox").classList.add("show");
+    document.querySelectorAll(".stem").forEach((inp, i) => inp.value = parts[i] ?? "");
+    kabuCalc();
+  } else {
+    $("girth").value = parts[0];
+  }
+  girthDiffUpd();
+}
 function stemVals(){
   return [...document.querySelectorAll(".stem")].map(i => parseFloat(i.value)).filter(v => v > 0);
 }
