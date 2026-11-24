@@ -1715,9 +1715,9 @@ function buildWorkbook(){
   });
   sheets.push(S);
   /* 路線ごとの樹木一覧 */
-  const heads = ["No", "図面番号", "桝No", "樹木No", "樹種名（台帳）", "H", "台帳C", "台帳区分", "現況", "実測幹周", "株立ち", "調査後区分", "区分変更", "現地の樹種", "メモ", "台帳備考", "最新の台帳図面", "調査日時", "台帳の行"];
+  const heads = ["No", "図面番号", "桝No", "樹木No", "樹種名（台帳）", "H", "台帳C", "台帳区分", "現況", "実測幹周", "株立ち", "調査後区分", "区分変更", "現地の樹種", "メモ", "台帳備考", "最新の台帳図面", "調査日時", "台帳の行", "位置の図面", "位置X", "位置Y"];
   pkg.routes.forEach(rt => {
-    const R = {name: rt.name, rows: [], widths: [5, 12, 7, 8, 14, 5, 7, 10, 13, 9, 30, 10, 8, 14, 24, 18, 22, 16, 8], freeze: 3};
+    const R = {name: rt.name, rows: [], widths: [5, 12, 7, 8, 14, 5, 7, 10, 13, 9, 30, 10, 8, 14, 24, 18, 22, 16, 8, 10, 7, 7], freeze: 3};
     R.rows.push([{v: rt.name + "　事前調査結果", s: 6}]);
     R.rows.push(["赤＝伐採済・空桝　灰＝桝無し　黄＝幹周区分が変わる　薄橙＝未調査　青＝台帳外の追加樹木"]);
     R.rows.push(heads.map(H));
@@ -1733,12 +1733,18 @@ function buildWorkbook(){
         chg ? {v: ac ? CLS_TXT[ac] : "", s: 5} : c(ac ? CLS_TXT[ac] : (ac === null ? "—" : "")),
         chg ? {v: "変更", s: 5} : c(""), c(r.sp2), c(r.memo), c(t.bikou),
         c([t.flag === "red" ? "赤い○（撤去）" : t.flag === "nolabel" ? "記号・番号なし" : "", t.moved ? "位置は図面 " + zShort(dwZumen(t.drawing)) : ""].filter(Boolean).join("　")),
-        c(fmtT(r.t)), cn(t.row)]);
+        c(fmtT(r.t)), cn(t.row)].concat(posCells(t, c, cn)));
     });
     R.filter = "A3:" + XL.col(heads.length - 1) + (R.rows.length);
     sheets.push(R);
   });
   return XL.build(sheets);
+}
+/* 現地で位置を直した樹木・追加した樹木の図面上の位置（PCで樹木点検へ移るときに使う。台帳の位置のままの樹木は空欄） */
+function posCells(t, c, cn){
+  const p = (t.added || (res.pins && res.pins[t.id])) ? posOf(t) : null;
+  if(!p || !t.drawing) return [c(""), c(""), c("")];
+  return [c(t.drawing), cn(Math.round(p.x)), cn(Math.round(p.y))];
 }
 function exportXlsx(){
   if(!pkg) return;
