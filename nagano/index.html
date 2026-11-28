@@ -94,7 +94,10 @@ body.ph-t #mmTgl{display:block}
 /* 要伐採・伐採推薦：印の左上に札、矢印で印を指す（v39〜。入力するとすぐ図面に出る） */
 .cut{position:absolute;left:0;top:0;pointer-events:none;z-index:4}
 .cut span{display:block;background:#C62828;color:#fff;font-size:13px;line-height:17px;font-weight:700;padding:2px 7px;border-radius:5px;border:2px solid #fff;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.5)}
-.cut.s span{background:#0A7FE0}
+#legend .lg{cursor:pointer;white-space:nowrap;border-radius:5px;padding:1px 0}
+#legend .lg:active{background:rgba(0,0,0,.08)}
+#legend .lg.off{opacity:.35;text-decoration:line-through}
+#legend .lgAll{margin-left:10px;color:var(--acc);font-weight:700;text-decoration:underline;cursor:pointer;white-space:nowrap}
 .cut svg{position:absolute;overflow:visible}
 /* 削除した写真（v39〜） */
 #trashList h4{margin:14px 0 4px;font-size:14px}
@@ -694,7 +697,7 @@ textarea.inp{resize:none;line-height:1.5;min-height:52px}
 <script>
 "use strict";
 if(navigator.standalone) document.documentElement.classList.add("standalone");
-const APP_VER = 42;
+const APP_VER = 43;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad2 = n => String(n).padStart(2, "0");
@@ -1079,14 +1082,36 @@ function tagWidth(text){
    印の左上に置き、斜めの矢印で印を指す。入力するとすぐ図面に出る（touch → scheduleMarks） */
 const CUT_L = 22, CUT_H = 25;
 let cutCtx = null;
-function cutOf(r){ return r && r.kanri ? (r.kanri.bas ? {t: "要伐採", c: ""} : r.kanri.basS ? {t: "伐採推薦", c: " s"} : null) : null; }
+/* 維持管理の処置の札（v43〜 要剪定・剪定推薦も）。1本に複数あるときは上から順に1つ。凡例で隠したものは出さない */
+const KANRI_TAGS = [{k: "bas", t: "要伐採", col: "#C62828"}, {k: "basS", t: "伐採推薦", col: "#0A7FE0"},
+                    {k: "sen", t: "要剪定", col: "#E65100"}, {k: "senS", t: "剪定推薦", col: "#00897B"}];
+function cutOf(r){
+  if(!r || !r.kanri) return null;
+  return KANRI_TAGS.find(x => r.kanri[x.k] && !hidden("k_" + x.k)) || null;
+}
+/* 凡例で隠したもの（opt.hide。v43〜） */
+function hidden(key){ return !!(opt.hide && opt.hide[key]); }
+/* 印の区分（凡例の項目と同じ） */
+function markKind(t, st){
+  if(st) return st;                               // done・need・insp・gone・skip
+  if(t.gone) return "pg";
+  if(t.out) return "out";
+  if(t.added || t.src === "circle" || t.src === "label") return "new";
+  return "u";
+}
+/* 図面に出す木：区分を隠していても、出している処置の札がある木と選んでいる木は出す */
+function treeShown(t){
+  if(t.id === selId) return true;
+  if(!hidden(markKind(t, stateOf(t)))) return true;
+  return !t.gone && !!cutOf(recOf(t.id));
+}
 function cutW(text){
   if(!cutCtx){ cutCtx = document.createElement("canvas").getContext("2d"); cutCtx.font = "700 13px sans-serif"; }
   return Math.ceil(cutCtx.measureText(text).width) + 18;
 }
 function cutHtml(c){
-  const L = CUT_L, col = c.k.c ? "#0A7FE0" : "#C62828";
-  return '<div class="cut' + c.k.c + '" style="transform:translate(' + (c.tx - L).toFixed(1) + 'px,' + (c.ty - L).toFixed(1) + 'px) translate(-100%,-100%)"><span>' + c.k.t + '</span>' +
+  const L = CUT_L, col = c.k.col;
+  return '<div class="cut" style="transform:translate(' + (c.tx - L).toFixed(1) + 'px,' + (c.ty - L).toFixed(1) + 'px) translate(-100%,-100%)"><span style="background:' + col + '">' + c.k.t + '</span>' +
     '<svg width="' + L + '" height="' + L + '" viewBox="0 0 ' + L + ' ' + L + '" style="right:-' + L + 'px;bottom:-' + L + 'px">' +
     '<path d="M0 0L' + (L - 7) + ' ' + (L - 7) + '" stroke="#fff" stroke-width="5"/>' +
     '<path d="M0 0L' + (L - 7) + ' ' + (L - 7) + '" stroke="' + col + '" stroke-width="2.5"/>' +
@@ -1104,9 +1129,10 @@ function renderMarks(){
   for(const t of allTrees()){
     const p = posOf(t), q = toScreen(p.x, p.y);
     if(q.x < -mx || q.y < -my || q.x > vs.w + mx || q.y > vs.h + my) continue;
+    if(!treeShown(t)) continue;
     const st = stateOf(t), r = recOf(t.id);
     const cls = "mk " + (st || (t.gone ? "pg" : t.src === "circle" ? "circ" : t.src === "label" ? "lbl" : "")) +
-                (t.added || R.renamed[t.id] ? " new" : "") + (r.kin ? " kin" : "") + (t.out && !st ? " out" : "") + (S.phase === "t" && !r.tenken ? " dim" : "") + (t.id === selId ? " sel" : "") + (st && missingOf(t).length ? " miss" : "");
+                (t.added || R.renamed[t.id] ? " new" : "") + (r.kin ? " kin" : "") + (t.out && !st ? " out" : "") + (S.phase === "t" && !r.tenken ? " dim" : "") + (t.id === selId ? " sel" : "") + (st && !hidden("miss") && missingOf(t).length ? " miss" : "");
     const dd = t.id === selId ? d + 8 : d;
     obst.push({x: q.x, y: q.y, r: dd / 2});
     h += '<div class="' + cls + '" style="width:' + dd + 'px;height:' + dd + 'px;transform:translate(' + (q.x - dd / 2) + 'px,' + (q.y - dd / 2) + 'px)"></div>';
@@ -1141,27 +1167,51 @@ function renderMarks(){
 function renderLegend(){
   if(!pkg){ $("legend").style.display = "none"; return; }
   $("legend").style.display = "";
+  // 項目を押すと図面での表示・非表示を切り替える（v43〜。設定はこのiPadに残る）
+  const it = (key, icon, label, off) => '<span class="lg' + (off ? " off" : "") + '" data-h="' + key + '">' + icon + label + '</span>';
+  const mk = (key, style, label) => it(key, '<i style="' + style + '"></i>', label, hidden(key));
+  const anyOff = Object.keys(opt.hide || {}).some(k => opt.hide[k]) || opt.range === false || opt.bnd === false;
   $("legend").innerHTML =
-    '<i style="border-color:var(--warn)"></i>未調査' +
-    '<i style="border-color:var(--ok);background:rgba(46,125,50,.35)"></i>調査済' +
-    '<i style="border-color:var(--pur);background:rgba(106,63,160,.3)"></i>要点検' +
-    '<i style="border-color:var(--acc);background:rgba(24,95,165,.55)"></i>点検済' +
-    '<i style="border-color:#222;background:rgba(0,0,0,.45)"></i>消失' +
-    '<i style="border-color:#999;border-style:dashed"></i>新木・番号なし' +
-    '<i style="border:none;background:var(--ng);width:9px;height:9px"></i>入力漏れ' +
-    '<br><i style="border-color:#555;border-style:dashed"></i>前回までに伐採・消失' +
-    ((pkg.map.range || []).length ? '<i style="border-radius:2px;border-color:rgba(200,30,30,.75);background:rgba(220,40,40,.1)"></i>調査範囲' +
-      '<i style="border-color:var(--warn);border-style:dotted;opacity:.5"></i>範囲の外' : "") +
-    ((pkg.map.boundary || []).length && opt.bnd !== false ? '<i style="border:none;border-radius:0;height:0;border-top:3px solid #11A63A;width:14px;vertical-align:middle"></i>公園の境界' : "") +
-    cutLegend();
+    mk("u", "border-color:var(--warn)", "未調査") +
+    mk("done", "border-color:var(--ok);background:rgba(46,125,50,.35)", "調査済") +
+    mk("need", "border-color:var(--pur);background:rgba(106,63,160,.3)", "要点検") +
+    mk("insp", "border-color:var(--acc);background:rgba(24,95,165,.55)", "点検済") +
+    mk("gone", "border-color:#222;background:rgba(0,0,0,.45)", "消失") +
+    mk("new", "border-color:#999;border-style:dashed", "新木・番号なし") +
+    mk("miss", "border:none;background:var(--ng);width:9px;height:9px", "入力漏れ") +
+    '<br>' + mk("pg", "border-color:#555;border-style:dashed", "前回までに伐採・消失") +
+    ((pkg.map.range || []).length ? it("range", '<i style="border-radius:2px;border-color:rgba(200,30,30,.75);background:rgba(220,40,40,.1)"></i>', "調査範囲", opt.range === false) +
+      mk("out", "border-color:var(--warn);border-style:dotted;opacity:.5", "範囲の外") : "") +
+    ((pkg.map.boundary || []).length ? it("bnd", '<i style="border:none;border-radius:0;height:0;border-top:3px solid #11A63A;width:14px;vertical-align:middle"></i>', "公園の境界", opt.bnd === false) : "") +
+    cutLegend() +
+    (anyOff ? '<span class="lgAll" data-h="*">すべて表示</span>' : "");
 }
-/* 凡例：要伐採・伐採推薦の本数（この地区） */
+/* 凡例：維持管理の処置（要伐採・伐採推薦・要剪定・剪定推薦）の本数（この地区）。0本の処置は出さない */
 function cutLegend(){
-  let a = 0, b = 0;
-  for(const t of allTrees()){ if(t.gone) continue; const k = cutOf(R.trees[t.id]); if(k) k.c ? b++ : a++; }
-  return (a ? '<b style="margin-left:8px;color:#fff;background:#C62828;border-radius:3px;padding:0 4px">要伐採</b> ' + a : "") +
-         (b ? '<b style="margin-left:8px;color:#fff;background:#0A7FE0;border-radius:3px;padding:0 4px">伐採推薦</b> ' + b : "");
+  const n = {};
+  for(const t of allTrees()){
+    if(t.gone) continue;
+    const r = R.trees[t.id];
+    if(!r || !r.kanri) continue;
+    const k = KANRI_TAGS.find(x => r.kanri[x.k]);      // 隠していても数える（札と同じ順で1本に1つ）
+    if(k) n[k.k] = (n[k.k] || 0) + 1;
+  }
+  const h = KANRI_TAGS.filter(x => n[x.k]).map(x => '<span class="lg' + (hidden("k_" + x.k) ? " off" : "") + '" data-h="k_' + x.k + '" style="margin-left:8px">' +
+    '<b style="color:#fff;background:' + x.col + ';border-radius:3px;padding:0 4px">' + x.t + '</b> ' + n[x.k] + '</span>').join("");
+  return h ? "<br>" + h : "";
 }
+$("legend").addEventListener("click", e => {
+  const el = e.target.closest("[data-h]"); if(!el) return;
+  const key = el.dataset.h;
+  opt.hide = opt.hide || {};
+  if(key === "*"){ opt.hide = {}; opt.range = true; opt.bnd = true; }
+  else if(key === "range" || key === "bnd") opt[key] = opt[key] === false;
+  else opt.hide[key] = !opt.hide[key];
+  lsSet("nagano_opt", opt);
+  $("rng").style.display = opt.range === false ? "none" : ""; $("bnd").style.display = opt.bnd === false ? "none" : "";
+  renderMarks();
+  toast(key === "*" ? "すべて表示しました" : (el.textContent.replace(/\s*\d+$/, "").trim() + (el.classList.contains("off") ? " を表示しました" : " を隠しました")));
+});
 
 /* ---- 指の操作 ---- */
 const ptrs = new Map();
@@ -1304,6 +1354,7 @@ document.addEventListener("touchmove", e => { if(e.touches.length > 1) e.prevent
 function nearestTree(sx, sy, lim){
   let best = null, bd = lim;
   for(const t of allTrees()){
+    if(!treeShown(t)) continue;
     const q = toScreen(posOf(t).x, posOf(t).y), d = Math.hypot(q.x - sx, q.y - sy);
     if(d < bd){ bd = d; best = t; }
   }
